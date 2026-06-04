@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --font-display: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --font-cormorant: "Cormorant Garamond", Georgia, serif;
+
+  --color-ink-950: #060a13;
+  --color-ink-900: #0b1120;
+  --color-ink-850: #0f172a;
+  --color-ink-800: #131c31;
+  --color-ink-700: #1e293b;
+  --color-ink-600: #334155;
+
+  --color-accent: #38bdf8;
+  --color-accent-soft: #0ea5e9;
+  --color-good: #34d399;
+  --color-bad: #f87171;
+  --color-warn: #fbbf24;
+
+  /* Poker palette */
+  --color-felt: #123524;
+  --color-felt-light: #1a4a32;
+  --color-felt-deep: #0b2218;
+  --color-pkred: #7a0019;
+  --color-pkred-light: #a30222;
+  --color-ivory: #f4ede4;
+  --color-pkblack: #0d0d0d;
+  --color-gold: #c9a227;
+  --color-gold-soft: #e2c563;
+}
+
+@keyframes pp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pp-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.pp-fade-up {
+  opacity: 0;
+  animation: pp-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.pp-float {
+  animation: pp-float 5s ease-in-out infinite;
+}
+
+/* A card sliding off the deck onto the felt. */
+@keyframes pp-deal {
+  from {
+    opacity: 0;
+    transform: translate(140px, -90px) rotate(14deg) scale(0.7);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0) scale(1);
+  }
+}
+
+.pp-deal {
+  animation: pp-deal 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A chip travelling from a player's seat into the pot. */
+@keyframes pp-chip-from-bottom {
+  0% {
+    opacity: 0;
+    transform: translateY(150px) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.9);
+  }
+}
+
+@keyframes pp-chip-from-top {
+  0% {
+    opacity: 0;
+    transform: translateY(-150px) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+
+.pp-chip-bottom {
+  animation: pp-chip-from-bottom 0.6s ease-in-out both;
+}
+.pp-chip-top {
+  animation: pp-chip-from-top 0.6s ease-in-out both;
+}
+
+/* Speech bubble pop. */
+@keyframes pp-bubble {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pp-bubble {
+  animation: pp-bubble 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Smooth fade for each cycled thinking message. */
+@keyframes pp-thought {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pp-thought {
+  animation: pp-thought 0.32s ease-out both;
+}
+
+/* Thinking dots. */
+@keyframes pp-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.pp-dot {
+  animation: pp-dot 1.2s infinite ease-in-out;
+}
+
+/* Soft pulsing glow for the active pot. */
+@keyframes pp-pot-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
+  }
+  50% {
+    box-shadow: 0 0 22px 2px rgba(201, 162, 39, 0.25);
+  }
+}
+
+.pp-pot-glow {
+  animation: pp-pot-glow 3.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-fade-up,
+  .pp-float,
+  .pp-deal,
+  .pp-chip-bottom,
+  .pp-chip-top,
+  .pp-bubble,
+  .pp-thought,
+  .pp-dot,
+  .pp-pot-glow {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(
+      1200px 800px at 50% -10%,
+      #16233f 0%,
+      transparent 55%
+    ),
+    var(--color-ink-950);
+  color: #e2e8f0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

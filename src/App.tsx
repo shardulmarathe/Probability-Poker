@@ -1,4 +1,5 @@
 import { Profiler, type ProfilerOnRenderCallback } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { Route, Routes } from "react-router-dom";
 import { GameProvider } from "./store/GameContext";
 import { commitAction } from "./lib/latency";
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="*" element={<Home />} />
         </Routes>
       </GameProvider>
+      <Analytics />
     </Profiler>
   );
 }

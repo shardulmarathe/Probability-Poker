@@ -16,7 +16,14 @@ import { useGame } from "../store/GameContext";
 import { PlayingCard } from "../components/PlayingCard";
 import { streetLabel } from "../poker/gameEngine";
 import { money, pct } from "../lib/format";
-import { ACTION_LIKELIHOODS, INITIAL_BELIEF, TIMELINE_SIMS } from "../data/constants";
+import {
+  ACTION_LIKELIHOODS,
+  INITIAL_BELIEF,
+  LEARNING_PRIOR_ALPHA,
+  LEARNING_PRIOR_DENOM,
+  TIMELINE_SIMS,
+} from "../data/constants";
+import { learnedActionLikelihoods } from "../poker/bayesian";
 import {
   HAND_CATEGORY_NAMES,
   HandCategory,
@@ -25,6 +32,7 @@ import {
   type BotDecision,
   type HandReport,
   type MonteCarloResult,
+  type OpponentModel,
   type PlayerActionType,
 } from "../types";
 
@@ -76,7 +84,7 @@ function num(v: number, digits = 3): string {
 // ===========================================================================
 
 export default function Analysis() {
-  const { history, latestReport, reportFor } = useGame();
+  const { history, latestReport, reportFor, game } = useGame();
   const params = useParams();
   const navigate = useNavigate();
 
@@ -201,6 +209,17 @@ export default function Analysis() {
               <BeliefChart evolution={report.beliefEvolution} />
               <HowCalculated label="How Bayesian Updating Works">
                 <BayesExplain evolution={report.beliefEvolution} />
+              </HowCalculated>
+            </Section>
+
+            <Section
+              title="Learned Opponent Model"
+              subtitle="Likelihoods learned from showdowns"
+              wide
+            >
+              <LearnedOpponentModel model={game.opponentModel} />
+              <HowCalculated label="How The Bot Learns Your Style">
+                <LearnedModelExplain model={game.opponentModel} />
               </HowCalculated>
             </Section>
 
@@ -1064,7 +1083,9 @@ function BayesExplain({ evolution }: { evolution: BeliefSnapshot[] }) {
 function BayesWorked({ snapshot }: { snapshot: BeliefSnapshot }) {
   const action = snapshot.triggerAction as PlayerActionType;
   const prior = snapshot.before;
-  const like = ACTION_LIKELIHOODS[action];
+  // Use the likelihoods actually applied for this update (the learned values),
+  // falling back to the defaults for older snapshots that predate learning.
+  const like = snapshot.likelihood ?? ACTION_LIKELIHOODS[action];
 
   const num_w = like.weak * prior.weak;
   const num_m = like.medium * prior.medium;
@@ -1122,6 +1143,154 @@ function BayesWorked({ snapshot }: { snapshot: BeliefSnapshot }) {
           <p className="mt-1 font-mono text-xs text-gold-soft">{tierRow(snapshot.after)}</p>
         </div>
       </div>
+    </>
+  );
+}
+
+// ===========================================================================
+// 6b. Learned Opponent Model
+// ===========================================================================
+
+const LEARNED_ACTIONS: { action: PlayerActionType; label: string }[] = [
+  { action: "raise", label: "Raise" },
+  { action: "call", label: "Call" },
+  { action: "bet", label: "Bet" },
+  { action: "check", label: "Check" },
+  { action: "fold", label: "Fold" },
+];
+
+const TIERS: { key: keyof OpponentModel; label: string; color: string }[] = [
+  { key: "weak", label: "Weak", color: COLORS.weak },
+  { key: "medium", label: "Medium", color: COLORS.medium },
+  { key: "strong", label: "Strong", color: COLORS.strong },
+];
+
+function LearnedOpponentModel({ model }: { model: OpponentModel }) {
+  const likelihoods = learnedActionLikelihoods(model);
+  const totalObserved = model.weak.total + model.medium.total + model.strong.total;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-3">
+        {TIERS.map((t) => (
+          <div
+            key={t.key}
+            className="rounded-xl border p-3 text-center"
+            style={{ borderColor: "rgba(244,237,228,0.14)", background: "rgba(0,0,0,0.25)" }}
+          >
+            <p className="text-xs uppercase tracking-wider" style={{ color: t.color }}>
+              {t.label} hands observed
+            </p>
+            <p className="mt-1 font-display text-2xl font-semibold text-ivory">
+              {model[t.key].total}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wider text-ivory/45">
+              <th className="py-2 pr-4">P(action | tier)</th>
+              {TIERS.map((t) => (
+                <th key={t.key} className="py-2 pr-4" style={{ color: t.color }}>
+                  {t.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="font-mono">
+            {LEARNED_ACTIONS.map(({ action, label }) => (
+              <tr key={action} className="border-t" style={{ borderColor: "rgba(244,237,228,0.1)" }}>
+                <td className="py-2.5 pr-4 font-sans text-ivory/80">P({label} | ·)</td>
+                {TIERS.map((t) => (
+                  <td key={t.key} className="py-2.5 pr-4 text-ivory">
+                    {pct(likelihoods[action][t.key])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-ivory/55">
+        {totalObserved === 0
+          ? "No showdowns observed yet — these are the Beta-prior starting values (~20% each). Play hands to the showdown and the bot will start adapting."
+          : `Updated from ${totalObserved} revealed hand${
+              totalObserved === 1 ? "" : "s"
+            }. The bot continuously updates these likelihoods after every showdown and uses them as priors for future Bayesian inference.`}
+      </p>
+    </div>
+  );
+}
+
+function LearnedModelExplain({ model }: { model: OpponentModel }) {
+  // Pick the tier with the most data to show a concrete worked example.
+  const richest = TIERS.reduce((best, t) =>
+    model[t.key].total > model[best.key].total ? t : best
+  , TIERS[0]);
+  const stats = model[richest.key];
+  const raiseP = (stats.raises + LEARNING_PRIOR_ALPHA) / (stats.total + LEARNING_PRIOR_DENOM);
+
+  return (
+    <>
+      <Heading>The idea</Heading>
+      <Lead>
+        Instead of fixed, hand-coded likelihoods, the bot <em>learns</em> how you
+        play. Whenever a hand reaches showdown your real cards are revealed, so it
+        can classify your true strength tier — <em>weak</em>, <em>medium</em>, or{" "}
+        <em>strong</em> — and record which actions you took. Those tallies persist
+        for the whole session and become the likelihoods used in every future
+        Bayesian update.
+      </Lead>
+
+      <Heading>Beta-prior smoothing</Heading>
+      <Lead>
+        Raw frequencies would swing wildly after one or two hands, so each
+        probability is smoothed with a Beta prior. Before any data, every action
+        sits at ~20%; observations pull it gradually toward the truth:
+      </Lead>
+      <Calc>
+        <div className="flex flex-wrap items-center gap-1">
+          P(action | tier) =
+          <Frac
+            n={<>handsWithAction + {LEARNING_PRIOR_ALPHA}</>}
+            d={<>handsObserved + {LEARNING_PRIOR_DENOM}</>}
+          />
+        </div>
+      </Calc>
+
+      <Heading>This session — {richest.label.toLowerCase()} hands</Heading>
+      {stats.total > 0 ? (
+        <Calc>
+          <div>
+            {richest.label} hands observed = {stats.total} &nbsp; raised in{" "}
+            {stats.raises} of them
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1">
+            P(Raise | {richest.label.toLowerCase()}) =
+            <Frac
+              n={<>{stats.raises} + {LEARNING_PRIOR_ALPHA}</>}
+              d={<>{stats.total} + {LEARNING_PRIOR_DENOM}</>}
+            />
+            = <span className="text-gold-soft">{pct(raiseP)}</span>
+          </div>
+        </Calc>
+      ) : (
+        <Lead>
+          No showdowns yet, so every likelihood is still at its ~20% prior. After
+          a few revealed hands these numbers start reflecting your real tendencies.
+        </Lead>
+      )}
+
+      <Why>
+        A raise from a player who keeps showing up with weak hands gets read very
+        differently from a raise by a tight player. By feeding observed behavior
+        back into P(action | tier), the bot adapts to <em>you</em> rather than
+        playing a fixed, generic model.
+      </Why>
     </>
   );
 }

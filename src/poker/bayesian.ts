@@ -1,9 +1,15 @@
-import { ACTION_LIKELIHOODS } from "../data/constants";
+import {
+  ACTION_LIKELIHOODS,
+  LEARNING_PRIOR_ALPHA,
+  LEARNING_PRIOR_DENOM,
+} from "../data/constants";
 import type {
   BeliefDistribution,
   Card,
+  OpponentModel,
   PlayerActionType,
   StrengthTier,
+  TierActionStats,
 } from "../types";
 
 /** Normalize a belief distribution so the three tiers sum to 1. */
@@ -15,18 +21,103 @@ export function normalize(b: BeliefDistribution): BeliefDistribution {
 
 /**
  * Bayesian update: posterior(tier) ∝ prior(tier) * P(action | tier).
- * The likelihoods come from the opponent-model table.
+ *
+ * The likelihood table defaults to the fixed `ACTION_LIKELIHOODS`, but callers
+ * pass the *learned* table (derived from observed player behavior) so the bot
+ * adapts to how this specific opponent actually plays.
  */
 export function updateBelief(
   prior: BeliefDistribution,
-  action: PlayerActionType
+  action: PlayerActionType,
+  likelihoods: Record<PlayerActionType, BeliefDistribution> = ACTION_LIKELIHOODS
 ): BeliefDistribution {
-  const like = ACTION_LIKELIHOODS[action];
+  const like = likelihoods[action];
   return normalize({
     weak: prior.weak * like.weak,
     medium: prior.medium * like.medium,
     strong: prior.strong * like.strong,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Learned opponent model
+// ---------------------------------------------------------------------------
+
+/** Maps an action type to its tally field on a `TierActionStats`. */
+const ACTION_STAT_KEY: Record<PlayerActionType, keyof TierActionStats> = {
+  raise: "raises",
+  call: "calls",
+  check: "checks",
+  fold: "folds",
+  bet: "bets",
+};
+
+function emptyTierStats(): TierActionStats {
+  return { total: 0, raises: 0, calls: 0, checks: 0, folds: 0, bets: 0 };
+}
+
+/** A fresh model with zero observations (falls back to ~20% per action). */
+export function createOpponentModel(): OpponentModel {
+  return {
+    weak: emptyTierStats(),
+    medium: emptyTierStats(),
+    strong: emptyTierStats(),
+  };
+}
+
+/**
+ * Beta-smoothed probability that the player takes `action` in a hand of this
+ * tier: (handsWithAction + α) / (handsObserved + denom). Each action is treated
+ * as an independent event, so these need not sum to 1 across actions.
+ */
+export function learnedLikelihood(
+  stats: TierActionStats,
+  action: PlayerActionType
+): number {
+  const count = stats[ACTION_STAT_KEY[action]];
+  return (count + LEARNING_PRIOR_ALPHA) / (stats.total + LEARNING_PRIOR_DENOM);
+}
+
+/** P(action | tier) across all three tiers for a single action. */
+export function actionLikelihoodAcrossTiers(
+  model: OpponentModel,
+  action: PlayerActionType
+): BeliefDistribution {
+  return {
+    weak: learnedLikelihood(model.weak, action),
+    medium: learnedLikelihood(model.medium, action),
+    strong: learnedLikelihood(model.strong, action),
+  };
+}
+
+/** Build the full learned likelihood table P(action | tier) from the model. */
+export function learnedActionLikelihoods(
+  model: OpponentModel
+): Record<PlayerActionType, BeliefDistribution> {
+  return {
+    check: actionLikelihoodAcrossTiers(model, "check"),
+    call: actionLikelihoodAcrossTiers(model, "call"),
+    bet: actionLikelihoodAcrossTiers(model, "bet"),
+    raise: actionLikelihoodAcrossTiers(model, "raise"),
+    fold: actionLikelihoodAcrossTiers(model, "fold"),
+  };
+}
+
+/**
+ * Record one revealed (showdown) hand into the model: bump the tier's hand
+ * count, then mark each action the player took during the hand. Actions are
+ * de-duplicated so a tally reflects "hands in which the action occurred."
+ */
+export function recordShowdownHand(
+  model: OpponentModel,
+  tier: StrengthTier,
+  actions: PlayerActionType[]
+): void {
+  const stats = model[tier];
+  stats.total += 1;
+  for (const action of new Set(actions)) {
+    stats[ACTION_STAT_KEY[action]] += 1;
+  }
 }
 
 /**

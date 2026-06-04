@@ -41,8 +41,10 @@ export const INITIAL_BELIEF: BeliefDistribution = {
 };
 
 /**
- * Likelihood of each player action given the opponent's true strength tier:
- * P(action | tier). Used directly in the Bayesian update.
+ * Default likelihood of each player action given the opponent's true strength
+ * tier: P(action | tier). These are the *fallback* values used before any hands
+ * have been observed. Once the learned opponent model has data it supplies the
+ * likelihoods instead (see `learnedActionLikelihoods` in `poker/bayesian.ts`).
  */
 export const ACTION_LIKELIHOODS: Record<
   PlayerActionType,
@@ -55,3 +57,17 @@ export const ACTION_LIKELIHOODS: Record<
   // Folding ends the hand; included for completeness only.
   fold: { weak: 0.8, medium: 0.15, strong: 0.05 },
 };
+
+/**
+ * Beta-prior smoothing for the learned opponent model. Each action's likelihood
+ * is computed as:
+ *
+ *   P(action | tier) = (handsWithAction + LEARNING_PRIOR_ALPHA)
+ *                      / (handsObserved + LEARNING_PRIOR_DENOM)
+ *
+ * With ALPHA = 2 and DENOM = 10 the prior belief (before any data) is ~20% for
+ * every action, and early hands nudge the estimate gently rather than swinging
+ * it wildly. As more showdowns accumulate, the observed frequencies dominate.
+ */
+export const LEARNING_PRIOR_ALPHA = 2;
+export const LEARNING_PRIOR_DENOM = 10;

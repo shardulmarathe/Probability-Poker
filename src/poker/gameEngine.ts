@@ -11,7 +11,13 @@ import { compareHands, evaluate } from "./handEvaluator";
 import {
   runFullKnowledgeMonteCarlo,
 } from "./monteCarlo";
-import { updateBelief } from "./bayesian";
+import {
+  createOpponentModel,
+  learnedActionLikelihoods,
+  recordShowdownHand,
+  tierOf,
+  updateBelief,
+} from "./bayesian";
 import { decideBotAction, type BotChoice } from "./botStrategy";
 import { getLegalActions, otherSeat } from "./betting";
 import { HandCategory } from "../types";
@@ -23,6 +29,7 @@ import type {
   HandResult,
   LegalAction,
   MonteCarloResult,
+  PlayerActionType,
   Seat,
   Street,
   TimelinePoint,
@@ -48,6 +55,7 @@ export function createInitialGame(): GameState {
     toAct: null,
     belief: { ...INITIAL_BELIEF },
     beliefEvolution: [],
+    opponentModel: createOpponentModel(),
     decisions: [],
     timeline: [],
     result: null,
@@ -80,6 +88,8 @@ export function startHand(state: GameState): GameState {
   state.currentBet = 0;
   state.acted = { player: false, bot: false };
   state.raisesThisStreet = 0;
+  // NOTE: state.opponentModel is intentionally NOT reset here — it accumulates
+  // across every hand of the session so the bot keeps learning the player.
   state.belief = { ...INITIAL_BELIEF };
   state.beliefEvolution = [
     {
@@ -87,6 +97,7 @@ export function startHand(state: GameState): GameState {
       triggerAction: null,
       before: { ...INITIAL_BELIEF },
       after: { ...INITIAL_BELIEF },
+      likelihood: null,
     },
   ];
   state.decisions = [];
@@ -149,16 +160,20 @@ export function applyPlayerAction(
 ): GameState {
   applyAction(state, "player", action);
 
-  // Bayesian belief update from the player's action.
+  // Bayesian belief update from the player's action, using the likelihoods
+  // learned from this opponent's past showdowns (falls back to defaults until
+  // any hands have been observed).
   if (state.status === "playing" || action.type === "fold") {
+    const likelihoods = learnedActionLikelihoods(state.opponentModel);
     const before = { ...state.belief };
-    const after = updateBelief(before, action.type);
+    const after = updateBelief(before, action.type, likelihoods);
     state.belief = after;
     state.beliefEvolution.push({
       street: state.street,
       triggerAction: action.type,
       before,
       after,
+      likelihood: { ...likelihoods[action.type] },
     });
   }
 
@@ -355,7 +370,27 @@ function resolveShowdown(state: GameState): void {
     cmp > 0 ? "player" : cmp < 0 ? "bot" : "split";
   const pot = settlePot(state, winner);
   state.toAct = null;
+
+  // The player's cards are now revealed: classify their true strength tier and
+  // fold every action they took this hand into the learned opponent model. This
+  // is what makes future Bayesian updates adapt to the player's real behavior.
+  learnFromShowdown(state);
+
   finishHand(state, winner, pot, "showdown", playerFinal, botFinal);
+}
+
+/**
+ * Update the persistent opponent model from a just-revealed hand. The player's
+ * hole cards give the ground-truth tier; the belief-evolution log gives the
+ * actions they took. Only ever called at showdown (folded hands stay hidden).
+ */
+function learnFromShowdown(state: GameState): void {
+  if (state.playerHole.length < 2) return;
+  const tier = tierOf(state.playerHole[0], state.playerHole[1]);
+  const actions = state.beliefEvolution
+    .filter((b) => b.triggerAction !== null)
+    .map((b) => b.triggerAction as PlayerActionType);
+  recordShowdownHand(state.opponentModel, tier, actions);
 }
 
 function finishHand(

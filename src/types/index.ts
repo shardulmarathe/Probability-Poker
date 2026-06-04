@@ -80,6 +80,38 @@ export interface BeliefSnapshot {
   triggerAction: PlayerActionType | null;
   before: BeliefDistribution;
   after: BeliefDistribution;
+  /**
+   * The likelihood row P(action | tier) actually used for this update. With the
+   * learned opponent model these change over time, so we record what was used
+   * (rather than re-deriving from a fixed table) to keep the analysis honest.
+   * Null for the initial prior snapshot.
+   */
+  likelihood?: BeliefDistribution | null;
+}
+
+// ----------------------------------------------------------------------------
+// Learned opponent model (adapts to the player's behavior across hands)
+// ----------------------------------------------------------------------------
+
+/**
+ * Per-tier behavioral tallies accumulated from revealed (showdown) hands.
+ * `total` counts hands observed in the tier; each action field counts hands of
+ * that tier in which the player took that action at least once. These feed
+ * Beta-smoothed likelihoods P(action | tier).
+ */
+export interface TierActionStats {
+  total: number;
+  raises: number;
+  calls: number;
+  checks: number;
+  folds: number;
+  bets: number;
+}
+
+export interface OpponentModel {
+  weak: TierActionStats;
+  medium: TierActionStats;
+  strong: TierActionStats;
 }
 
 // ----------------------------------------------------------------------------
@@ -204,6 +236,11 @@ export interface GameState {
 
   belief: BeliefDistribution;
   beliefEvolution: BeliefSnapshot[];
+  /**
+   * Cumulative learned model of the player's behavior. Persists across hands
+   * for the whole session — startHand never resets it; only a new game does.
+   */
+  opponentModel: OpponentModel;
   decisions: BotDecision[];
   timeline: TimelinePoint[];
 

@@ -1,0 +1,237 @@
+\documentclass[11pt]{article}
+
+% ---------------------------------------------------------------------------
+% Packages
+% ---------------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{bbm}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Math shortcuts
+% ---------------------------------------------------------------------------
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\newcommand{\SE}{\operatorname{SE}}
+\newcommand{\ind}{\mathbbm{1}}
+
+% A lightweight, non-formal way to set off the worked examples.
+\newcommand{\example}[1]{\smallskip\noindent\textit{Example.}\ #1\smallskip}
+
+\title{\textbf{The Probability Behind \emph{Probability Poker}}}
+\author{[Your Name] \\ \small First-Year Computer Science, Stanford University}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+\emph{Probability Poker} is a heads-up Texas Hold'em game I built so that the
+opponent bot makes every decision from probability theory rather than scripted
+poker rules. The bot reasons under uncertainty in four connected steps: it
+estimates its chance of winning by Monte Carlo simulation, maintains a Bayesian
+belief about my hand, \emph{learns} my personal tendencies from past hands, and
+finally chooses the action with the highest expected value. This paper explains
+the mathematics behind each step and how they chain together. I write
+$\Pr(\cdot)$ for probability and $\mathbb{E}[\cdot]$ for expectation.
+\end{abstract}
+
+% ===========================================================================
+\section{Monte Carlo Simulation: estimating equity}
+% ===========================================================================
+
+The number the bot most wants is its \emph{equity}, $p=\Pr(\text{it wins the
+hand})$. Computing $p$ exactly means averaging over every way the hidden cards
+could fall, and that space is huge: before the flop the opponent holds one of
+$\binom{50}{2}=1225$ possible two-card hands, and for each the remaining board
+can come $\binom{48}{5}=1{,}712{,}304$ ways---about $2\times10^{9}$ joint
+outcomes. Enumerating that on every decision is hopeless, so I estimate $p$ by
+sampling instead.
+
+The justification is the law of large numbers. I run $N$ independent simulated
+showdowns; in trial $s$ I deal random cards into the unknown slots (the
+opponent's hole cards and the undealt board), score both five-card hands, and
+record the indicator
+\begin{equation}
+X_s=\ind[\text{the bot's best hand beats the opponent's}].
+\end{equation}
+Each $X_s$ is Bernoulli$(p)$ and they are i.i.d., so the sample mean estimates
+$p$ (and the same tally gives losses and ties):
+\begin{equation}
+\hat p=\frac1N\sum_{s=1}^N X_s=\frac{\text{Wins}}{N},\qquad
+\hat q=\frac{\text{Losses}}{N},\qquad
+\widehat{\Pr}(\text{tie})=\frac{\text{Ties}}{N}.
+\end{equation}
+Because $\mathbb{E}[X_s]=p$, the estimator is unbiased: $\mathbb{E}[\hat p]=p$.
+By independence its variance is $\Var(\hat p)=p(1-p)/N$, so the standard error is
+\begin{equation}
+\SE(\hat p)=\sqrt{\frac{p(1-p)}{N}}\;\le\;\frac{1}{2\sqrt N},
+\end{equation}
+using $p(1-p)\le\tfrac14$. The intuition I find most useful is that the error
+falls like $1/\sqrt N$ \emph{no matter how complicated} the outcome space is---
+this is exactly why sampling beats enumeration here. To match accuracy to cost I
+run more trials when more is unknown (about $7000$ preflop) and fewer when
+little is left to chance (about $3000$ on the river). At $N=5000$ the error bound
+is roughly $\pm1.4$ percentage points, which is plenty to drive good decisions.
+
+One important detail connects this section to the next: I do \emph{not} draw the
+opponent's hand uniformly. I draw it from my current belief about their strength,
+so the simulation is weighted toward the hands I think they actually hold.
+
+% ===========================================================================
+\section{Bayesian Updating: reading the opponent's hand}\label{sec:bayes}
+% ===========================================================================
+
+Since the bot can't see my cards, it tracks a probability distribution over how
+strong my hand is, grouped into three hypotheses
+$H\in\{\text{weak},\text{medium},\text{strong}\}$, and revises it with Bayes'
+rule after every action I take.
+
+The \textbf{prior} $\Pr(H)$ is the belief before I act; at the start of a hand it
+is $(\Pr(\text{weak}),\Pr(\text{medium}),\Pr(\text{strong}))=(0.40,0.35,0.25)$.
+The \textbf{likelihood} $\Pr(A\mid H)$ is how often each action $A$ (check, call,
+bet, raise, fold) is taken with each strength; it encodes the intuition that a
+raise is far likelier from a strong hand than a weak one. The default raise row,
+for example, is $\Pr(\text{raise}\mid H)=(0.05,0.25,0.70)$. When I act, the bot
+updates to the \textbf{posterior} by
+\begin{equation}
+\Pr(H\mid A)=\frac{\Pr(A\mid H)\,\Pr(H)}{\Pr(A)}
+=\frac{\Pr(A\mid H)\,\Pr(H)}{\sum_{H'}\Pr(A\mid H')\,\Pr(H')},
+\label{eq:bayes}
+\end{equation}
+where the denominator $\Pr(A)=\sum_{H'}\Pr(A\mid H')\Pr(H')$ is the
+total-probability normalizer (the ``evidence'').
+
+\example{Suppose I raise from the starting prior. Multiplying each likelihood by
+its prior gives the unnormalized scores
+\[
+\text{weak}:0.05\times0.40=0.0200,\quad
+\text{medium}:0.25\times0.35=0.0875,\quad
+\text{strong}:0.70\times0.25=0.1750,
+\]
+which sum to $\Pr(\text{raise})=0.2825$. Normalizing yields the posterior
+\[
+\Pr(H\mid\text{raise})\approx(0.071,\ 0.310,\ 0.620).
+\]
+A single raise lifts the belief that I am strong from $25\%$ to about $62\%$ and
+drops ``weak'' from $40\%$ to $7\%$.}
+
+Each posterior becomes the prior for my next action, so a hand's belief is just a
+running product of likelihoods that sharpens as I reveal more through my betting.
+Crucially, this belief is the very distribution the Monte Carlo of Section~1 uses
+to sample my hand---so when the bot reads me as strong, its estimated equity
+drops automatically.
+
+% ===========================================================================
+\section{Learned Opponent Modeling: adapting across hands}
+% ===========================================================================
+
+The likelihood table above is a fixed guess about a \emph{generic} player. What
+makes the bot interesting is that it \emph{learns} my personal likelihoods from
+data. Every time a hand goes to showdown my cards are revealed, so the bot can
+label my true strength tier and record which actions I took. Across many hands it
+accumulates two counts per tier $T$: $n_T$, how many revealed hands were of that
+tier, and $k_{a,T}$, how many of those involved action $a$.
+
+The naive estimate $k_{a,T}/n_T$ is useless early on---a single hand would force a
+probability to $0$ or $1$. So I smooth it with a \textbf{Beta prior}, treating
+``did I take action $a$ on a tier-$T$ hand?'' as a Bernoulli with rate $\theta$
+and putting a $\mathrm{Beta}(\alpha,\beta)$ prior on $\theta$ with $\alpha=2$ and
+$\alpha+\beta=10$. Since the Beta is conjugate to the Bernoulli, the posterior
+after the data is $\mathrm{Beta}(k_{a,T}+2,\,n_T-k_{a,T}+8)$, and its mean is the
+likelihood the bot actually plugs into Equation~\eqref{eq:bayes}:
+\begin{equation}
+\Pr(a\mid T)=\frac{k_{a,T}+\alpha}{n_T+(\alpha+\beta)}
+=\frac{k_{a,T}+2}{n_T+10}.
+\label{eq:smooth}
+\end{equation}
+This formula is satisfying because it behaves correctly at both extremes. With no
+data ($n_T=k_{a,T}=0$) every action starts at $2/10=0.20$, a neutral prior; as
+$n_T\to\infty$ it converges to the empirical frequency $k_{a,T}/n_T$, so the prior
+fades exactly as real evidence accumulates.
+
+\example{Suppose I keep reaching showdown having raised with weak hands. After
+$15$ such hands,
+\[
+\Pr(\text{raise}\mid\text{weak})=\frac{15+2}{15+10}=\frac{17}{25}=0.68,
+\]
+well above the $0.20$ default. Now a raise from me, run through
+Equation~\eqref{eq:bayes}, gives $\Pr(\text{weak}\mid\text{raise})\approx0.64$
+instead of the $\approx0.07$ the generic table produced. The bot has learned that
+\emph{I} bluff-raise and reinterprets the identical action accordingly.}
+
+So there are two timescales of inference working together: a fast belief update
+\emph{within} a hand via Equation~\eqref{eq:bayes}, and a slow likelihood update
+\emph{across} hands via Equation~\eqref{eq:smooth} that continually re-trains the
+first.
+
+% ===========================================================================
+\section{Expected Value: choosing an action}
+% ===========================================================================
+
+Win probability alone can't decide a bet: a $30\%$ call is correct when the pot is
+large, while an $80\%$ call can lose money at a bad price. The bot therefore ranks
+actions by \textbf{expected value}, the average chip result $\mathbb{E}[O]=\sum_i
+o_i\Pr(o_i)$, in a forward-looking form where money already in the pot is sunk and
+only what I risk \emph{now} matters. With win probability $p$, loss probability
+$q$, pot $P$, amount to call $c_{\text{call}}$, and an action of immediate cost
+$\mathrm{cost}$ whose amount beyond a call is $\mathrm{extra}=\max(0,\,
+\mathrm{cost}-c_{\text{call}})$, the unifying formula (ties are chip-neutral) is
+\begin{equation}
+\mathbb{E}[\text{action}]=p\,(P+\mathrm{extra})-q\cdot\mathrm{cost}.
+\label{eq:ev}
+\end{equation}
+Specializing to each legal action,
+\begin{align}
+\mathbb{E}[\text{Fold}]&=0, &
+\mathbb{E}[\text{Check}]&=p\,P, &
+\mathbb{E}[\text{Call}]&=p\,P-q\,c_{\text{call}},\\
+\mathbb{E}[\text{Bet}]&=p\,(P+\mathrm{cost})-q\cdot\mathrm{cost}, &
+\mathbb{E}[\text{Raise}]&=p\,(P+\mathrm{extra})-q\cdot\mathrm{cost}. &&
+\end{align}
+Fold is the zero baseline, which is what makes folding ever correct: an action is
+worth taking only if its EV clears $0$. The formula also reproduces standard
+poker theory---requiring $\mathbb{E}[\text{Call}]=p\,P-q\,c_{\text{call}}>0$
+rearranges to the familiar pot-odds rule
+\begin{equation}
+\frac{p}{q}>\frac{c_{\text{call}}}{P}.
+\end{equation}
+The bot then plays the maximizer, $a^\star=\argmax_a \mathbb{E}[a]$.
+
+\example{Facing a \$10 bet into a \$30 pot, the simulation returns $p=0.35$,
+$q=0.62$. A call has $\mathrm{cost}=c_{\text{call}}=10$, so
+$\mathbb{E}[\text{Call}]=0.35(30)-0.62(10)=+\$4.3$; a raise to \$20 has
+$\mathrm{cost}=20$ and $\mathrm{extra}=10$, so
+$\mathbb{E}[\text{Raise}]=0.35(40)-0.62(20)=+\$1.6$; and
+$\mathbb{E}[\text{Fold}]=0$. Since $\argmax\{0,\,4.3,\,1.6\}$ is the call, the bot
+calls.}
+
+This is where the whole pipeline closes: the $p$ and $q$ in Equation~\eqref{eq:ev}
+come from the belief-weighted Monte Carlo, the belief comes from Bayesian updating,
+and the likelihoods driving that update are themselves learned from past hands.
+
+% ===========================================================================
+\section*{Reflection}
+% ===========================================================================
+
+Building \emph{Probability Poker} changed how I think about probability. Coming in
+as a first-year CS student, I knew the formulas in isolation, but implementing
+them forced me to see how they depend on one another: a posterior is only as good
+as its likelihoods, an equity estimate is only as good as the distribution it
+samples from, and a decision is only as good as the probabilities feeding it.
+Three lessons stuck with me. First, sampling is a genuinely powerful idea---the
+$1/\sqrt N$ error bound meant I could trade a hopeless $10^9$-term sum for a few
+thousand random trials and still act with confidence. Second, Bayesian updating
+made ``learning'' concrete: priors are humility, likelihoods are evidence, and the
+Beta-smoothed counts let the bot start cautious and grow certain only as data
+earned it. Third, and most importantly, I learned that good decisions under
+uncertainty are not about being sure---they are about combining imperfect beliefs
+with the stakes of each choice, which is exactly what expected value does. The bot
+never knows my cards, yet by chaining estimation, inference, learning, and
+$\argmax$ it plays well anyway, and a little better every hand it watches.
+
+\end{document}

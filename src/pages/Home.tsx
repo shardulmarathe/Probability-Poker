@@ -43,14 +43,6 @@ export default function Home() {
       <FeltBackground />
 
       <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col px-6 py-[clamp(0.75rem,2.5vh,1.75rem)]">
-        {/* Top label */}
-        <p
-          className="pp-fade-up text-center font-mono text-xs uppercase tracking-[0.4em] text-gold/80"
-          style={{ animationDelay: "0ms" }}
-        >
-          Stanford Probability Project
-        </p>
-
         {/* Hero */}
         <div className="grid flex-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
           {/* Left: copy */}
@@ -310,17 +302,17 @@ function FeltBackground() {
             "radial-gradient(120% 100% at 50% 45%, transparent 55%, rgba(0,0,0,0.55) 100%)",
         }}
       />
-      {/* Corner suit symbols — fully contained, subtle */}
-      <span className="absolute left-4 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.04]">
+      {/* Corner suit symbols — fully contained, subtle watermark */}
+      <span className="absolute left-4 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.14]">
         {"\u2660"}
       </span>
-      <span className="absolute right-5 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.07]">
+      <span className="absolute right-5 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.22]">
         {"\u2665"}
       </span>
-      <span className="absolute bottom-2 left-5 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.07]">
+      <span className="absolute bottom-2 left-5 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.22]">
         {"\u2666"}
       </span>
-      <span className="absolute bottom-2 right-4 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.04]">
+      <span className="absolute bottom-2 right-4 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.14]">
         {"\u2663"}
       </span>
     </div>

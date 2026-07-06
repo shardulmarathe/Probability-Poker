@@ -39,12 +39,12 @@ const CONCEPTS: Concept[] = [
 
 export default function Home() {
   return (
-    <main className="relative h-[100svh] overflow-hidden bg-pkblack font-sans text-ivory">
+    <main className="relative min-h-[100svh] overflow-x-hidden bg-pkblack font-sans text-ivory">
       <FeltBackground />
 
-      <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col px-6 py-[clamp(0.75rem,2.5vh,1.75rem)]">
+      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col px-4 py-[clamp(1rem,2.5vh,1.75rem)] sm:px-6">
         {/* Hero */}
-        <div className="grid flex-1 items-center gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="grid flex-1 items-center gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12">
           {/* Left: copy */}
           <div className="text-center lg:text-left">
             <h1
@@ -126,7 +126,7 @@ export default function Home() {
 function Matchup() {
   return (
     <div
-      className="relative w-full max-w-lg rounded-3xl border border-gold/20 px-7 py-9 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]"
+      className="relative w-full max-w-lg rounded-3xl border border-gold/20 px-4 py-6 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] sm:px-7 sm:py-9"
       style={{
         background:
           "radial-gradient(120% 100% at 50% 0%, #1a4a32 0%, #123524 45%, #0b2218 100%)",
@@ -191,8 +191,8 @@ function Seat({
   cards: ReactNode;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-3.5">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full border border-gold/40 bg-felt-deep text-4xl shadow-inner">
+    <div className="flex flex-1 flex-col items-center gap-2.5 sm:gap-3.5">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40 bg-felt-deep text-3xl shadow-inner sm:h-16 sm:w-16 sm:text-4xl">
         {avatar}
       </div>
       <div className="text-center leading-tight">
@@ -236,7 +236,7 @@ function FloatCard({
 function ConceptCard({ concept, delay }: { concept: Concept; delay: number }) {
   return (
     <div
-      className="pp-fade-up group relative flex min-h-[9.5rem] flex-col overflow-hidden rounded-2xl border border-gold/15 bg-pkblack/40 p-5 backdrop-blur-sm transition-colors duration-200 hover:border-gold/40"
+      className="pp-fade-up group relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-2xl border border-gold/15 bg-pkblack/40 p-4 backdrop-blur-sm transition-colors duration-200 hover:border-gold/40 sm:min-h-[9.5rem] sm:p-5"
       style={{ animationDelay: `${delay}ms` }}
     >
       {/* suit watermark */}

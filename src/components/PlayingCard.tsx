@@ -4,12 +4,20 @@ import type { Card } from "../types";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
+// Card dimensions are fluid: they shrink on narrow phones (so rows of cards
+// never overflow) and settle at their full size on larger screens. Corner
+// pips are sized in `em`, so they scale automatically with the card's font.
 const SIZES: Record<Size, string> = {
-  sm: "h-12 w-9 text-base rounded-lg",
-  md: "h-24 w-[4.25rem] text-3xl rounded-xl",
-  lg: "h-28 w-20 text-4xl rounded-2xl",
-  xl: "h-36 w-[6.5rem] text-5xl rounded-2xl",
+  sm: "h-[clamp(2.75rem,9vw,3rem)] w-[clamp(2rem,6.7vw,2.25rem)] text-[clamp(0.75rem,2.4vw,1rem)] rounded-lg",
+  md: "h-[clamp(4.5rem,15vw,6rem)] w-[clamp(3.25rem,10.8vw,4.25rem)] text-[clamp(1.25rem,4.6vw,1.875rem)] rounded-lg sm:rounded-xl",
+  lg: "h-[clamp(5rem,17vw,7rem)] w-[clamp(3.5rem,12.2vw,5rem)] text-[clamp(1.4rem,5.2vw,2.25rem)] rounded-xl sm:rounded-2xl",
+  xl: "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)] text-[clamp(1.5rem,5.6vw,3rem)] rounded-xl sm:rounded-2xl",
 };
+
+// The card size used for empty community-card placeholders on the table — kept
+// in sync with the `xl` card footprint above so slots and cards line up.
+export const XL_CARD_BOX =
+  "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)]";
 
 interface PlayingCardProps {
   card?: Card;

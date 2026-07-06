@@ -95,7 +95,7 @@ export default function Analysis() {
   return (
     <main className="relative min-h-[100svh] text-ivory">
       <FeltBackground />
-      <div className="relative z-10 mx-auto max-w-6xl px-4 py-8">
+      <div className="relative z-10 mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-8">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
@@ -104,7 +104,7 @@ export default function Analysis() {
             >
               ← Back to table
             </Link>
-            <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-gold-soft">
+            <h1 className="mt-2 font-display text-[clamp(1.9rem,6vw,2.25rem)] font-bold tracking-tight text-gold-soft">
               Probability Analysis
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-ivory/55">
@@ -280,7 +280,7 @@ function Section({
 }) {
   return (
     <section
-      className={`rounded-2xl border p-6 shadow-xl ${wide ? "lg:col-span-2" : ""}`}
+      className={`rounded-2xl border p-4 shadow-xl sm:p-6 ${wide ? "lg:col-span-2" : ""}`}
       style={{
         borderColor: "rgba(201,162,39,0.28)",
         background:

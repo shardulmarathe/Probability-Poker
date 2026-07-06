@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useGame } from "../store/GameContext";
-import { PlayingCard } from "../components/PlayingCard";
+import { PlayingCard, XL_CARD_BOX } from "../components/PlayingCard";
 import { streetLabel } from "../poker/gameEngine";
 import { money } from "../lib/format";
 import type { ChipFx, ThinkStep } from "../store/GameContext";
@@ -25,15 +25,22 @@ export default function Game() {
   const playerIsDealer = game.dealer === "player";
 
   return (
-    <main className="relative min-h-[100svh] overflow-hidden text-ivory">
+    <main className="relative min-h-[100svh] overflow-x-hidden text-ivory">
       <FeltBackground />
 
-      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-5xl flex-col px-4 pb-6 pt-5">
+      <div
+        className="relative z-10 mx-auto flex min-h-[100svh] max-w-5xl flex-col px-3 pt-4 sm:px-4 sm:pt-5"
+        style={{
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+          paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
+          paddingRight: "max(0.75rem, env(safe-area-inset-right))",
+        }}
+      >
         <TopBar handNumber={game.handNumber} />
 
         {/* ---------------------------- Table ---------------------------- */}
         <div
-          className="relative mt-5 flex flex-1 flex-col justify-between rounded-[2.5rem] border p-6 shadow-2xl"
+          className="relative mt-4 flex flex-1 flex-col justify-between rounded-[1.5rem] border p-3 shadow-2xl sm:mt-5 sm:rounded-[2.5rem] sm:p-6"
           style={{
             borderColor: "rgba(201,162,39,0.35)",
             background:
@@ -64,10 +71,10 @@ export default function Game() {
           </div>
 
           {/* Center — street, pot, community */}
-          <div className="relative my-4 flex flex-col items-center gap-4">
+          <div className="relative my-3 flex flex-col items-center gap-3 sm:my-4 sm:gap-4">
             <div className="flex items-center gap-3">
               <span
-                className="rounded-full border px-4 py-1 font-display text-xs font-semibold uppercase tracking-[0.3em]"
+                className="rounded-full border px-3 py-1 font-display text-[0.65rem] font-semibold uppercase tracking-[0.25em] sm:px-4 sm:text-xs sm:tracking-[0.3em]"
                 style={{
                   borderColor: "rgba(201,162,39,0.4)",
                   color: "#e2c563",
@@ -79,21 +86,21 @@ export default function Game() {
             </div>
 
             <div
-              className="pp-pot-glow rounded-2xl border px-6 py-2 text-center"
+              className="pp-pot-glow rounded-2xl border px-4 py-2 text-center sm:px-6"
               style={{
                 borderColor: "rgba(201,162,39,0.45)",
                 background: "rgba(0,0,0,0.3)",
               }}
             >
-              <div className="text-[0.6rem] uppercase tracking-[0.35em] text-ivory/55">
+              <div className="text-[0.55rem] uppercase tracking-[0.3em] text-ivory/55 sm:text-[0.6rem] sm:tracking-[0.35em]">
                 Pot
               </div>
-              <div className="font-display text-3xl font-bold text-gold-soft">
+              <div className="font-display text-2xl font-bold text-gold-soft sm:text-3xl">
                 {money(game.pot)}
               </div>
             </div>
 
-            <div className="relative flex min-h-[9rem] items-center justify-center gap-3">
+            <div className="relative flex min-h-[clamp(4.5rem,19vw,9.5rem)] items-center justify-center gap-1.5 sm:gap-3">
               {[0, 1, 2, 3, 4].map((i) => {
                 const c = game.community[i];
                 const dealt = i < fx.dealtCount && !!c;
@@ -104,7 +111,7 @@ export default function Game() {
                 ) : (
                   <div
                     key={`s-${i}`}
-                    className="h-36 w-[6.5rem] rounded-2xl border border-dashed"
+                    className={`${XL_CARD_BOX} rounded-xl border border-dashed sm:rounded-2xl`}
                     style={{ borderColor: "rgba(244,237,228,0.14)" }}
                   />
                 );
@@ -196,14 +203,14 @@ function FeltBackground() {
 
 function TopBar({ handNumber }: { handNumber: number }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <Link
         to="/"
         className="font-display text-sm tracking-wide text-ivory/70 transition hover:text-ivory"
       >
         ← Probability Poker
       </Link>
-      <div className="flex items-center gap-3 text-xs">
+      <div className="flex items-center gap-2 text-xs sm:gap-3">
         <span
           className="rounded-lg border px-3 py-1.5 font-display tracking-widest text-gold-soft"
           style={{ borderColor: "rgba(201,162,39,0.35)", background: "rgba(0,0,0,0.25)" }}
@@ -282,9 +289,9 @@ function Seat({
   children: ReactNode;
 }) {
   const info = (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3">
       <div
-        className="flex h-14 w-14 items-center justify-center rounded-2xl border text-3xl transition"
+        className="flex h-11 w-11 items-center justify-center rounded-xl border text-2xl transition sm:h-14 sm:w-14 sm:rounded-2xl sm:text-3xl"
         style={{
           borderColor: active ? "#c9a227" : "rgba(244,237,228,0.2)",
           background: active ? "rgba(201,162,39,0.14)" : "rgba(0,0,0,0.3)",
@@ -308,10 +315,10 @@ function Seat({
     </div>
   );
 
-  const cards = <div className="flex gap-3">{children}</div>;
+  const cards = <div className="flex gap-1.5 sm:gap-3">{children}</div>;
 
   return (
-    <div className="relative flex items-center gap-5">
+    <div className="relative flex items-center gap-2 sm:gap-5">
       {thought ? (
         <ThoughtBubble step={thought} side={bubbleSide} />
       ) : (
@@ -402,7 +409,7 @@ function SpeechBubble({ text, side }: { text: string; side: "top" | "bottom" }) 
 function ThoughtBubble({ step, side }: { step: ThinkStep; side: "top" | "bottom" }) {
   const pos = side === "top" ? "bottom-full mb-3" : "top-full mt-3";
   return (
-    <div className={`pp-bubble absolute left-1/2 z-20 w-[16rem] -translate-x-1/2 ${pos}`}>
+    <div className={`pp-bubble absolute left-1/2 z-20 w-[min(16rem,78vw)] -translate-x-1/2 ${pos}`}>
       <div
         className="rounded-2xl border px-4 py-3 shadow-xl"
         style={{
@@ -480,7 +487,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className={`min-w-[7.5rem] rounded-xl px-6 py-3 font-display text-sm font-semibold tracking-wide shadow-lg transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.04] hover:shadow-2xl focus:outline-none ${
+      className={`min-h-[44px] min-w-[6.5rem] rounded-xl px-5 py-3 font-display text-sm font-semibold tracking-wide shadow-lg transition-all duration-200 ease-out hover:-translate-y-1 hover:scale-[1.04] hover:shadow-2xl focus:outline-none sm:min-w-[7.5rem] sm:px-6 ${
         ACTION_STYLES[action.type] ?? "bg-black/30"
       }`}
     >
@@ -512,7 +519,7 @@ function EndOfHandModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
       <div
-        className="pp-bubble w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl"
+        className="pp-bubble w-full max-w-sm rounded-3xl border p-6 text-center shadow-2xl sm:p-8"
         style={{
           borderColor: "rgba(201,162,39,0.4)",
           background:

@@ -1,0 +1,51 @@
+name: Refresh OG screenshot
+
+# Re-captures the homepage screenshot used for link previews (og:image) after
+# every push and commits it back to public/og.png; that commit triggers the
+# Vercel deploy that actually serves the fresh image. This runs here instead
+# of inside the Vercel build because headless Chrome cannot launch in Vercel's
+# build container — the old in-build capture failed silently on every deploy.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: og-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    # GITHUB_TOKEN pushes don't retrigger workflows, but guard on the bot's
+    # commit message anyway so this can never loop.
+    if: ${{ !startsWith(github.event.head_commit.message, '[og-refresh]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run build
+      - run: OG_OUT=public/og.png node scripts/capture-og.mjs
+      - name: Commit the screenshot if it changed
+        run: |
+          git add public/og.png
+          if git diff --cached --quiet; then
+            echo "Screenshot unchanged — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "[og-refresh] Update homepage screenshot for link previews"
+          git pull --rebase origin ${{ github.ref_name }}
+          git push origin HEAD:${{ github.ref_name }}

@@ -47,5 +47,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "[og-refresh] Update homepage screenshot for link previews"
-          git pull --rebase origin ${{ github.ref_name }}
+          git pull --rebase --autostash origin ${{ github.ref_name }}
           git push origin HEAD:${{ github.ref_name }}

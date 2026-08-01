@@ -16,7 +16,7 @@ import {
   getLegalActions,
   startHand,
 } from "../poker/gameEngine";
-import { decideBotAction, type BotChoice } from "../poker/botStrategy";
+import { decideBotActionAsync, decisionSims } from "../poker/botStrategy";
 import { otherSeat } from "../poker/betting";
 import { beginAction } from "../lib/latency";
 import type { GameState, HandReport, LegalAction, Seat } from "../types";
@@ -73,11 +73,14 @@ const T = {
   dealStep: 230, // delay between each community card landing
   blindGap: 180, // gap between SB and BB chips
   // The bot's visible reasoning window. Each message lingers thinkStepMin..Max,
-  // and the whole sequence targets ~3.5–4.8s so it reads as deliberate work.
-  thinkStepMin: 700,
-  thinkStepMax: 1000,
-  thinkTotalMin: 3600,
-  thinkTotalMax: 4800,
+  // and the whole sequence targets ~1.2–1.8s. It used to be ~3.5–4.8s, sized to
+  // hide a Monte Carlo run that blocked the main thread; the run now happens in
+  // the worker pool, so this is purely a legibility beat and the old budget went
+  // into simulation count instead (see DECISION_SIMS).
+  thinkStepMin: 150,
+  thinkStepMax: 280,
+  thinkTotalMin: 1200,
+  thinkTotalMax: 1800,
 };
 
 /**
@@ -87,9 +90,7 @@ const T = {
  * probability, beliefs, and EV numbers — which would leak information to the
  * player. Only public/config facts (trial count, cards left to come) are shown.
  */
-function buildThinkingSteps(choice: BotChoice, unknownBoard: number): ThinkStep[] {
-  const sims = choice.decision.monteCarlo.simulations;
-
+function buildThinkingSteps(sims: number, unknownBoard: number): ThinkStep[] {
   const frames: { title: string; detail: string | null }[] = [
     {
       title: "Running simulations",
@@ -193,23 +194,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const performBot = useCallback(async () => {
     const g = gameRef.current;
 
-    // Compute the full decision up front. The heavy Monte Carlo work therefore
-    // runs *during* the visible thinking animation, and its real outputs feed
-    // the messages the player sees.
+    // Kick the decision off before the animation so the Monte Carlo actually
+    // overlaps the thinking beat instead of preceding it. It runs in the worker
+    // pool, so the main thread stays free to animate while it is in flight.
     const startedAt = performance.now();
     const next = structuredClone(g);
     const before = next.community.length;
-    const computeStart = performance.now();
-    const choice = decideBotAction(next);
-    const compute = performance.now() - computeStart;
-    beginAction(startedAt, {
-      mc: choice.timings.mc,
-      ev: choice.timings.ev,
-      compute,
-    });
+    // Stop the clock where the decision ends, not where the choreography does —
+    // the thinking beat is deliberate delay and would bury the number. Reporting
+    // happens later, next to the commit that renders this move, so the Profiler
+    // pairs it with the right render (see `beginAction` below).
+    const pendingChoice = decideBotActionAsync(next).then((choice) => ({
+      choice,
+      compute: performance.now() - startedAt,
+    }));
 
     // Walk the reasoning steps, each lingering long enough to read.
-    const steps = buildThinkingSteps(choice, 5 - g.community.length);
+    const steps = buildThinkingSteps(decisionSims(next), 5 - g.community.length);
     const target =
       T.thinkTotalMin + Math.random() * (T.thinkTotalMax - T.thinkTotalMin);
     const per = Math.min(
@@ -220,6 +221,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setThinking(s);
       await sleep(per);
     }
+
+    const { choice, compute } = await pendingChoice;
     setThinking(null);
 
     applyBotChoice(next, choice);
@@ -227,6 +230,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (choice.action.cost > 0) spawnChip("bot");
     await sleep(choice.action.cost > 0 ? T.chip : T.noChip);
 
+    // Arm the report immediately before the commit that renders the move: the
+    // next React commit is that one, so the Profiler attributes its render to
+    // this decision instead of to whatever thinking frame happened to be next.
+    beginAction({ mc: choice.timings.mc, ev: choice.timings.ev, compute });
     commit(next);
     await sleep(T.settle);
     setBotBubble(null);
@@ -262,55 +269,59 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 
   // ---- Public actions ------------------------------------------------------
+  /**
+   * Run one animated sequence at a time, and release the lock in `finally`. The
+   * lock has to survive a throw: anything escaping the sequence — a rejected
+   * decision, a worker that never answers — used to leave `busy` true and
+   * `thinking` set forever, which kills every control on the table for good.
+   */
+  const runExclusive = useCallback((seq: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    void (async () => {
+      try {
+        await seq();
+      } finally {
+        setThinking(null);
+        busyRef.current = false;
+        setBusy(false);
+      }
+    })();
+  }, []);
+
   const playerAct = useCallback(
     (action: LegalAction) => {
       if (busyRef.current) return;
       const g = gameRef.current;
       if (g.status !== "playing" || g.toAct !== "player") return;
-      busyRef.current = true;
-      setBusy(true);
-      void (async () => {
+      runExclusive(async () => {
         await performPlayer(action);
         await drive();
-        busyRef.current = false;
-        setBusy(false);
-      })();
+      });
     },
-    [drive, performPlayer]
+    [drive, performPlayer, runExclusive]
   );
 
   const nextHand = useCallback(() => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
-    void (async () => {
+    runExclusive(async () => {
       const next = structuredClone(gameRef.current);
       startHand(next);
       await beginHand(next);
-      busyRef.current = false;
-      setBusy(false);
-    })();
-  }, [beginHand]);
+    });
+  }, [beginHand, runExclusive]);
 
   const newGame = useCallback(() => {
     if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
     setHistory([]);
-    void (async () => {
-      await beginHand(freshGame());
-      busyRef.current = false;
-      setBusy(false);
-    })();
-  }, [beginHand]);
+    runExclusive(() => beginHand(freshGame()));
+  }, [beginHand, runExclusive]);
 
   // ---- Initial hand choreography (blinds + any first bot turn) -------------
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    busyRef.current = true;
-    setBusy(true);
-    void (async () => {
+    runExclusive(async () => {
       const g = gameRef.current;
       setDealtCount(0);
       spawnChip(g.dealer);
@@ -318,10 +329,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       spawnChip(otherSeat(g.dealer));
       await sleep(T.chip);
       await drive();
-      busyRef.current = false;
-      setBusy(false);
-    })();
-  }, [drive, spawnChip]);
+    });
+  }, [drive, runExclusive, spawnChip]);
 
   // ---- Archive + lazily enrich the hand report ----------------------------
   useEffect(() => {

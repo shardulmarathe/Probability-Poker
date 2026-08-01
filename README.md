@@ -70,7 +70,7 @@ src/
   store/        React context wiring the engine to the UI
   types/        shared domain types
 scripts/
-  simulate.ts   headless engine self-test (npx tsx scripts/simulate.ts)
+  profile.ts    engine benchmarks (npx tsx scripts/profile.ts)
 ```
 
 ## Rules & betting

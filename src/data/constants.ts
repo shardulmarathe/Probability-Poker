@@ -19,15 +19,21 @@ export const MAX_RAISES_PER_STREET = 4;
 export const MONTE_CARLO_SIMS = 5000;
 
 /**
- * Per-street sim counts for the bot's live in-hand decisions. Tuned for
- * responsiveness (< 500ms per decision) over precision — later streets need
+ * Per-street sim counts for the bot's live in-hand decisions. Later streets get
  * fewer samples because fewer cards remain unknown.
+ *
+ * These are ~6x what they were when a decision ran on the main thread. The run
+ * is now split four ways across the equity worker pool (`poker/equity/pool`),
+ * so preflop costs ~11ms wall clock in the browser instead of ~6ms, and ±0.25%
+ * on the equity estimate instead of ±0.60%. The ceiling is the machine that
+ * gets one worker and runs every shard serially: ~35ms here, still far inside
+ * the 250ms budget on hardware several times slower.
  */
 export const DECISION_SIMS: Record<Exclude<Street, "showdown">, number> = {
-  preflop: 7000,
-  flop: 7000,
-  turn: 5000,
-  river: 3000,
+  preflop: 40000,
+  flop: 40000,
+  turn: 30000,
+  river: 20000,
 };
 
 /** Sims for the post-hand probability timeline (kept light for snappy streets). */

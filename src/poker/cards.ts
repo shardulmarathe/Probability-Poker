@@ -55,15 +55,8 @@ export function makeDeck(): Card[] {
   return deck;
 }
 
-/** Fisher–Yates shuffle (returns a new array). */
-export function shuffle<T>(input: T[]): T[] {
-  const arr = input.slice();
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+// Shuffling lives on the Rng (see `core/rng.ts`). Keeping a second Math.random
+// copy here is what made hands unreproducible; call `rng.shuffle(makeDeck())`.
 
 /** Returns a new deck with the given cards removed. */
 export function removeCards(deck: Card[], used: Card[]): Card[] {

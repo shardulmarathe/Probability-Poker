@@ -3,11 +3,9 @@ import {
   HandCategory,
   type Card,
   type HandResult,
-  type Suit,
 } from "../types";
 
 const BASE = 15;
-const SUIT_INDEX: Record<Suit, number> = { s: 0, h: 1, d: 2, c: 3 };
 
 /** Fold a category plus up to 5 ordered kickers into a single comparable score. */
 function encode(category: HandCategory, kickers: number[]): number {
@@ -18,185 +16,223 @@ function encode(category: HandCategory, kickers: number[]): number {
   return score;
 }
 
-/**
- * High card of the best 5-card straight encoded in a 15-bit rank mask
- * (bit r set => rank r present), or 0. Handles the wheel (A-2-3-4-5).
- */
-function straightHigh(rankMask: number): number {
-  let m = rankMask;
-  // Treat the Ace (bit 14) as low (bit 1) as well.
-  if (m & (1 << 14)) m |= 1 << 1;
-  for (let high = 14; high >= 5; high--) {
-    if (((m >> (high - 4)) & 0x1f) === 0x1f) return high;
+// Place values of the base-15 score above, so the hot path can add a kicker
+// straight into its slot instead of running encode()'s loop.
+const P1 = BASE; // kicker 5
+const P2 = P1 * BASE; // kicker 4
+const P3 = P2 * BASE; // kicker 3
+const P4 = P3 * BASE; // kicker 2
+const P5 = P4 * BASE; // kicker 1 / category multiplier
+
+// ---------------------------------------------------------------------------
+// Lookup tables, keyed by a 13-bit rank mask (bit i set => rank i+2 present)
+// ---------------------------------------------------------------------------
+//
+// 13 bits is small enough to index directly, which turns every "scan the ranks
+// from the ace down" loop in the old evaluator into a single array load. Built
+// once at module load; ~96 KB total.
+
+const MASKS = 1 << 13;
+
+/** Rank (2..14) of the highest card in the mask, 0 for an empty mask. */
+const HIGH = new Uint8Array(MASKS);
+/** The same card as a one-bit mask, so it can be cleared without a shift. */
+const HIGH_BIT = new Uint16Array(MASKS);
+/** Number of distinct ranks in the mask — flush detection reads this. */
+const POP = new Uint8Array(MASKS);
+/** High card of the best straight in the mask, 0 if none. Includes the wheel. */
+const STRAIGHT = new Uint8Array(MASKS);
+/** Top 2 / 3 / 5 ranks as base-15 digits; callers scale them into their slot. */
+const KICK2 = new Uint8Array(MASKS);
+const KICK3 = new Uint16Array(MASKS);
+const KICK5 = new Uint32Array(MASKS);
+
+for (let mask = 1; mask < MASKS; mask++) {
+  const ranks: number[] = [];
+  for (let i = 12; i >= 0; i--) {
+    if (mask & (1 << i)) ranks.push(i + 2);
   }
-  return 0;
+
+  HIGH[mask] = ranks[0];
+  HIGH_BIT[mask] = 1 << (ranks[0] - 2);
+  POP[mask] = ranks.length;
+
+  // Built through encode() itself so the digit layout can't drift. HighCard is
+  // 0, so it contributes nothing and only the kickers survive; a mask with too
+  // few ranks pads with trailing zeros, exactly as encode() does.
+  KICK2[mask] = encode(HandCategory.HighCard, [0, 0, 0, ...ranks.slice(0, 2)]);
+  KICK3[mask] = encode(HandCategory.HighCard, [0, 0, ...ranks.slice(0, 3)]);
+  KICK5[mask] = encode(HandCategory.HighCard, ranks.slice(0, 5));
+
+  // Rank r lives at bit r-2, so a straight to `high` is 5 consecutive bits
+  // ending at high-2.
+  for (let high = 14; high >= 6; high--) {
+    const need = 0x1f << (high - 6);
+    if ((mask & need) === need) {
+      STRAIGHT[mask] = high;
+      break;
+    }
+  }
+  // The wheel (A-2-3-4-5) is the one straight that is not consecutive in bits.
+  if (STRAIGHT[mask] === 0 && (mask & 0x100f) === 0x100f) STRAIGHT[mask] = 5;
 }
 
 // ---------------------------------------------------------------------------
-// Memoized evaluation
+// Evaluation
 // ---------------------------------------------------------------------------
 
-const cache = new Map<number, HandResult>();
-const MAX_CACHE = 400_000;
+/**
+ * Suit char code -> suit index (s:0, h:1, d:2, c:3).
+ *
+ * INVARIANT: this must stay identical to `SUIT_INDEX`/`SUITS` in core/card.ts.
+ * It is a third copy only because indexing a typed array by char code beats a
+ * string-keyed property load in the per-card loop; importing the record would
+ * cost exactly what this table exists to avoid.
+ */
+const SUIT_OF_CHAR = new Uint8Array(128);
+SUIT_OF_CHAR[115] = 0; // s
+SUIT_OF_CHAR[104] = 1; // h
+SUIT_OF_CHAR[100] = 2; // d
+SUIT_OF_CHAR[99] = 3; // c
+
+/**
+ * Per-suit rank masks. Module-level so the hot path allocates nothing; JS is
+ * single-threaded and no evaluation yields, so reuse is safe.
+ */
+const SUIT_MASKS = new Int32Array(4);
 
 /**
  * Evaluate the best 5-card hand from 5, 6, or 7 cards.
  *
- * Results are memoized by a 52-bit card-set bitmask. This is a large win for
- * the Monte Carlo loops, where the bot's own hand is constant across every
- * roll-out on a complete board (and varies over only a handful of cards on the
- * turn), so most repeat evaluations become O(1) cache hits.
+ * No memoization: the direct path now costs less than the Map lookup (plus
+ * boxed-number key) that used to guard it, and it has no 400k-entry cliff.
  */
 export function evaluate(cards: Card[]): HandResult {
-  // counts[r] = number of cards of rank r (2..14)
-  const counts = new Uint8Array(15);
-  const suitCount = new Uint8Array(4);
-  const suitRankMask = new Uint16Array(4);
-  let rankMask = 0;
-  let key = 0;
-
+  SUIT_MASKS[0] = 0;
+  SUIT_MASKS[1] = 0;
+  SUIT_MASKS[2] = 0;
+  SUIT_MASKS[3] = 0;
   for (let i = 0; i < cards.length; i++) {
     const c = cards[i];
-    const si = SUIT_INDEX[c.suit];
-    counts[c.rank]++;
-    suitCount[si]++;
-    suitRankMask[si] |= 1 << c.rank;
-    rankMask |= 1 << c.rank;
-    // Card index 0..51 -> contribute a distinct power of two to the key.
-    key += 2 ** ((c.rank - 2) * 4 + si);
+    SUIT_MASKS[SUIT_OF_CHAR[c.suit.charCodeAt(0)]] |= 1 << (c.rank - 2);
   }
-
-  const hit = cache.get(key);
-  if (hit) return hit;
-
-  const res = classify(counts, suitCount, suitRankMask, rankMask);
-  if (cache.size >= MAX_CACHE) cache.clear();
-  cache.set(key, res);
-  return res;
+  return toResult(
+    scoreMasks(SUIT_MASKS[0], SUIT_MASKS[1], SUIT_MASKS[2], SUIT_MASKS[3])
+  );
 }
 
-function classify(
-  counts: Uint8Array,
-  suitCount: Uint8Array,
-  suitRankMask: Uint16Array,
-  rankMask: number
-): HandResult {
-  // Flush detection.
-  let flushSuit = -1;
-  for (let s = 0; s < 4; s++) {
-    if (suitCount[s] >= 5) {
-      flushSuit = s;
-      break;
+/**
+ * Score `count` integer-encoded cards (see core/card.ts). This is the hot path
+ * the Monte Carlo runs on: the score alone is enough to compare hands, and
+ * skipping the HandResult saves an allocation per call. Pair it with
+ * `categoryOf` when the category is also needed.
+ */
+export function scoreInts(cards: Uint8Array | number[], count: number): number {
+  SUIT_MASKS[0] = 0;
+  SUIT_MASKS[1] = 0;
+  SUIT_MASKS[2] = 0;
+  SUIT_MASKS[3] = 0;
+  for (let i = 0; i < count; i++) {
+    const c = cards[i];
+    SUIT_MASKS[c & 3] |= 1 << (c >> 2);
+  }
+  return scoreMasks(
+    SUIT_MASKS[0],
+    SUIT_MASKS[1],
+    SUIT_MASKS[2],
+    SUIT_MASKS[3]
+  );
+}
+
+/**
+ * The whole evaluator, in bit operations over the four per-suit rank masks.
+ * Category order matches the old branch ladder exactly.
+ */
+function scoreMasks(s0: number, s1: number, s2: number, s3: number): number {
+  // At most one suit can hold 5 of 7 cards, so the first hit is the flush.
+  let flush = 0;
+  if (POP[s0] >= 5) flush = s0;
+  else if (POP[s1] >= 5) flush = s1;
+  else if (POP[s2] >= 5) flush = s2;
+  else if (POP[s3] >= 5) flush = s3;
+
+  if (flush !== 0) {
+    const sf = STRAIGHT[flush];
+    if (sf !== 0) return HandCategory.StraightFlush * P5 + sf * P4;
+  }
+
+  // "Rank appears in at least k suits" masks. A rank is in >=3 suits iff it is
+  // in both of one pair of suits and in at least one of the other pair.
+  const u = s0 | s1;
+  const v = s2 | s3;
+  const both1 = s0 & s1;
+  const both2 = s2 & s3;
+  const m1 = u | v;
+  const m2 = both1 | both2 | (u & v);
+  const m3 = (both1 & v) | (both2 & u);
+  const m4 = both1 & both2;
+
+  if (m4 !== 0) {
+    const quadBit = HIGH_BIT[m4];
+    return (
+      HandCategory.FourOfAKind * P5 +
+      HIGH[m4] * P4 +
+      HIGH[m1 & ~quadBit] * P3
+    );
+  }
+
+  // With quads ruled out, m3 is exactly the trips.
+  const trip = HIGH[m3];
+  const tripBit = HIGH_BIT[m3];
+  if (trip !== 0) {
+    // A second trip plays as the pair, and m2 already contains it.
+    const under = m2 & ~tripBit;
+    if (under !== 0) {
+      return HandCategory.FullHouse * P5 + trip * P4 + HIGH[under] * P3;
     }
   }
 
-  // Straight flush.
-  if (flushSuit >= 0) {
-    const sfHigh = straightHigh(suitRankMask[flushSuit]);
-    if (sfHigh) return make(HandCategory.StraightFlush, [sfHigh]);
+  if (flush !== 0) return HandCategory.Flush * P5 + KICK5[flush];
+
+  const straight = STRAIGHT[m1];
+  if (straight !== 0) return HandCategory.Straight * P5 + straight * P4;
+
+  if (trip !== 0) {
+    return (
+      HandCategory.ThreeOfAKind * P5 + trip * P4 + KICK2[m1 & ~tripBit] * P2
+    );
   }
 
-  // Bucket ranks by count (high to low so collected ranks stay descending).
-  let quad = 0;
-  let trip1 = 0;
-  let trip2 = 0;
-  let pair1 = 0;
-  let pair2 = 0;
-  for (let r = 14; r >= 2; r--) {
-    const c = counts[r];
-    if (c === 4) quad = r;
-    else if (c === 3) {
-      if (trip1 === 0) trip1 = r;
-      else if (trip2 === 0) trip2 = r;
-    } else if (c === 2) {
-      if (pair1 === 0) pair1 = r;
-      else if (pair2 === 0) pair2 = r;
+  if (m2 !== 0) {
+    const pair1 = HIGH[m2];
+    const pair1Bit = HIGH_BIT[m2];
+    const rest = m2 & ~pair1Bit;
+    if (rest !== 0) {
+      // A third pair still supplies a kicker, so exclude only the two that play.
+      return (
+        HandCategory.TwoPair * P5 +
+        pair1 * P4 +
+        HIGH[rest] * P3 +
+        HIGH[m1 & ~pair1Bit & ~HIGH_BIT[rest]] * P2
+      );
     }
+    return HandCategory.Pair * P5 + pair1 * P4 + KICK3[m1 & ~pair1Bit] * P1;
   }
 
-  // Four of a kind.
-  if (quad) {
-    return make(HandCategory.FourOfAKind, [quad, highest(counts, quad, 0)]);
-  }
-
-  // Full house (trips + pair, or two sets of trips).
-  if (trip1 && (pair1 || trip2)) {
-    const pairRank = Math.max(pair1, trip2);
-    return make(HandCategory.FullHouse, [trip1, pairRank]);
-  }
-
-  // Flush.
-  if (flushSuit >= 0) {
-    return make(HandCategory.Flush, topFromMask(suitRankMask[flushSuit], 5));
-  }
-
-  // Straight.
-  const sHigh = straightHigh(rankMask);
-  if (sHigh) return make(HandCategory.Straight, [sHigh]);
-
-  // Three of a kind.
-  if (trip1) {
-    return make(HandCategory.ThreeOfAKind, [
-      trip1,
-      ...topRanks(counts, 2, trip1, 0),
-    ]);
-  }
-
-  // Two pair.
-  if (pair1 && pair2) {
-    return make(HandCategory.TwoPair, [
-      pair1,
-      pair2,
-      highest(counts, pair1, pair2),
-    ]);
-  }
-
-  // One pair.
-  if (pair1) {
-    return make(HandCategory.Pair, [pair1, ...topRanks(counts, 3, pair1, 0)]);
-  }
-
-  // High card.
-  return make(HandCategory.HighCard, topRanks(counts, 5, 0, 0));
+  return HandCategory.HighCard * P5 + KICK5[m1];
 }
 
-/** Highest rank with count > 0, skipping up to two excluded ranks. */
-function highest(counts: Uint8Array, exclude1: number, exclude2: number): number {
-  for (let r = 14; r >= 2; r--) {
-    if (counts[r] > 0 && r !== exclude1 && r !== exclude2) return r;
-  }
-  return 0;
+/**
+ * The category `encode` packed into a score: its leading base-15 digit. Lets a
+ * caller histogram a raw `scoreInts` result without building a `HandResult`.
+ */
+export function categoryOf(score: number): HandCategory {
+  return ((score / P5) | 0) as HandCategory;
 }
 
-/** Top `n` ranks (descending) with count > 0, skipping excluded ranks. */
-function topRanks(
-  counts: Uint8Array,
-  n: number,
-  exclude1: number,
-  exclude2: number
-): number[] {
-  const out: number[] = [];
-  for (let r = 14; r >= 2 && out.length < n; r--) {
-    if (counts[r] > 0 && r !== exclude1 && r !== exclude2) out.push(r);
-  }
-  return out;
-}
-
-/** Top `n` ranks (descending) set in a rank bitmask. */
-function topFromMask(mask: number, n: number): number[] {
-  const out: number[] = [];
-  for (let r = 14; r >= 2 && out.length < n; r--) {
-    if (mask & (1 << r)) out.push(r);
-  }
-  return out;
-}
-
-function make(category: HandCategory, kickers: number[]): HandResult {
-  return {
-    category,
-    score: encode(category, kickers),
-    name: HAND_CATEGORY_NAMES[category],
-  };
+function toResult(score: number): HandResult {
+  const category = categoryOf(score);
+  return { category, score, name: HAND_CATEGORY_NAMES[category] };
 }
 
 /**

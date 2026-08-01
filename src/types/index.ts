@@ -140,9 +140,25 @@ export interface LegalAction {
 
 export interface MonteCarloResult {
   simulations: number;
+  /**
+   * Raw outcome counts. Kept alongside the probabilities because they are the
+   * sufficient statistics: the confidence interval needs the actual successes
+   * (not a rounded probability), and partial runs are merged by summing these.
+   */
+  wins: number;
+  losses: number;
+  ties: number;
   pWin: number;
   pLoss: number;
   pTie: number;
+  /**
+   * Sampling error on pWin. `se` is the Wald error the writeup derives;
+   * `ciWin` is the 95% Wilson interval, which stays honest at pWin = 0 or 1
+   * where the Wald error collapses to zero. Both are shown so the difference
+   * is visible rather than hidden.
+   */
+  se: number;
+  ciWin: { lo: number; hi: number };
   /** Distribution of the evaluated player's final made-hand category. */
   categoryFrequencies: Record<HandCategory, number>;
 }
@@ -183,6 +199,13 @@ export interface TimelinePoint {
 
 export interface HandReport {
   handNumber: number;
+  /**
+   * The seed this hand was dealt from. Every card and every bot decision is a
+   * deterministic function of it, so a hand can be replayed exactly from this
+   * number alone — which is what makes hands shareable and analysis
+   * reproducible.
+   */
+  seed: number;
   playerHole: Card[];
   botHole: Card[];
   community: Card[];
@@ -210,6 +233,8 @@ export interface HandReport {
 // ----------------------------------------------------------------------------
 
 export interface GameState {
+  /** Session seed. Each hand's seed is derived from this plus its hand number. */
+  seed: number;
   handNumber: number;
   playerBankroll: number;
   botBankroll: number;

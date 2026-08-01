@@ -6,7 +6,8 @@ import {
   STARTING_BANKROLL,
   TIMELINE_SIMS,
 } from "../data/constants";
-import { makeDeck, removeCards, shuffle } from "./cards";
+import { makeDeck, removeCards } from "./cards";
+import { hashSeed, makeRng } from "./core/rng";
 import { compareHands, evaluate } from "./handEvaluator";
 import {
   runFullKnowledgeMonteCarlo,
@@ -35,8 +36,25 @@ import type {
   TimelinePoint,
 } from "../types";
 
-export function createInitialGame(): GameState {
+/**
+ * The seed a single hand is dealt from. Derived rather than stored so any hand
+ * of a session can be reconstructed from the session seed and its number alone.
+ */
+export function handSeed(sessionSeed: number, handNumber: number): number {
+  return hashSeed(sessionSeed, handNumber);
+}
+
+/**
+ * Entropy enters the engine here and nowhere else — everything downstream is a
+ * deterministic function of this seed. Tests and hand replays pass one in.
+ */
+function randomSeed(): number {
+  return (Date.now() ^ (Math.random() * 0x100000000)) >>> 0;
+}
+
+export function createInitialGame(seed: number = randomSeed()): GameState {
   const state: GameState = {
+    seed,
     handNumber: 0,
     playerBankroll: STARTING_BANKROLL,
     botBankroll: STARTING_BANKROLL,
@@ -75,7 +93,7 @@ export function startHand(state: GameState): GameState {
   state.handNumber += 1;
   state.dealer = state.handNumber === 1 ? "player" : otherSeat(state.dealer);
 
-  const deck = shuffle(makeDeck());
+  const deck = makeRng(handSeed(state.seed, state.handNumber)).shuffle(makeDeck());
   state.playerHole = [deck[0], deck[1]];
   state.botHole = [deck[2], deck[3]];
   state.community = [];
@@ -429,6 +447,7 @@ function buildReport(
 ): HandReport {
   return {
     handNumber: state.handNumber,
+    seed: handSeed(state.seed, state.handNumber),
     playerHole: cloneCards(state.playerHole),
     botHole: cloneCards(state.botHole),
     community: cloneCards(state.community),
@@ -449,9 +468,14 @@ function buildReport(
 function emptyMonteCarlo(): MonteCarloResult {
   return {
     simulations: 0,
+    wins: 0,
+    losses: 0,
+    ties: 0,
     pWin: 0,
     pLoss: 0,
     pTie: 0,
+    se: 0,
+    ciWin: { lo: 0, hi: 1 },
     categoryFrequencies: {
       [HandCategory.HighCard]: 0,
       [HandCategory.Pair]: 0,
@@ -478,6 +502,10 @@ function emptyMonteCarlo(): MonteCarloResult {
 export function generateAnalysis(report: HandReport): HandReport {
   const { playerHole, botHole, community } = report;
 
+  // One stream for the whole report, derived from the hand's own seed, so the
+  // analysis of a given hand is identical every time it is regenerated.
+  const rng = makeRng(hashSeed(report.seed, 0xa1));
+
   // Timeline: one point per street that was reached.
   const timeline: TimelinePoint[] = [];
   const streets: [TimelinePoint["street"], number][] = [
@@ -495,7 +523,8 @@ export function generateAnalysis(report: HandReport): HandReport {
       botHole,
       board,
       pool,
-      TIMELINE_SIMS
+      TIMELINE_SIMS,
+      rng
     );
     timeline.push({
       street: label,
@@ -512,7 +541,8 @@ export function generateAnalysis(report: HandReport): HandReport {
     botHole,
     [],
     preflopPool,
-    MONTE_CARLO_SIMS
+    MONTE_CARLO_SIMS,
+    rng
   );
 
   return { ...report, timeline, monteCarlo, analysisReady: true };

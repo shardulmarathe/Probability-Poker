@@ -5,8 +5,8 @@ import {
   startHand,
 } from "../src/poker/gameEngine";
 import { decideBotAction } from "../src/poker/botStrategy";
-import { cardLabel } from "../src/poker/cards";
-import { makeDeck, shuffle } from "../src/poker/cards";
+import { cardLabel, makeDeck } from "../src/poker/cards";
+import { makeRng } from "../src/poker/core/rng";
 import { INITIAL_BELIEF } from "../src/data/constants";
 import type { GameState, Street } from "../src/types";
 
@@ -16,8 +16,8 @@ function round(n: number): number {
 
 /** Build a realistic state with the bot to act, facing a bet, at a street. */
 function stateAt(street: Exclude<Street, "showdown">): GameState {
-  const g = startHand(createInitialGame());
-  const deck = shuffle(makeDeck());
+  const g = startHand(createInitialGame(0xbeef));
+  const deck = makeRng(0xbeef).shuffle(makeDeck());
   // Deterministic-ish: give the bot a hand and lay out a board.
   g.botHole = [deck[0], deck[1]];
   g.playerHole = [deck[2], deck[3]];

@@ -58,7 +58,10 @@ interface Counts {
   sims: number;
 }
 
-/** Reconstruct integer win/loss/tie counts from stored probabilities. */
+/**
+ * Reconstruct integer win/loss/tie counts from stored probabilities. Only the
+ * timeline needs this — it records probabilities alone.
+ */
 function countsFrom(pWin: number, pLoss: number, pTie: number, sims: number): Counts {
   const wins = Math.round(pWin * sims);
   const losses = Math.round(pLoss * sims);
@@ -67,7 +70,13 @@ function countsFrom(pWin: number, pLoss: number, pTie: number, sims: number): Co
 }
 
 function mcCounts(mc: MonteCarloResult): Counts {
-  return countsFrom(mc.pWin, mc.pLoss, mc.pTie, mc.simulations);
+  // The real tallies, not a round-trip through the probabilities.
+  return {
+    wins: mc.wins,
+    losses: mc.losses,
+    ties: mc.ties,
+    sims: mc.simulations,
+  };
 }
 
 /** Win equity using the (wins + ½·ties) / sims convention. */
@@ -714,11 +723,29 @@ function MonteCarloExplain({ report }: { report: HandReport }) {
           = <span className="text-gold-soft">{pct(equity(c))}</span>
         </div>
       </Calc>
+      <Heading>How precise is that estimate?</Heading>
+      <Lead>
+        Every simulation is one Bernoulli trial, so the estimate carries
+        sampling error. The standard error is{" "}
+        <span className="font-mono text-gold-soft">√(p(1−p)/N)</span>, which
+        here is {(mc.se * 100).toFixed(2)} percentage points. The worst case
+        over any p is ±{(100 / Math.sqrt(Math.max(c.sims, 1))).toFixed(1)}{" "}
+        points, since p(1−p) peaks at p = ½.
+      </Lead>
+      <Calc>
+        95% confidence interval for P(win):
+        <div className="mt-2 text-gold-soft">
+          [{pct(mc.ciWin.lo)}, {pct(mc.ciWin.hi)}]
+        </div>
+      </Calc>
       <Why>
-        With ~{c.sims.toLocaleString()} samples the estimate is accurate to
-        roughly ±{(100 / Math.sqrt(Math.max(c.sims, 1))).toFixed(1)} percentage
-        points — precise enough to drive every betting decision while staying
-        fast enough to feel instant.
+        That interval is the <em>Wilson</em> score interval, not the textbook
+        p ± 1.96·SE. The difference matters at the edges: by a decided river the
+        estimate reaches exactly 0% or 100% — where the timeline above ends —
+        and the standard error collapses to zero, claiming perfect certainty
+        from a finite sample. The number on this card is the preflop run, so it
+        never sits at an edge, but Wilson is what the bot's precision is judged
+        by on every street, because it stays honest when one does.
       </Why>
     </>
   );

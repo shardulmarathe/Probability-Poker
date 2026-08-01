@@ -1,8 +1,12 @@
-import { makeDeck, removeCards, shuffle } from "../src/poker/cards";
+import { makeDeck, removeCards } from "../src/poker/cards";
+import { makeRng } from "../src/poker/core/rng";
 import { evaluate } from "../src/poker/handEvaluator";
 import { runBeliefMonteCarlo } from "../src/poker/monteCarlo";
 import { DECISION_SIMS, INITIAL_BELIEF } from "../src/data/constants";
 import type { Card } from "../src/types";
+
+// Fixed seed so successive benchmark runs measure the same work.
+const rng = makeRng(0xbeef);
 
 function bench(label: string, fn: () => void, iters = 1): number {
   // warm up
@@ -17,7 +21,7 @@ function bench(label: string, fn: () => void, iters = 1): number {
 
 // Raw evaluator throughput.
 {
-  const deck = shuffle(makeDeck());
+  const deck = rng.shuffle(makeDeck());
   const seven = deck.slice(0, 7);
   const N = 200000;
   const start = performance.now();
@@ -31,7 +35,7 @@ function bench(label: string, fn: () => void, iters = 1): number {
 
 // Belief Monte Carlo at each street.
 function scenario(communityCount: number) {
-  const deck = shuffle(makeDeck());
+  const deck = rng.shuffle(makeDeck());
   const botHole = deck.slice(0, 2);
   const community = deck.slice(4, 4 + communityCount);
   const pool: Card[] = removeCards(makeDeck(), [...botHole, ...community]);
@@ -50,7 +54,7 @@ for (const [name, cc, sims] of [
   // for that board (mimics a real new hand).
   const per = bench(`${name} @ ${sims} sims`, () => {
     const s = scenario(cc);
-    runBeliefMonteCarlo(s.botHole, s.community, s.pool, INITIAL_BELIEF, sims);
+    runBeliefMonteCarlo(s.botHole, s.community, s.pool, INITIAL_BELIEF, sims, rng);
   }, 10);
   worst = Math.max(worst, per);
 }

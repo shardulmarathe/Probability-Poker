@@ -4,13 +4,19 @@
  * A single decision is timed across its phases:
  *   - mc       : Monte Carlo simulation time
  *   - ev       : expected-value calculation time
- *   - compute  : total synchronous engine step (decision + apply + state clone)
+ *   - compute  : the whole decision, kickoff to resolved (clone + MC + EV, and
+ *                the worker round trip, which is why it is wall-clock not CPU)
  *   - render   : React commit duration for the resulting update (from <Profiler>)
- *   - total    : wall-clock from decision start until the commit lands
+ *   - total    : compute + render — the work on the decision→render path
  *
- * Timings flow: the store calls `beginAction()` right before computing the bot
- * move, and the app's <Profiler> calls `commitAction()` after the resulting
- * React commit. The breakdown is logged to the console.
+ * `total` is a sum, not a stopwatch reading, and deliberately so: the store
+ * holds the decision behind a ~1.2–1.8s "thinking" beat, and a wall-clock total
+ * would be that beat plus noise rather than anything about the engine.
+ *
+ * Timings flow: the store calls `beginAction()` once the decision has landed and
+ * immediately before the state commit that renders it, so the <Profiler>'s next
+ * `commitAction()` is the render of *this* decision. Commits before that point
+ * have nothing pending and are ignored. The breakdown is logged to the console.
  */
 
 export interface ActionTimings {
@@ -19,11 +25,7 @@ export interface ActionTimings {
   compute: number;
 }
 
-interface Pending extends ActionTimings {
-  startedAt: number;
-}
-
-let pending: Pending | null = null;
+let pending: ActionTimings | null = null;
 
 /** Enable verbose per-action logging via `localStorage.ppLatency = "1"`. */
 function enabled(): boolean {
@@ -35,14 +37,14 @@ function enabled(): boolean {
   }
 }
 
-export function beginAction(startedAt: number, timings: ActionTimings): void {
-  pending = { startedAt, ...timings };
+export function beginAction(timings: ActionTimings): void {
+  pending = timings;
 }
 
 /** Called from the React Profiler after a commit. `renderMs` = actualDuration. */
 export function commitAction(renderMs: number): void {
   if (!pending) return;
-  const total = performance.now() - pending.startedAt;
+  const total = pending.compute + renderMs;
   const row = {
     "Monte Carlo (ms)": round(pending.mc),
     "EV calc (ms)": round(pending.ev),

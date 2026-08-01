@@ -1,5 +1,8 @@
-import { evaluate } from "./handEvaluator";
+import { categoryOf, scoreInts } from "./handEvaluator";
 import { tierOf } from "./bayesian";
+import { decodeCard, encodeCards } from "./core/card";
+import type { Rng } from "./core/rng";
+import { standardError, wilsonInterval } from "./core/stats";
 import {
   HandCategory,
   type BeliefDistribution,
@@ -8,22 +11,31 @@ import {
   type StrengthTier,
 } from "../types";
 
-function emptyFreq(): Record<HandCategory, number> {
-  return {
-    [HandCategory.HighCard]: 0,
-    [HandCategory.Pair]: 0,
-    [HandCategory.TwoPair]: 0,
-    [HandCategory.ThreeOfAKind]: 0,
-    [HandCategory.Straight]: 0,
-    [HandCategory.Flush]: 0,
-    [HandCategory.FullHouse]: 0,
-    [HandCategory.FourOfAKind]: 0,
-    [HandCategory.StraightFlush]: 0,
-  };
+/** HandCategory is a contiguous 0..8 enum, so counts live in a flat array. */
+const CATEGORY_COUNT = 9;
+
+function emptyFreq(): number[] {
+  return new Array<number>(CATEGORY_COUNT).fill(0);
 }
 
-function weightedTier(b: BeliefDistribution): StrengthTier {
-  const r = Math.random();
+/**
+ * Raw outcome counts from a run — the sufficient statistics for everything
+ * `MonteCarloResult` reports. A run split across workers is merged by summing
+ * these and normalizing once, which is why they are handed back unnormalized;
+ * the flat `freq` array also structured-clones across a worker boundary for
+ * free, unlike a `Record<HandCategory, number>`.
+ */
+export interface MonteCarloCounts {
+  sims: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  /** Made-hand category counts, indexed by `HandCategory`. */
+  freq: number[];
+}
+
+function weightedTier(b: BeliefDistribution, rng: Rng): StrengthTier {
+  const r = rng.next();
   if (r < b.weak) return "weak";
   if (r < b.weak + b.medium) return "medium";
   return "strong";
@@ -37,24 +49,70 @@ function weightedTier(b: BeliefDistribution): StrengthTier {
  *
  * Performance notes:
  *  - The opponent's hole-card combos are bucketed by tier once, as index pairs.
+ *  - Cards become 0..51 codes at the top and stay that way, so the loop scores
+ *    `Uint8Array`s through `scoreInts` and never touches a `Card` property.
  *  - Each roll-out reuses pre-allocated hand/scratch buffers (no per-sim
  *    `filter`/`concat`/`Set` allocation).
- *  - Hand evaluations are memoized, so the bot's own hand — constant on a
- *    complete board, and varying over only a few cards on the turn — is mostly
- *    served from cache. When the board is already complete it is evaluated once.
+ *  - Evaluation is not memoized — the direct path costs less than the lookup
+ *    would. When the board is already complete the bot's hand is scored once.
  */
 export function runBeliefMonteCarlo(
   botHole: Card[],
   community: Card[],
   pool: Card[],
   belief: BeliefDistribution,
-  sims: number
+  sims: number,
+  rng: Rng
 ): MonteCarloResult {
+  return finalizeCounts(
+    runBeliefCounts(botHole, community, pool, belief, sims, rng)
+  );
+}
+
+/**
+ * The same run, stopping at the raw counts — what a sharded run needs, since a
+ * partial run is only meaningful once summed with its siblings and normalizing
+ * per shard would be wrong.
+ */
+export function runBeliefCounts(
+  botHole: Card[],
+  community: Card[],
+  pool: Card[],
+  belief: BeliefDistribution,
+  sims: number,
+  rng: Rng
+): MonteCarloCounts {
+  return runBeliefCountsFromCodes(
+    encodeCards(botHole),
+    encodeCards(community),
+    encodeCards(pool),
+    belief,
+    sims,
+    rng
+  );
+}
+
+/**
+ * The implementation, on 0..51 card codes (see core/card.ts). Split out so the
+ * equity worker — which already receives codes on the wire — can hand them
+ * straight through instead of decoding to `Card[]` for this to re-encode.
+ */
+export function runBeliefCountsFromCodes(
+  botHole: Uint8Array,
+  community: Uint8Array,
+  pool: Uint8Array,
+  belief: BeliefDistribution,
+  sims: number,
+  rng: Rng
+): MonteCarloCounts {
   const L = pool.length;
   const cc = community.length;
   const needed = 5 - cc;
 
-  // Bucket every possible opponent two-card combo by tier (as pool index pairs).
+  // Bucket every possible opponent two-card combo by tier (as pool index
+  // pairs). `tierOf` wants `Card`s, but this runs once per call rather than
+  // once per sim, so decoding the pool here is off the hot path.
+  const poolCards = Array.from(pool, decodeCard);
   const byTier: Record<StrengthTier, number[][]> = {
     weak: [],
     medium: [],
@@ -62,16 +120,19 @@ export function runBeliefMonteCarlo(
   };
   for (let i = 0; i < L; i++) {
     for (let j = i + 1; j < L; j++) {
-      byTier[tierOf(pool[i], pool[j])].push([i, j]);
+      byTier[tierOf(poolCards[i], poolCards[j])].push([i, j]);
     }
   }
   const nonEmptyTiers = (["weak", "medium", "strong"] as StrengthTier[]).filter(
     (t) => byTier[t].length > 0
   );
 
-  // Reusable 7-card buffers: [hole, hole, ...community, ...drawn].
-  const botHand: Card[] = new Array(2 + cc + needed);
-  const oppHand: Card[] = new Array(2 + cc + needed);
+  // Reusable code buffers: [hole, hole, ...community, ...drawn]. Always 7
+  // long — `needed` is exactly the board's shortfall — but spelled out so the
+  // indexing below reads the same as the fill above.
+  const handSize = 2 + cc + needed;
+  const botHand = new Uint8Array(handSize);
+  const oppHand = new Uint8Array(handSize);
   botHand[0] = botHole[0];
   botHand[1] = botHole[1];
   for (let k = 0; k < cc; k++) {
@@ -79,8 +140,9 @@ export function runBeliefMonteCarlo(
     oppHand[2 + k] = community[k];
   }
 
-  // The bot's hand is fixed once the board is complete: evaluate it just once.
-  const fixedBot = needed === 0 ? evaluate(botHand) : null;
+  // The bot's hand is fixed once the board is complete: score it just once.
+  // -1 is not a reachable score, so it doubles as "not fixed".
+  const fixedBotScore = needed === 0 ? scoreInts(botHand, handSize) : -1;
 
   const scratch = new Uint8Array(L);
   const sampleTop = L - 2; // sample drawn community from indices [0, L-3]
@@ -91,12 +153,12 @@ export function runBeliefMonteCarlo(
   let tie = 0;
 
   for (let s = 0; s < sims; s++) {
-    let tier = weightedTier(belief);
+    let tier = weightedTier(belief, rng);
     if (byTier[tier].length === 0) {
-      tier = nonEmptyTiers[(Math.random() * nonEmptyTiers.length) | 0];
+      tier = nonEmptyTiers[rng.int(nonEmptyTiers.length)];
     }
     const combos = byTier[tier];
-    const pair = combos[(Math.random() * combos.length) | 0];
+    const pair = combos[rng.int(combos.length)];
     const a = pair[0];
     const b = pair[1];
 
@@ -111,7 +173,7 @@ export function runBeliefMonteCarlo(
       swap(scratch, b === L - 1 ? a : b, L - 2);
 
       for (let d = 0; d < needed; d++) {
-        const t = d + ((Math.random() * (sampleTop - d)) | 0);
+        const t = d + rng.int(sampleTop - d);
         const tmp = scratch[d];
         scratch[d] = scratch[t];
         scratch[t] = tmp;
@@ -121,16 +183,17 @@ export function runBeliefMonteCarlo(
       }
     }
 
-    const botEval = fixedBot ?? evaluate(botHand);
-    const oppEval = evaluate(oppHand);
+    const botScore =
+      fixedBotScore >= 0 ? fixedBotScore : scoreInts(botHand, handSize);
+    const oppScore = scoreInts(oppHand, handSize);
 
-    freq[botEval.category] += 1;
-    if (botEval.score > oppEval.score) win++;
-    else if (botEval.score < oppEval.score) loss++;
+    freq[categoryOf(botScore)] += 1;
+    if (botScore > oppScore) win++;
+    else if (botScore < oppScore) loss++;
     else tie++;
   }
 
-  return finalize(sims, win, loss, tie, freq);
+  return { sims, wins: win, losses: loss, ties: tie, freq };
 }
 
 /**
@@ -144,7 +207,8 @@ export function runFullKnowledgeMonteCarlo(
   villainHole: Card[],
   community: Card[],
   pool: Card[],
-  sims: number
+  sims: number,
+  rng: Rng
 ): MonteCarloResult {
   const L = pool.length;
   const cc = community.length;
@@ -155,27 +219,34 @@ export function runFullKnowledgeMonteCarlo(
   let loss = 0;
   let tie = 0;
 
+  // Same integer fast path as the belief run: encode once, then stay on codes.
+  const poolCodes = encodeCards(pool);
+  const heroCodes = encodeCards(heroHole);
+  const villCodes = encodeCards(villainHole);
+  const commCodes = encodeCards(community);
+
   // Reusable buffers.
-  const heroHand: Card[] = new Array(2 + cc + needed);
-  const villHand: Card[] = new Array(2 + cc + needed);
-  heroHand[0] = heroHole[0];
-  heroHand[1] = heroHole[1];
-  villHand[0] = villainHole[0];
-  villHand[1] = villainHole[1];
+  const handSize = 2 + cc + needed;
+  const heroHand = new Uint8Array(handSize);
+  const villHand = new Uint8Array(handSize);
+  heroHand[0] = heroCodes[0];
+  heroHand[1] = heroCodes[1];
+  villHand[0] = villCodes[0];
+  villHand[1] = villCodes[1];
   for (let k = 0; k < cc; k++) {
-    heroHand[2 + k] = community[k];
-    villHand[2 + k] = community[k];
+    heroHand[2 + k] = commCodes[k];
+    villHand[2 + k] = commCodes[k];
   }
 
   // Complete board: deterministic outcome.
   if (needed === 0) {
-    const heroEval = evaluate(heroHand);
-    const villEval = evaluate(villHand);
-    freq[heroEval.category] = sims;
-    if (heroEval.score > villEval.score) win = sims;
-    else if (heroEval.score < villEval.score) loss = sims;
+    const heroScore = scoreInts(heroHand, handSize);
+    const villScore = scoreInts(villHand, handSize);
+    freq[categoryOf(heroScore)] = sims;
+    if (heroScore > villScore) win = sims;
+    else if (heroScore < villScore) loss = sims;
     else tie = sims;
-    return finalize(sims, win, loss, tie, freq);
+    return finalizeCounts({ sims, wins: win, losses: loss, ties: tie, freq });
   }
 
   const scratch = new Uint8Array(L);
@@ -183,25 +254,25 @@ export function runFullKnowledgeMonteCarlo(
   for (let s = 0; s < sims; s++) {
     for (let k = 0; k < L; k++) scratch[k] = k;
     for (let d = 0; d < needed; d++) {
-      const t = d + ((Math.random() * (L - d)) | 0);
+      const t = d + rng.int(L - d);
       const tmp = scratch[d];
       scratch[d] = scratch[t];
       scratch[t] = tmp;
-      const card = pool[scratch[d]];
+      const card = poolCodes[scratch[d]];
       heroHand[2 + cc + d] = card;
       villHand[2 + cc + d] = card;
     }
 
-    const heroEval = evaluate(heroHand);
-    const villEval = evaluate(villHand);
+    const heroScore = scoreInts(heroHand, handSize);
+    const villScore = scoreInts(villHand, handSize);
 
-    freq[heroEval.category] += 1;
-    if (heroEval.score > villEval.score) win++;
-    else if (heroEval.score < villEval.score) loss++;
+    freq[categoryOf(heroScore)] += 1;
+    if (heroScore > villScore) win++;
+    else if (heroScore < villScore) loss++;
     else tie++;
   }
 
-  return finalize(sims, win, loss, tie, freq);
+  return finalizeCounts({ sims, wins: win, losses: loss, ties: tie, freq });
 }
 
 function swap(arr: Uint8Array, i: number, j: number): void {
@@ -210,22 +281,25 @@ function swap(arr: Uint8Array, i: number, j: number): void {
   arr[j] = t;
 }
 
-function finalize(
-  sims: number,
-  win: number,
-  loss: number,
-  tie: number,
-  freq: Record<HandCategory, number>
-): MonteCarloResult {
-  const probFreq = emptyFreq();
-  for (const key of Object.keys(freq) as unknown as HandCategory[]) {
-    probFreq[key] = freq[key] / sims;
+/** Normalize raw counts into the reported result. Pure, so merged shard totals
+ * go through exactly the same arithmetic a single run would. */
+export function finalizeCounts(c: MonteCarloCounts): MonteCarloResult {
+  const { sims, wins, losses, ties, freq } = c;
+  const probFreq = {} as Record<HandCategory, number>;
+  for (let i = 0; i < CATEGORY_COUNT; i++) {
+    probFreq[i as HandCategory] = sims > 0 ? freq[i] / sims : 0;
   }
+  const pWin = sims > 0 ? wins / sims : 0;
   return {
     simulations: sims,
-    pWin: win / sims,
-    pLoss: loss / sims,
-    pTie: tie / sims,
+    wins,
+    losses,
+    ties,
+    pWin,
+    pLoss: sims > 0 ? losses / sims : 0,
+    pTie: sims > 0 ? ties / sims : 0,
+    se: standardError(pWin, sims),
+    ciWin: wilsonInterval(wins, sims),
     categoryFrequencies: probFreq,
   };
 }

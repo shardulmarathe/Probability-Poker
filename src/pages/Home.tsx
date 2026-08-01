@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { PlayingCard } from "../components/PlayingCard";
+import TableSetupPanel from "../components/TableSetupPanel";
 import { makeCard } from "../poker/cards";
 
 const ACE_SPADES = makeCard(14, "s");
@@ -73,14 +74,14 @@ export default function Home() {
             </p>
 
             <div
-              className="pp-fade-up mt-8 flex justify-center lg:justify-start"
+              className="pp-fade-up mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
               style={{ animationDelay: "320ms" }}
             >
               <Link
-                to="/game"
+                to="/table"
                 className="group relative inline-flex items-center gap-3 rounded-xl border border-gold/40 bg-pkred px-10 py-4 text-lg font-semibold tracking-wide text-ivory shadow-[0_10px_30px_-10px_rgba(122,0,25,0.8)] transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/70 hover:bg-pkred-light"
               >
-                <span className="font-display tracking-widest">PLAY GAME</span>
+                <span className="font-display tracking-widest">TAKE A SEAT</span>
                 <span
                   aria-hidden
                   className="text-gold transition-transform duration-200 group-hover:translate-x-1"
@@ -88,7 +89,24 @@ export default function Home() {
                   &rarr;
                 </span>
               </Link>
+              <a
+                href="#setup"
+                className="font-display text-sm tracking-widest text-gold/80 underline-offset-4 transition hover:text-gold hover:underline"
+              >
+                CHOOSE THE TABLE ↓
+              </a>
             </div>
+
+            <p
+              className="pp-fade-up mt-4 text-xs text-ivory/40"
+              style={{ animationDelay: "360ms" }}
+            >
+              Or play the original{" "}
+              <Link to="/game" className="text-gold/70 underline-offset-2 hover:underline">
+                heads-up match
+              </Link>
+              .
+            </p>
           </div>
 
           {/* Right: poker matchup centerpiece */}
@@ -100,26 +118,39 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Connector → ties the hero to the concept row */}
-        <div
-          className="pp-fade-up mb-4 mt-2 flex items-center justify-center gap-3"
-          style={{ animationDelay: "400ms" }}
-        >
-          <span className="h-px w-12 bg-gradient-to-r from-transparent to-gold/40" />
-          <span className="font-mono text-[10px] uppercase tracking-[0.35em] text-gold/70">
-            The Probability Engine
-          </span>
-          <span className="h-px w-12 bg-gradient-to-l from-transparent to-gold/40" />
+        {/* Connector → ties the hero to the setup panel */}
+        <Divider label="Sit Down" delay={400} />
+
+        <div className="pp-fade-up" style={{ animationDelay: "440ms" }}>
+          <TableSetupPanel />
         </div>
 
+        {/* Connector → ties the setup panel to the concept row */}
+        <Divider label="The Probability Engine" delay={480} />
+
         {/* Concept cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
           {CONCEPTS.map((c, i) => (
-            <ConceptCard key={c.title} concept={c} delay={460 + i * 90} />
+            <ConceptCard key={c.title} concept={c} delay={520 + i * 90} />
           ))}
         </div>
       </div>
     </main>
+  );
+}
+
+function Divider({ label, delay }: { label: string; delay: number }) {
+  return (
+    <div
+      className="pp-fade-up mb-4 mt-8 flex items-center justify-center gap-3"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <span className="h-px w-12 bg-gradient-to-r from-transparent to-gold/40" />
+      <span className="font-mono text-[10px] uppercase tracking-[0.35em] text-gold/70">
+        {label}
+      </span>
+      <span className="h-px w-12 bg-gradient-to-l from-transparent to-gold/40" />
+    </div>
   );
 }
 

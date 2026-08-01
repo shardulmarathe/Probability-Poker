@@ -1,0 +1,172 @@
+/**
+ * Shared shapes for the N-handed table.
+ *
+ * This file is the seam between the three pieces that are built independently:
+ * the hand lifecycle (`engine.ts`), multiway equity (`../equity/multiway.ts`),
+ * and the bot roster (`../model/profiles.ts`). Each depends only on the types
+ * here, never on the others' implementations, so a change to how equity is
+ * estimated cannot ripple into how a hand is dealt.
+ */
+
+import type { BeliefDistribution, HandResult, Street } from "../../types";
+import type { TableSeat, TableState } from "./state";
+import type { TableAction, TableConfig } from "./rules";
+
+// ---------------------------------------------------------------------------
+// Equity
+// ---------------------------------------------------------------------------
+
+/**
+ * Equity for one seat against a specific set of opponents.
+ *
+ * `pWin` counts only outright wins; a k-way chop contributes to `pTie` and is
+ * worth `1/k` of the pot, so the value of a holding is `equity`, not `pWin`.
+ * Heads-up these nearly coincide, which is exactly why multiway needs both.
+ */
+export interface MultiwayEquity {
+  simulations: number;
+  wins: number;
+  ties: number;
+  losses: number;
+  pWin: number;
+  pTie: number;
+  pLoss: number;
+  /** Pot share under random completion: pWin + Σ (tie split) / sims. */
+  equity: number;
+  se: number;
+  ciWin: { lo: number; hi: number };
+  /**
+   * Head-to-head equity against each opponent taken alone, keyed by seat id.
+   *
+   * The number the report needs most: you can hold 60% against every opponent
+   * individually and still be an underdog to the field, which is the single
+   * biggest way multiway play differs from heads-up.
+   */
+  perOpponent: Record<number, number>;
+}
+
+export interface EquityRequest {
+  heroHole: number[];
+  board: number[];
+  /** Seat ids still contesting the pot, excluding the hero. */
+  opponents: number[];
+  /** The table's current read on each opponent, keyed by seat id. */
+  beliefs: Record<number, BeliefDistribution>;
+  simulations: number;
+  seed: number;
+}
+
+// ---------------------------------------------------------------------------
+// Bots
+// ---------------------------------------------------------------------------
+
+export type BotArchetype =
+  | "rock"
+  | "nit"
+  | "station"
+  | "maniac"
+  | "tag"
+  | "lag"
+  | "professor"
+  | "mirror";
+
+/**
+ * A bot's playing style, expressed as parameters rather than code so each seat
+ * can be described honestly in the analysis ("this opponent enters 38% of pots
+ * and bluffs 22% of its river bets") instead of being an opaque black box.
+ */
+export interface BotProfile {
+  id: BotArchetype;
+  name: string;
+  avatar: string;
+  blurb: string;
+  /** Minimum Chen-style hole score to enter a pot unraised. Lower = looser. */
+  entryThreshold: number;
+  /**
+   * Multiplier on the EV of aggressive actions. Above 1 the bot bets and raises
+   * where a pure maximiser would call; below 1 it does the reverse.
+   */
+  aggression: number;
+  /** Probability of betting with a hand too weak to value bet. */
+  bluffRate: number;
+  /** Preferred pot fraction when betting, before EV comparison. */
+  preferredSizing: number;
+}
+
+export interface BotDecision {
+  seat: number;
+  street: Street;
+  action: TableAction;
+  potBefore: number;
+  toCall: number;
+  equity: MultiwayEquity;
+  /** EV of every action considered, by label, for the audit trail. */
+  evByAction: Record<string, number>;
+  beliefs: Record<number, BeliefDistribution>;
+  profile: BotArchetype;
+}
+
+/**
+ * How the engine asks a bot to move. Injected rather than imported so the
+ * engine can be tested with a scripted decider and never needs Monte Carlo.
+ */
+export type BotDecider = (
+  state: TableState,
+  seat: number,
+  config: TableConfig
+) => Promise<BotDecision>;
+
+/** Synchronous variant for headless tests and offline scripts. */
+export type SyncBotDecider = (
+  state: TableState,
+  seat: number,
+  config: TableConfig
+) => BotDecision;
+
+// ---------------------------------------------------------------------------
+// Hand records
+// ---------------------------------------------------------------------------
+
+export interface SeatResult {
+  seat: number;
+  hole: number[];
+  /** Null when the seat folded before showdown — its cards stay hidden. */
+  final: HandResult | null;
+  invested: number;
+  won: number;
+  net: number;
+  status: TableSeat["status"];
+}
+
+export interface PotRecord {
+  amount: number;
+  eligible: number[];
+  winners: number[];
+}
+
+/**
+ * The immutable record of a completed hand. `seed` alone is enough to replay
+ * it exactly, so this is both the analysis input and the persistence payload.
+ */
+export interface TableHandReport {
+  handNumber: number;
+  seed: number;
+  button: number;
+  seatCount: number;
+  board: number[];
+  seats: SeatResult[];
+  pots: PotRecord[];
+  decisions: BotDecision[];
+  actions: ActionRecord[];
+  endStreet: Street;
+  wentToShowdown: boolean;
+}
+
+export interface ActionRecord {
+  seat: number;
+  street: Street;
+  action: TableAction["type"];
+  cost: number;
+  potBefore: number;
+  toCall: number;
+}

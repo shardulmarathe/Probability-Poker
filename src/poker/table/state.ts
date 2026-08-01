@@ -156,9 +156,12 @@ export function openingActor(state: TableState): number | null {
  * the big blind still gets its option after a round of limps: posting the blind
  * left `hasActed` false even though `streetCommit` already equals `currentBet`.
  *
- * Fewer than two seats able to act also closes the round — with one live seat
- * and the rest all-in there is nobody left to bet against, so the remaining
- * board just runs out.
+ * With nobody able to act the round is trivially closed. A *single* seat able
+ * to act is NOT enough on its own: preflop, one live seat facing an unmatched
+ * blind still owes a decision. It closes only once that seat has acted and
+ * matched, like any other. The "everyone else is all-in, run the board out"
+ * shortcut belongs to the caller, after `resetStreetBetting` has cleared the
+ * debts — not here.
  */
 export function bettingClosed(state: TableState): boolean {
   return actingSeats(state).every(

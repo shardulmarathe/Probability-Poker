@@ -8,18 +8,37 @@ import {
   it,
   vi,
 } from "vitest";
-import { mergeShards, planShards, runEquity, runEquitySync } from "./pool";
 import {
+  mergeShards,
+  planShards,
+  runEquity,
+  runEquitySync,
+  runMultiwayEquity,
+  runMultiwayEquitySync,
+} from "./pool";
+import {
+  runAnyShard,
+  runMultiwayShard,
   runShard,
+  type AnyShardJob,
+  type AnyShardResult,
+  type MultiwayShardJob,
   type ShardJob,
-  type ShardResult,
 } from "../../workers/equity.worker";
-import { encodeCards } from "../core/card";
+import { encodeCard, encodeCards } from "../core/card";
 import { makeRng } from "../core/rng";
 import { runBeliefMonteCarlo } from "../monteCarlo";
-import { makeDeck, removeCards } from "../cards";
+import { makeCard, makeDeck, removeCards } from "../cards";
+import {
+  beliefsFor,
+  finalizeMultiway,
+  mergeMultiwayCounts,
+  remainingPool,
+  runMultiway,
+} from "./multiway";
 import { INITIAL_BELIEF } from "../../data/constants";
-import type { Card } from "../../types";
+import type { BeliefDistribution, Card, RankValue, Suit } from "../../types";
+import type { EquityRequest } from "../table/contract";
 
 /** A concrete decision to estimate: bot holds the first two cards of a shuffle. */
 function job(seed: number, boardCards = 3, sims = 4000) {
@@ -47,6 +66,63 @@ function viaWorkerTransport(j: ReturnType<typeof job>) {
       const msg: ShardJob = { ...wire, id: i, sims: s.sims, seed: s.seed };
       return structuredClone(runShard(structuredClone(msg)));
     })
+  );
+}
+
+// ---- Multiway fixtures ----------------------------------------------------
+
+const RANKS: Record<string, RankValue> = {
+  "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9,
+  T: 10, J: 11, Q: 12, K: 13, A: 14,
+};
+function codes(...s: string[]): number[] {
+  return s.map((c) => encodeCard(makeCard(RANKS[c[0]], c[1] as Suit)));
+}
+
+/** A multiway decision: the hero against `n` seats with distinguishable reads. */
+function multiwayJob(
+  seed: number,
+  n = 3,
+  boardCards = 3,
+  sims = 4000
+): EquityRequest {
+  const board = codes("Jh", "7c", "2d", "9s", "4h").slice(0, boardCards);
+  const beliefs: Record<number, BeliefDistribution> = {};
+  for (let i = 0; i < n; i++) {
+    // Distinct per seat, so a bug that collapsed the field onto one belief or
+    // shuffled the seat order would change the answer.
+    beliefs[i + 1] = {
+      weak: 0.2 + 0.1 * i,
+      medium: 0.5 - 0.05 * i,
+      strong: 0.3 - 0.05 * i,
+    };
+  }
+  return {
+    heroHole: codes("Qs", "Qd"),
+    board,
+    opponents: Array.from({ length: n }, (_, i) => i + 1),
+    beliefs,
+    simulations: sims,
+    seed,
+  };
+}
+
+/** The multiway job replayed the way the worker path does, clones and all. */
+function viaMultiwayWorkerTransport(req: EquityRequest) {
+  const wire = {
+    kind: "multiway" as const,
+    heroHole: Uint8Array.from(req.heroHole),
+    board: Uint8Array.from(req.board),
+    pool: remainingPool(req.heroHole, req.board),
+    beliefs: beliefsFor(req),
+  };
+  const parts = planShards(req.simulations, req.seed).map((s, i) => {
+    const msg: MultiwayShardJob = { ...wire, id: i, sims: s.sims, seed: s.seed };
+    return structuredClone(runMultiwayShard(structuredClone(msg)));
+  });
+  return finalizeMultiway(
+    mergeMultiwayCounts(parts, req.opponents.length),
+    req.opponents
   );
 }
 
@@ -158,6 +234,98 @@ describe("equity pool — sharding vs a single stream", () => {
   });
 });
 
+describe("equity pool — multiway", () => {
+  it("routes a multiway job through the same shard plan as a heads-up one", () => {
+    // The split must stay a function of (seed, sims) only. A multiway job that
+    // planned its own shards — by field size, say — would make the answer
+    // depend on the table, and a 2-core machine disagree with a 16-core one.
+    const req = multiwayJob(0x5a1, 4, 3, 4001);
+    const plan = planShards(req.simulations, req.seed);
+    expect(plan.map((s) => s.sims)).toEqual([1001, 1000, 1000, 1000]);
+    expect(plan).toEqual(planShards(4001, req.seed));
+  });
+
+  it("produces identical results across the message boundary", () => {
+    for (const board of [0, 3, 4, 5]) {
+      for (const n of [1, 2, 5]) {
+        const req = multiwayJob(0x3ee + board + n, n, board, 4000);
+        expect(viaMultiwayWorkerTransport(req)).toEqual(
+          runMultiwayEquitySync(req)
+        );
+      }
+    }
+  });
+
+  it("is a pure function of seed, sims and the field", () => {
+    const req = multiwayJob(0xc0c0, 3);
+    expect(runMultiwayEquitySync(req)).toEqual(runMultiwayEquitySync(req));
+    const other = runMultiwayEquitySync({ ...req, seed: req.seed + 1 });
+    expect(other.wins).not.toBe(runMultiwayEquitySync(req).wins);
+  });
+
+  it("keeps every count and every seat key intact through the merge", () => {
+    const req = multiwayJob(0x11, 4, 3, 5000);
+    const r = runMultiwayEquitySync(req);
+    expect(r.simulations).toBe(5000);
+    expect(r.wins + r.ties + r.losses).toBe(5000);
+    expect(r.pWin + r.pTie + r.pLoss).toBeCloseTo(1, 12);
+    expect(r.equity).toBeGreaterThanOrEqual(r.pWin);
+    expect(r.equity).toBeLessThanOrEqual(r.pWin + r.pTie);
+    expect(Object.keys(r.perOpponent).map(Number)).toEqual(req.opponents);
+  });
+
+  it("falls back in-process when there is no Worker (Node)", async () => {
+    expect(typeof Worker).toBe("undefined");
+    const req = multiwayJob(0xfa12, 3);
+    await expect(runMultiwayEquity(req)).resolves.toEqual(
+      runMultiwayEquitySync(req)
+    );
+  });
+
+  it("agrees with an unsharded run to within sampling error", () => {
+    // Four shards of one estimator draw different streams, so not identical —
+    // but they must still be estimating the same quantity.
+    const req = multiwayJob(0xbee5, 3, 3, 40_000);
+    const sharded = runMultiwayEquitySync(req);
+    const single = runMultiway(req);
+    expect(Math.abs(sharded.equity - single.equity)).toBeLessThan(0.014);
+    expect(sharded.ciWin.lo).toBeLessThan(single.pWin);
+    expect(sharded.ciWin.hi).toBeGreaterThan(single.pWin);
+    for (const id of req.opponents) {
+      expect(
+        Math.abs(sharded.perOpponent[id] - single.perOpponent[id])
+      ).toBeLessThan(0.014);
+    }
+  });
+
+  it("leaves the heads-up path untouched", () => {
+    // Both job types now share one worker, one pending map and one dispatcher;
+    // the tag has to keep them apart in both directions.
+    const j = job(0x4ead);
+    const wire = {
+      botHole: encodeCards(j.botHole),
+      community: encodeCards(j.community),
+      pool: encodeCards(j.pool),
+      belief: j.belief,
+    };
+    const msg: ShardJob = { ...wire, id: 1, sims: 100, seed: 5 };
+    expect(runAnyShard(msg)).toEqual(runShard(msg));
+
+    const mw = multiwayJob(0x4eae, 2);
+    const mwMsg: MultiwayShardJob = {
+      kind: "multiway",
+      heroHole: Uint8Array.from(mw.heroHole),
+      board: Uint8Array.from(mw.board),
+      pool: remainingPool(mw.heroHole, mw.board),
+      beliefs: beliefsFor(mw),
+      id: 2,
+      sims: 100,
+      seed: 5,
+    };
+    expect(runAnyShard(mwMsg)).toEqual(runMultiwayShard(mwMsg));
+  });
+});
+
 // ---- Fake worker ----------------------------------------------------------
 
 /** How a fake worker answers: normally, newest-first, never, or by dying. */
@@ -188,10 +356,10 @@ function resetFake(): void {
  * die, the two failure modes the pool has to survive.
  */
 class FakeWorker {
-  onmessage: ((e: { data: ShardResult }) => void) | null = null;
+  onmessage: ((e: { data: AnyShardResult }) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
   private readonly slot: number;
-  private held: ShardResult[] = [];
+  private held: AnyShardResult[] = [];
   private dead = false;
 
   constructor(_url: URL, _opts?: { type?: string }) {
@@ -204,7 +372,7 @@ class FakeWorker {
     fake.routed[this.slot] = [];
   }
 
-  postMessage(job: ShardJob): void {
+  postMessage(job: AnyShardJob): void {
     fake.routed[this.slot].push(job.seed);
     if (fake.behavior === "silent") return;
     if (fake.behavior === "error") {
@@ -213,7 +381,10 @@ class FakeWorker {
       }, 1);
       return;
     }
-    const reply = structuredClone(runShard(structuredClone(job)));
+    // `runAnyShard`, not `runShard`: the real worker tags on `kind`, and this
+    // fake has to route both job types the same way or the multiway tests
+    // below would be testing a transport the app does not have.
+    const reply = structuredClone(runAnyShard(structuredClone(job)));
     if (fake.behavior === "reverse") {
       // Dispatch is synchronous, so the whole batch is in hand before this
       // timer fires — and every reply comes back newest-first.
@@ -367,6 +538,54 @@ describe("equity pool — worker path", () => {
     await expect(pool.runEquity(j)).resolves.toEqual(runEquitySync(j));
     expect(fake.built).toBe(8);
     expect(fake.live).toBe(4);
+  });
+
+  it("returns the same multiway numbers whatever the core count", async () => {
+    const req = multiwayJob(0x3c0e5, 4, 3, 1200);
+    const expected = runMultiwayEquitySync(req);
+    const seeds = planShards(req.simulations, req.seed).map((s) => s.seed);
+    for (const cores of [1, 2, 3, 5, 16]) {
+      const pool = await freshPool(cores);
+      await expect(pool.runMultiwayEquity(req)).resolves.toEqual(expected);
+      const n = workersFor(cores);
+      expect(fake.built).toBe(n);
+      // Same shard seeds as the heads-up path: the split never sees the field.
+      expect(fake.routed.flat()).toHaveLength(seeds.length);
+      seeds.forEach((seed, i) => expect(fake.routed[i % n]).toContain(seed));
+    }
+  });
+
+  it("correlates multiway replies by id when they race", async () => {
+    const pool = await freshPool(1); // one worker takes all four shards
+    fake.behavior = "reverse";
+    const req = multiwayJob(0x3adc0de, 5, 3, 1200);
+    await expect(pool.runMultiwayEquity(req)).resolves.toEqual(
+      runMultiwayEquitySync(req)
+    );
+  });
+
+  it("interleaves heads-up and multiway jobs on the same pool", async () => {
+    // One `pending` map keyed by a shared id counter serves both; a reply must
+    // never be handed to the other kind of job waiting alongside it.
+    const pool = await freshPool(5);
+    const hu = job(0x1f1, 3, 1200);
+    const mw = multiwayJob(0x1f2, 3, 3, 1200);
+    const [a, b] = await Promise.all([
+      pool.runEquity(hu),
+      pool.runMultiwayEquity(mw),
+    ]);
+    expect(a).toEqual(runEquitySync(hu));
+    expect(b).toEqual(runMultiwayEquitySync(mw));
+  });
+
+  it("falls back in-process when a multiway worker dies", async () => {
+    const pool = await freshPool(5);
+    fake.behavior = "error";
+    const req = multiwayJob(0x3e12, 3, 3, 1200);
+    await expect(pool.runMultiwayEquity(req)).resolves.toEqual(
+      runMultiwayEquitySync(req)
+    );
+    expect(fake.live).toBe(0);
   });
 
   it("gives up for good after the rebuild fails too, and says so", async () => {

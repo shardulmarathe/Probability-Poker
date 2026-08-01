@@ -9,14 +9,26 @@
  */
 
 import {
+  runMultiwayShard,
   runShard,
+  type AnyShardJob,
+  type AnyShardResult,
+  type MultiwayShardJob,
+  type MultiwayShardResult,
   type ShardJob,
   type ShardResult,
 } from "../../workers/equity.worker";
 import { encodeCards } from "../core/card";
 import { hashSeed } from "../core/rng";
 import { finalizeCounts, type MonteCarloCounts } from "../monteCarlo";
+import {
+  beliefsFor,
+  finalizeMultiway,
+  mergeMultiwayCounts,
+  remainingPool,
+} from "./multiway";
 import type { BeliefDistribution, Card, MonteCarloResult } from "../../types";
+import type { EquityRequest, MultiwayEquity } from "../table/contract";
 
 export interface EquityJob {
   botHole: Card[];
@@ -85,7 +97,7 @@ let unavailable = false;
 let nextId = 1;
 const pending = new Map<
   number,
-  { resolve: (r: ShardResult) => void; reject: (e: unknown) => void }
+  { resolve: (r: AnyShardResult) => void; reject: (e: unknown) => void }
 >();
 
 /**
@@ -107,6 +119,16 @@ let poolBuilds = 0;
  * bot's ~1.2s thinking beat.
  */
 const SHARD_TIMEOUT_MS = 400;
+
+/**
+ * A multiway shard scores one hand per seat where a heads-up shard scores two,
+ * so its unit of work grows with the field and a fixed deadline would start
+ * retiring healthy workers at a full table. Scaling by the opponent count keeps
+ * the same ~40x headroom against the work actually dispatched.
+ */
+function multiwayTimeout(opponents: number): number {
+  return SHARD_TIMEOUT_MS * Math.max(1, opponents);
+}
 
 function workerCount(): number {
   const cores =
@@ -137,7 +159,7 @@ function ensureWorkers(): Worker[] | null {
         new URL("../../workers/equity.worker.ts", import.meta.url),
         { type: "module" }
       );
-      w.onmessage = (e: MessageEvent<ShardResult>) => {
+      w.onmessage = (e: MessageEvent<AnyShardResult>) => {
         const slot = pending.get(e.data.id);
         if (!slot) return;
         pending.delete(e.data.id);
@@ -183,17 +205,26 @@ function retire(err: unknown): void {
   }
 }
 
-function dispatch(worker: Worker, job: ShardJob): Promise<ShardResult> {
-  return new Promise<ShardResult>((resolve, reject) => {
+/**
+ * `R` is asserted, not checked: `id` is unique per dispatch, so the reply keyed
+ * to it is necessarily the answer to the job just sent, and a job's type fixes
+ * its reply's type. Nothing on the wire is trusted beyond that correlation.
+ */
+function dispatch<R extends AnyShardResult>(
+  worker: Worker,
+  job: AnyShardJob,
+  timeoutMs: number
+): Promise<R> {
+  return new Promise<R>((resolve, reject) => {
     const timer = setTimeout(
       () => retire(new Error(`equity: shard ${job.id} timed out`)),
-      SHARD_TIMEOUT_MS
+      timeoutMs
     );
     // Settling always cancels the deadline, so it can only fire while pending.
     pending.set(job.id, {
       resolve: (r) => {
         clearTimeout(timer);
-        resolve(r);
+        resolve(r as R);
       },
       reject: (e) => {
         clearTimeout(timer);
@@ -241,12 +272,11 @@ export async function runEquity(job: EquityJob): Promise<MonteCarloResult> {
     // `Promise.all` resolves in input order, so the merge sees shard order.
     const parts = await Promise.all(
       shards.map((s, i) =>
-        dispatch(ws[i % ws.length], {
-          ...wire,
-          id: nextId++,
-          sims: s.sims,
-          seed: s.seed,
-        })
+        dispatch<ShardResult>(
+          ws[i % ws.length],
+          { ...wire, id: nextId++, sims: s.sims, seed: s.seed },
+          SHARD_TIMEOUT_MS
+        )
       )
     );
     return mergeShards(parts);
@@ -267,4 +297,84 @@ function encodeJob(job: EquityJob): Omit<ShardJob, "id" | "sims" | "seed"> {
     pool: encodeCards(job.pool),
     belief: job.belief,
   };
+}
+
+// ---- Multiway -------------------------------------------------------------
+//
+// The same scheduler, a different unit of work. Shards are planned by the same
+// `planShards`, so a multiway run inherits the property that matters: the split
+// is a function of (seed, sims) alone and never of the machine's core count.
+
+/**
+ * Resolve the request into the wire shape once: seat-keyed beliefs become an
+ * index-aligned array, and the deck-minus-what-is-visible pool is derived here
+ * rather than being carried in the request, so a caller cannot desynchronize
+ * the two.
+ */
+function encodeMultiwayJob(
+  req: EquityRequest
+): Omit<MultiwayShardJob, "id" | "sims" | "seed"> {
+  return {
+    kind: "multiway",
+    heroHole: Uint8Array.from(req.heroHole),
+    board: Uint8Array.from(req.board),
+    pool: remainingPool(req.heroHole, req.board),
+    beliefs: beliefsFor(req),
+  };
+}
+
+/** Every shard on the calling thread, through the same `runMultiwayShard` the
+ * workers use — the two paths are identical by construction, not by upkeep. */
+export function runMultiwayEquitySync(req: EquityRequest): MultiwayEquity {
+  const wire = encodeMultiwayJob(req);
+  const parts = planShards(req.simulations, req.seed).map((s) =>
+    runMultiwayShard({ ...wire, id: 0, sims: s.sims, seed: s.seed })
+  );
+  return finalizeMultiway(
+    mergeMultiwayCounts(parts, req.opponents.length),
+    req.opponents
+  );
+}
+
+/**
+ * The multiway run across the worker pool, falling back to
+ * `runMultiwayEquitySync` when there are no workers (Node) or the pool has
+ * failed. Same numbers either way; the fallback blocks the calling thread and
+ * costs roughly (opponents + 1) / 2 times what a heads-up run does.
+ */
+export async function runMultiwayEquity(
+  req: EquityRequest
+): Promise<MultiwayEquity> {
+  try {
+    // Inside the try for the same reason the heads-up path is: `new Worker` can
+    // throw synchronously under CSP, and that must fall back rather than
+    // stranding the decision that awaited it.
+    const ws = ensureWorkers();
+    if (!ws || ws.length === 0) return runMultiwayEquitySync(req);
+
+    const wire = encodeMultiwayJob(req);
+    const shards = planShards(req.simulations, req.seed);
+    const timeout = multiwayTimeout(req.opponents.length);
+    // `Promise.all` resolves in input order, so the merge sees shard order.
+    const parts = await Promise.all(
+      shards.map((s, i) =>
+        dispatch<MultiwayShardResult>(
+          ws[i % ws.length],
+          { ...wire, id: nextId++, sims: s.sims, seed: s.seed },
+          timeout
+        )
+      )
+    );
+    return finalizeMultiway(
+      mergeMultiwayCounts(parts, req.opponents.length),
+      req.opponents
+    );
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "equity: multiway shard dispatch failed; running in-process",
+      err
+    );
+    return runMultiwayEquitySync(req);
+  }
 }

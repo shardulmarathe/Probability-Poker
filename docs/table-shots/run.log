@@ -1,0 +1,33 @@
+sizing: range 60-1000 · start $78 · drag→$530 · key→$531 · "All-in"→$1000
+hand 1 complete (preflop)
+sizing: range 20-1030 · start $50 · drag→$525 · key→$526 · "All-in"→$1030
+hand 2 complete (flop)
+sizing: range 20-1020 · start $140 · drag→$520 · key→$521 · "All-in"→$1020
+hand 3 complete (river)
+sizing: range 20-1250 · start $40 · drag→$635 · key→$636 · "All-in"→$1250
+hand 4 complete (showdown)
+sizing: range 20-1227 · start $68 · drag→$624 · key→$625 · "All-in"→$1227
+hand 5 complete (showdown)
+sizing: range 220-1225 · start $275 · drag→$723 · key→$724 · "All-in"→$1225
+hand 6 complete (showdown)
+sizing: range 20-300 · start $155 · drag→$160 · key→$161 · "All-in"→$300
+hand 7 complete (river)
+sizing: range 20-560 · start $40 · drag→$290 · key→$291 · "All-in"→$560
+hand 8 complete (showdown)
+sizing: range 20-1130 · start $55 · drag→$575 · key→$576 · "All-in"→$1130
+hand 9 complete (showdown)
+sizing: range 20-660 · start $110 · drag→$340 · key→$341 · "All-in"→$660
+hand 10 complete (turn)
+desktop: 10 hands, 36 hero decisions, 10 sized raises
+mode fair: coach=false stats=false revealed=1/4
+mode coach: coach=true stats=true revealed=1/4
+mode study: coach=true stats=true revealed=4/4
+phone sheet: $23 → $1000
+phone hand 1 complete
+phone hand 2 complete
+phone hand 3 complete
+phone overflow check: scrollWidth 390 vs clientWidth 390
+observer: 3 hands dealt with no input
+
+console errors/warnings: 0
+problems: 0

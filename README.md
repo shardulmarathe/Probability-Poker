@@ -25,7 +25,12 @@ npm install
 npm run dev      # start the dev server (http://localhost:5173)
 npm run build    # typecheck + production build
 npm run preview  # preview the production build
+npm test         # run the test suite
 ```
+
+Every hand is dealt from a seed, so a hand replays exactly from its seed alone
+and the test suite is fully deterministic. Equity simulation runs in a Web
+Worker pool, with an in-process fallback when workers are unavailable.
 
 ## The probability concepts on display
 
@@ -75,7 +80,7 @@ scripts/
 
 ## Rules & betting
 
-- Heads-up Texas Hold'em, starting bankrolls of **$100** each.
+- Heads-up Texas Hold'em, starting bankrolls of **$1,000** each.
 - Blinds: small **$5**, big **$10**; the dealer alternates each hand.
 - Simplified **fixed-limit** betting: bet **$10** preflop/flop, **$20** turn/river;
   a raise doubles the current bet. Only legal actions are shown.

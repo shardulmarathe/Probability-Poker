@@ -25,7 +25,9 @@ export interface Card {
 
 The deck is the full Cartesian product $\{2,\dots,14\}\times\{s,h,d,c\}$, giving $|D| = 13\times 4 = 52$ distinct cards (`src/poker/cards.ts`, `makeDeck`).
 
-Shuffling uses **Fisher–Yates**, which produces a uniform random permutation: iterating $i$ from $n-1$ down to 1 and swapping element $i$ with a uniformly chosen $j\in\{0,\dots,i\}$ yields each of the $n!$ orderings with probability $1/n!$ (`src/poker/cards.ts`, `shuffle`).
+Shuffling uses **Fisher–Yates**, which produces a uniform random permutation: iterating $i$ from $n-1$ down to 1 and swapping element $i$ with a uniformly chosen $j\in\{0,\dots,i\}$ yields each of the $n!$ orderings with probability $1/n!$ (`src/poker/core/rng.ts`, `Rng.shuffle`).
+
+The randomness itself is **seeded and deterministic**. Every draw comes from an explicit `Rng` (xoshiro128\*\*, seeded through SplitMix32) rather than the ambient `Math.random`, and a hand's stream is derived as $\text{seed}_{\text{hand}} = H(\text{seed}_{\text{session}},\, n_{\text{hand}})$. Two consequences matter for the mathematics rather than the engineering: an estimate is exactly reproducible, so a reported probability can be re-derived rather than merely re-sampled; and the uniform index draws use rejection sampling on the raw 32-bit output instead of `Math.floor(u \cdot n)`, which is very slightly biased when $n$ does not divide $2^{32}$.
 
 The uniformity of this shuffle is the foundation of every probability estimate downstream: it is the assumption that the unseen cards are exchangeable and equally likely in every unseen slot.
 
@@ -178,7 +180,15 @@ $$
 \mathrm{SE}(\widehat p)=\sqrt{\frac{p(1-p)}{N}} \le \frac{1}{2\sqrt N}.
 $$
 
-The Analysis UI surfaces exactly this bound, reporting accuracy of $\pm 100/\sqrt{N}$ percentage points (`MonteCarloExplain`). For $N=5000$ this is $\approx\pm 1.4\%$.
+This is the worst case over $p$, since $p(1-p)$ peaks at $p=\tfrac12$; for $N=5000$ it gives $\approx\pm 1.4\%$.
+
+**Why the reported interval is not $\widehat p \pm z\,\mathrm{SE}$.** The Wald interval built from the expression above degenerates exactly where poker spends much of its time: on a decided river $\widehat p$ is 0 or 1, so $\widehat{\mathrm{SE}} = 0$ and the interval collapses to a point, claiming certainty from a finite sample. The engine therefore reports the **Wilson score interval**, the set of $p$ satisfying $(\widehat p - p)^2 \le z^2 p(1-p)/N$:
+
+$$
+\frac{\widehat p + \frac{z^2}{2N} \pm z\sqrt{\dfrac{\widehat p(1-\widehat p)}{N} + \dfrac{z^2}{4N^2}}}{1 + \frac{z^2}{N}}.
+$$
+
+Because the bound is derived from the *true* $p$ rather than the estimate, it stays inside $[0,1]$ and retains positive width at $\widehat p \in \{0,1\}$ (`src/poker/core/stats.ts`, `wilsonInterval`). `MonteCarloExplain` shows both the standard error and this interval, so the gap between them is visible rather than hidden.
 
 ### Number of simulations per street, and why they differ
 Live decisions use street-dependent counts; post-hand analysis uses larger fixed counts (`src/data/constants.ts`):
@@ -187,22 +197,30 @@ Live decisions use street-dependent counts; post-hand analysis uses larger fixed
 export const MONTE_CARLO_SIMS = 5000;
 
 export const DECISION_SIMS: Record<Exclude<Street, "showdown">, number> = {
-  preflop: 7000,
-  flop: 7000,
-  turn: 5000,
-  river: 3000,
+  preflop: 40000,
+  flop: 40000,
+  turn: 30000,
+  river: 20000,
 };
 
 export const TIMELINE_SIMS = 1500;
 ```
 
-The counts **decrease** from preflop (7000) to river (3000) because the variance of the per-sim outcome shrinks as information accrues: on the river there are zero unknown board cards, so only the opponent's hand is random and far fewer samples achieve the same standard error. Early streets have higher-dimensional randomness (more unknown board cards → larger effective outcome variance) and so get more samples. The choice is a deliberate trade between estimator error $O(1/\sqrt N)$ and the latency budget (<500 ms/decision).
+The counts **decrease** from preflop (40000) to river (20000) because the variance of the per-sim outcome shrinks as information accrues: on the river there are zero unknown board cards, so only the opponent's hand is random and far fewer samples achieve the same standard error. Early streets have higher-dimensional randomness (more unknown board cards → larger effective outcome variance) and so get more samples. The choice is a deliberate trade between estimator error $O(1/\sqrt N)$ and the latency budget.
+
+**Why these counts and not smaller ones.** A decision is an $\arg\max$ over a handful of EVs, so what matters is not the error on $\widehat p$ but whether that error is large enough to reorder the maximum. Measured against a 600,000-sim reference over 60 real decision points with 12 seeds each, the previous counts (7000/7000/5000/3000) chose a different action than ground truth on $3/720$ trials; at the counts above, $0/720$. The mean spread of $\widehat p$ across seeds fell from $0.0178$ to $0.0071$ — a factor of $2.5 \approx \sqrt 6$, exactly the $O(1/\sqrt N)$ the theory predicts for a $6\times$ increase. The extra samples are affordable because a run is sharded across a Web Worker pool (§2.5) rather than computed on the interface thread.
 
 ### Performance optimizations
 These do not change the mathematics, only the constant factor:
 - **Tier bucketing once per decision:** $O(L^2)$ combos are classified a single time, then each sim is an $O(1)$ lookup.
 - **Pre-allocated 7-card buffers** reused across sims, avoiding per-sim allocation.
-- **Memoized hand evaluation** keyed by a 52-bit card-set bitmask (`handEvaluator.ts`); on a complete board the bot's own hand is evaluated once (`fixedBot`).
+- **Bit-parallel hand evaluation.** `handEvaluator.ts` scores a holding from four per-suit 13-bit rank masks using precomputed lookup tables, with no per-call allocation; the Monte Carlo loop passes integer card codes (`scoreInts`) rather than card objects. On a complete board the bot's own hand is evaluated once (`fixedBot`). Evaluation is deliberately *not* memoized — measurement showed a hash lookup costs more than recomputing, even at a 100% hit rate.
+
+### Splitting the estimate across workers
+
+A Monte Carlo run is a sum of independent trials, so it parallelizes exactly: the run is cut into a fixed number of shards, each drawing from its own stream $H(\text{seed}, i)$, and the shard counts are summed before a single normalization. Since $\sum_i W_i / \sum_i N_i$ is the same estimator as the unsharded one, sharding changes the wall clock and nothing else.
+
+Two details keep it reproducible. The shard count is a **constant**, independent of how many CPU cores the machine reports — cores decide only which shard runs where — and merging is by summation in shard order, not completion order. A 2-core and a 16-core machine therefore produce bit-identical results (`src/poker/equity/pool.ts`).
 
 ### Pseudocode matching the implementation
 ```
@@ -656,7 +674,7 @@ The `EvTable` shows the same data across all decisions in the hand. Each value e
 Consider the bot facing a $\$10$ bet on the flop with pot $P=\$30$, holding a flush draw, with current belief $\beta=(0.4,0.35,0.25)$.
 
 1. **Input state** → `decideBotAction` reads `pot = 30`, `toCall = currentBet − streetCommit.bot = 10`, and the legal actions {fold, call, raise} from `getLegalActions`.
-2. **Monte Carlo** → with `street = "flop"`, `sims = DECISION_SIMS.flop = 7000`. `runBeliefMonteCarlo` samples 7000 opponent hands from $\beta$ (over-weighting whatever tiers $\beta$ favors) and completes the 2 remaining board cards, returning say $\widehat p = 0.35$, $\widehat q = 0.62$, $\widehat{\text{tie}}=0.03$.
+2. **Monte Carlo** → with `street = "flop"`, `sims = DECISION_SIMS.flop = 40000`. `runBeliefMonteCarlo` samples 40000 opponent hands from $\beta$ (over-weighting whatever tiers $\beta$ favors) and completes the 2 remaining board cards, returning say $\widehat p = 0.35$, $\widehat q = 0.62$, $\widehat{\text{tie}}=0.03$.
 3. **Bayesian update** → this is applied to the *opponent's* prior action, not the bot's; the belief $\beta$ that weighted step 2 is whatever the player's earlier actions produced via `updateBelief` (§6), using learned likelihoods (§7). The belief is stored on the decision for transparency.
 4. **EV calculation** via `actionEv`:
    - $\mathbb{E}[\text{Fold}] = 0$.
@@ -705,7 +723,7 @@ Appears: the full pipeline — belief over hidden tiers → belief-weighted equi
 | Quantity | Symbol | Value | Source |
 |---|---|---|---|
 | Deck size | $\|D\|$ | 52 | `cards.ts` |
-| Decision sims | $N$ | 7000 / 7000 / 5000 / 3000 | `DECISION_SIMS` |
+| Decision sims | $N$ | 40000 / 40000 / 30000 / 20000 | `DECISION_SIMS` |
 | Report sims | $N$ | 5000 | `MONTE_CARLO_SIMS` |
 | Timeline sims | $N$ | 1500 | `TIMELINE_SIMS` |
 | Preflop prior | $\Pr(H)$ | (0.40, 0.35, 0.25) | `INITIAL_BELIEF` |
@@ -713,5 +731,6 @@ Appears: the full pipeline — belief over hidden tiers → belief-weighted equi
 | Default raise likelihood | $\Pr(\text{raise}\mid H)$ | (0.05, 0.25, 0.70) | `ACTION_LIKELIHOODS` |
 | Beta-prior | $(\alpha,\delta)$ | (2, 10) → 0.20 each | `LEARNING_PRIOR_*` |
 | EV(action) | — | $p(P+\text{extra})-q\,\text{cost}$ | `actionEv` |
+| Confidence interval | 95% | Wilson score | `wilsonInterval` |
 
 Every figure in this document is computed by the code at the cited locations; none are hardcoded outcomes.

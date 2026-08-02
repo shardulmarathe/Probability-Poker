@@ -60,6 +60,39 @@ import { HandCategory, type Card, type StrengthTier } from "../../types";
  *    the flop, 0.773 / 0.756 on the turn and 0.783 / 0.791 on the river — the
  *    sign of the gap flips with the boards drawn, so the test asserts they are
  *    close rather than pretending the ladder is sharper than the game is.
+ *
+ * Ordering by mean equity is expected hand strength, and EHS is the metric the
+ * abstraction literature rejects: it "fails to account for the entire
+ * probability distribution of hand strength" (Ganzfried & Sandholm, AAAI-14).
+ * So the ladder was re-audited against that objection, with distributions
+ * rather than means — see distribution.ts, and distribution.test.ts for the
+ * numbers. It survives, more cleanly than the audit expected:
+ *
+ *  - Searching all 9! orderings for the one whose bucket-centroid Earth Mover's
+ *    Distance matrix is most monotone away from the diagonal returns THIS
+ *    order, on every street. Across six independent board samples the only
+ *    alternative that ever ties it is the one that swaps `TopPair` and
+ *    `Overpair` — the single adjacency the paragraph above already declines to
+ *    order. Two unrelated metrics agreeing about which rung is not really a
+ *    rung is worth more than either alone, and it means no reordering here is
+ *    justified: the index is already the ordering the distributions want.
+ *  - Hands sharing a bucket are ~3x closer in EMD than hands drawn from
+ *    different ones (flop 5.20 vs 15.03 bins, turn 5.36 vs 16.94, river 7.67
+ *    vs 22.36), and ~99% of combos have their EMD-nearest neighbour inside
+ *    their own bucket.
+ *
+ * What the audit does NOT excuse is the tails, which are bad and are a limit of
+ * having nine classes rather than of how they are ordered. `Air` and the two
+ * draw buckets carry most of it: on Ks-7s-Qc the flop puts 2c3c (a backdoor
+ * flush) and JcAs (a gutshot to Broadway, ace high) both in `WeakDraw` at an
+ * EMD of 21.1 bins, further apart than `Air` is from `WeakPair`. On a
+ * four-flush board Kd-Qd-3d-9d, `Monster` holds both TdJd (a straight flush)
+ * and TsJs (the same straight, losing to every diamond) at 21.2 bins. Nine
+ * hand-crafted classes have nowhere to put "ace-high with a gutshot" or "the
+ * straight that a flush board has already beaten". Fixing that means more
+ * classes, which means k-means over distributions with a free cluster count —
+ * and BUCKET_COUNT is frozen by the persisted keys `likelihood.ts` builds from
+ * these ids, so it is not a change that can be made here alone.
  */
 export enum HandBucket {
   /** No pair, no draw. Also where "playing the board" lands. */

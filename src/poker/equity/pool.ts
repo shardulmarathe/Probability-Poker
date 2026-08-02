@@ -22,9 +22,9 @@ import { encodeCards } from "../core/card";
 import { hashSeed } from "../core/rng";
 import { finalizeCounts, type MonteCarloCounts } from "../monteCarlo";
 import {
-  beliefsFor,
   finalizeMultiway,
   mergeMultiwayCounts,
+  rangesFor,
   remainingPool,
 } from "./multiway";
 import type { BeliefDistribution, Card, MonteCarloResult } from "../../types";
@@ -306,10 +306,14 @@ function encodeJob(job: EquityJob): Omit<ShardJob, "id" | "sims" | "seed"> {
 // is a function of (seed, sims) alone and never of the machine's core count.
 
 /**
- * Resolve the request into the wire shape once: seat-keyed beliefs become an
+ * Resolve the request into the wire shape once: seat-keyed ranges become an
  * index-aligned array, and the deck-minus-what-is-visible pool is derived here
  * rather than being carried in the request, so a caller cannot desynchronize
  * the two.
+ *
+ * Once per job, not once per shard. `rangesFor` classifies the board and copies
+ * a 1326-slot range per seat; every shard then clones the same arrays, which is
+ * also what makes the four shards provably see identical inputs.
  */
 function encodeMultiwayJob(
   req: EquityRequest
@@ -319,7 +323,7 @@ function encodeMultiwayJob(
     heroHole: Uint8Array.from(req.heroHole),
     board: Uint8Array.from(req.board),
     pool: remainingPool(req.heroHole, req.board),
-    beliefs: beliefsFor(req),
+    ranges: rangesFor(req),
   };
 }
 

@@ -15,10 +15,23 @@
  *    `equity = (wins + Σ 1/k) / sims`, not `pWin`. Both are reported; heads-up
  *    they nearly coincide, multiway they do not.
  *  - Opponents share one deck, so the field is drawn as one object: propose
- *    every seat's hole cards from that seat's own belief, and if any two seats
+ *    every seat's hole cards from that seat's own range, and if any two seats
  *    want the same card throw the whole tuple away and start over. The law that
  *    survives is `Π p(hᵢ)` conditioned on the hands being disjoint — symmetric
  *    under relabelling the seats, which is the point. See `MAX_TUPLE_ATTEMPTS`.
+ *
+ * WHAT A SEAT'S HAND IS DRAWN FROM. A `Range` — one weight for each of the 1326
+ * hole-card combinations — and not the three-tier `BeliefDistribution` this
+ * module sampled from originally. That version bucketed the pool with
+ * `bayesian.tierOf`, a *preflop* Chen score, and drew uniformly inside the
+ * chosen tier. On K-7-2-9-4 that calls 7-2 weak when it is two pair, and on
+ * 5-6-7-8-9 it calls aces strong when they are playing the board; every equity
+ * number the bot acted on was built on that classifier. A range fixes it at the
+ * source: `model/buckets.ts` classifies each combo against the actual board,
+ * `model/likelihood.ts` reweights it by what the seat has done, and
+ * `model/range.ts`'s `removeCards` zeroes what the hero can see — so card
+ * removal is arithmetic rather than a special case, and a blocker moves the
+ * equity rather than only the chart.
  *
  * `perOpponent` — the hero's head-to-head equity against each seat alone —
  * falls out of the same pass: every comparison it needs was already made to
@@ -32,15 +45,31 @@
  * the price is paid in the tuple loop, never in the scoring.
  */
 
-import { normalize, tierOf } from "../bayesian";
-import { decodeCard } from "../core/card";
+import { normalize } from "../bayesian";
 import { makeRng, type Rng } from "../core/rng";
 import { standardError, wilsonInterval } from "../core/stats";
 import { scoreInts } from "../handEvaluator";
-import type { BeliefDistribution, StrengthTier } from "../../types";
+import {
+  classifyAll,
+  makeBoardContext,
+  tierFromBucket,
+  type HandBucket,
+} from "../model/buckets";
+import {
+  COMBO_COUNT,
+  cloneRange,
+  comboCardA,
+  comboCardB,
+  comboIndex,
+  drawCombo,
+  makeComboSampler,
+  removeCards,
+  uniformRange,
+  type ComboSampler,
+  type Range,
+} from "../model/range";
+import type { BeliefDistribution } from "../../types";
 import type { EquityRequest, MultiwayEquity } from "../table/contract";
-
-const TIERS: StrengthTier[] = ["weak", "medium", "strong"];
 
 /** Belief for a seat the caller gave no read on: no information, no lean. */
 const UNIFORM_BELIEF: BeliefDistribution = {
@@ -54,16 +83,16 @@ const UNIFORM_BELIEF: BeliefDistribution = {
  *
  * Rejecting the tuple rather than the offending seat is what makes the sampler
  * exchangeable, and the price is paid here: acceptance is the chance that N
- * independent belief draws happen to be pairwise disjoint, which falls off fast
- * with the field. Measured on a 50-card preflop pool with a flat read at every
- * seat, p(accept) is 0.91 at two opponents, 0.55 at four and 0.22 at six; a read
- * concentrated on one tier is worse, because a tier is a much smaller set of
- * combos than the deck — 0.05 at six opponents against a 0.9-strong read, 0.026
- * against a degenerate 1.0-strong one.
+ * independent range draws happen to be pairwise disjoint, which falls off fast
+ * with the field, and faster the sharper the reads. Measured on this sampler
+ * over a 50-card pool: a flat range at every seat accepts 0.920 at two
+ * opponents, 0.598 at four and 0.269 at six, and ranges reweighted by three
+ * streets of betting accept 0.851 / 0.375 / 0.191 (the last at five, the most
+ * seats a table here holds).
  *
- * 256 makes even that degenerate case fail with probability ~1e-3, and the
- * realistic worst (~0.9 strong, six-handed) ~2e-6. The bound is not decoration:
- * with two seats pinned on a tier holding a single combo, no disjoint tuple
+ * 256 puts even that sharpest case at 4e-25 per sim, so the bound is not what
+ * makes the realistic ones work. It is there for the degenerate one: with two
+ * seats pinned on ranges whose only combo is the same combo, no disjoint tuple
  * exists at all and nothing but a bound terminates the loop.
  */
 const MAX_TUPLE_ATTEMPTS = 256;
@@ -95,21 +124,6 @@ export interface MultiwayCounts {
   h2hTies: number[];
 }
 
-/**
- * Local copy of the heads-up sampler's tier draw (`monteCarlo.ts` does not
- * export it), returning `TIERS`' index rather than its name so the hot loop
- * indexes arrays instead of hashing strings. It must consume exactly one
- * `next()` in exactly this order: a one-opponent run here is asserted to
- * reproduce `runBeliefCountsFromCodes` count for count off the same seed, and
- * that test is what keeps the two in step if either changes.
- */
-function weightedTier(b: BeliefDistribution, rng: Rng): number {
-  const r = rng.next();
-  if (r < b.weak) return 0;
-  if (r < b.weak + b.medium) return 1;
-  return 2;
-}
-
 /** The 0..51 codes still unseen: the deck minus the hero's cards and the board. */
 export function remainingPool(heroHole: number[], board: number[]): Uint8Array {
   const used = new Uint8Array(52);
@@ -122,32 +136,130 @@ export function remainingPool(heroHole: number[], board: number[]): Uint8Array {
 }
 
 /**
- * Beliefs in request order. Seats the caller has no read on get a flat prior
- * rather than being dropped, since a seat with an unknown range still takes
- * cards out of the deck and still has to be beaten.
+ * A three-tier belief spread over combos, by *board-relative* bucket.
+ *
+ * The adapter for callers that still speak `BeliefDistribution`. Two things
+ * make it more than a type conversion:
+ *
+ *  - `buckets` comes from `model/buckets.ts`, so "strong" means two pair on
+ *    this board rather than a good preflop score. That alone is most of the
+ *    defect this migration exists to remove, and it reaches every caller.
+ *  - Each tier's *total* weight is set to `belief[tier]` and split evenly
+ *    inside it, rather than writing `belief[tier]` into every combo. The weak
+ *    tier holds several times the combos the strong one does, so the naive form
+ *    turns a 0.40 / 0.35 / 0.25 read into an effective 0.70 / 0.24 / 0.06 — an
+ *    opponent four times less likely to hold a real hand than the table
+ *    believes.
+ *
+ * Card removal is applied first, so blockers thin the tier they actually hit.
  */
-export function beliefsFor(req: EquityRequest): BeliefDistribution[] {
-  return req.opponents.map((id) =>
-    normalize(req.beliefs[id] ?? UNIFORM_BELIEF)
-  );
+export function beliefRange(
+  belief: BeliefDistribution,
+  buckets: Uint8Array,
+  dead: ArrayLike<number>
+): Range {
+  const range = removeCards(uniformRange(), dead);
+  const b = normalize(belief);
+  const mass = [b.weak, b.medium, b.strong];
+  const live = new Float64Array(3);
+  const tierIndex = (c: number): number => {
+    const tier = tierFromBucket(buckets[c] as HandBucket);
+    return tier === "weak" ? 0 : tier === "medium" ? 1 : 2;
+  };
+
+  for (let c = 0; c < COMBO_COUNT; c++) if (range[c] > 0) live[tierIndex(c)] += 1;
+
+  let total = 0;
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    if (range[c] <= 0) continue;
+    const t = tierIndex(c);
+    range[c] = live[t] > 0 ? mass[t] / live[t] : 0;
+    total += range[c];
+  }
+
+  // A read that put all its weight on a tier this board leaves empty would
+  // otherwise produce a range with nothing in it. Fall back to no read at all.
+  if (!(total > 0)) return removeCards(uniformRange(), dead);
+  return range;
 }
 
 /**
- * The kernel, on 0..51 card codes. `beliefs` is index-aligned with the
+ * One range per opponent, in request order.
+ *
+ * A seat with an explicit range gets it (copied — the kernel masks in place and
+ * a caller's range outlives the call). A seat with only a belief gets that
+ * belief spread by board-relative bucket. A seat with neither gets a flat prior
+ * rather than being dropped, since an unknown opponent still takes cards out of
+ * the deck and still has to be beaten.
+ *
+ * Card removal is re-applied here in every branch: the request carries a board
+ * and a hero holding, and a range that disagrees with them would put impossible
+ * hands in the field.
+ */
+export function rangesFor(req: EquityRequest): Range[] {
+  const dead = [...req.heroHole, ...req.board];
+  // Built at most once per request, and only if some seat needs the adapter.
+  let buckets: Uint8Array | null = null;
+  return req.opponents.map((id) => {
+    const supplied = req.ranges?.[id];
+    if (supplied) return removeCards(cloneRange(supplied), dead);
+    if (buckets === null) buckets = classifyAll(makeBoardContext(req.board));
+    return beliefRange(req.beliefs?.[id] ?? UNIFORM_BELIEF, buckets, dead);
+  });
+}
+
+/**
+ * Mask a range onto what the deck still holds and build its O(1) draw table.
+ *
+ * The pool is the authority, not the range: a caller that forgets to remove a
+ * card would otherwise have a seat draw a card the hero is holding, and the
+ * kernel's availability permutation has no slot to take it from. Masking here
+ * costs one pass over 1326 weights per seat per call — nothing next to the run
+ * it feeds — and makes the kernel correct on its own inputs rather than on a
+ * promise about them.
+ */
+function poolSampler(
+  range: Range,
+  pool: Uint8Array,
+  poolIndex: Int16Array
+): ComboSampler {
+  const masked = new Float64Array(COMBO_COUNT);
+  let total = 0;
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    const w = range[c];
+    if (!(w > 0)) continue;
+    if (poolIndex[comboCardA(c)] < 0 || poolIndex[comboCardB(c)] < 0) continue;
+    masked[c] = w;
+    total += w;
+  }
+  // A read this deck leaves nothing of — every combo it liked is already on the
+  // board or in the hero's hand. Fall back to no read at all rather than to an
+  // empty range, which has no draw to make. Mirrors `beliefRange`'s fallback.
+  if (!(total > 0)) {
+    const L = pool.length;
+    for (let i = 0; i < L; i++) {
+      for (let j = i + 1; j < L; j++) masked[comboIndex(pool[i], pool[j])] = 1;
+    }
+  }
+  return makeComboSampler(masked);
+}
+
+/**
+ * The kernel, on 0..51 card codes. `ranges` is index-aligned with the
  * opponents, so this never needs to know what a seat id is.
  */
 export function runMultiwayCountsFromCodes(
   heroHole: Uint8Array,
   board: Uint8Array,
   pool: Uint8Array,
-  beliefs: BeliefDistribution[],
+  ranges: Range[],
   sims: number,
   rng: Rng
 ): MultiwayCounts {
   const L = pool.length;
   const cc = board.length;
   const needed = 5 - cc;
-  const N = beliefs.length;
+  const N = ranges.length;
 
   if (cc > 5) throw new Error(`multiway: board of ${cc} cards`);
   // The uniform fallback below is only guaranteed to terminate because the deck
@@ -158,38 +270,18 @@ export function runMultiwayCountsFromCodes(
     );
   }
 
-  // Every possible two-card combo as a pair of pool indices, bucketed by tier.
-  // Built once per call, so decoding the pool for `tierOf` stays off the hot
-  // path. Construction order matters and is deliberately identical to the
-  // heads-up sampler's: it is what makes a one-opponent run draw the same
-  // combos from the same stream.
-  const poolCards = Array.from(pool, decodeCard);
-  const byTier: Record<StrengthTier, number[][]> = {
-    weak: [],
-    medium: [],
-    strong: [],
-  };
-  for (let i = 0; i < L; i++) {
-    for (let j = i + 1; j < L; j++) {
-      byTier[tierOf(poolCards[i], poolCards[j])].push([i, j]);
-    }
-  }
+  // Card code -> its slot in the pool, -1 for a card nobody can be dealt. The
+  // sampler speaks card codes and the availability permutation below speaks
+  // pool indices; this is the one place the two meet.
+  const poolIndex = new Int16Array(52).fill(-1);
+  for (let i = 0; i < L; i++) poolIndex[pool[i]] = i;
 
-  // Then flatten each bucket to `[i, j, i, j, ...]`, keeping that order. The
-  // tuple loop draws a combo per seat per attempt — a hundred-odd times per sim
-  // once six seats hold concentrated reads — and a `number[][]` costs a pointer
-  // chase into a two-element array on every one of them.
-  const combos = TIERS.map((t) => {
-    const src = byTier[t];
-    const flat = new Uint8Array(2 * src.length);
-    for (let k = 0; k < src.length; k++) {
-      flat[2 * k] = src[k][0];
-      flat[2 * k + 1] = src[k][1];
-    }
-    return flat;
-  });
-  const comboCount = TIERS.map((t) => byTier[t].length);
-  const nonEmptyTiers = [0, 1, 2].filter((t) => comboCount[t] > 0);
+  // One alias table per seat, built once per call: O(1326) to build, O(1) per
+  // draw, and the tuple loop draws a combo per seat per attempt.
+  const samplers: ComboSampler[] = [];
+  for (let o = 0; o < N; o++) {
+    samplers.push(poolSampler(ranges[o], pool, poolIndex));
+  }
 
   // Reusable code buffers: [hole, hole, ...board, ...drawn], always 7 long.
   const handSize = 2 + cc + needed;
@@ -221,13 +313,13 @@ export function runMultiwayCountsFromCodes(
   let lo = 0;
   let hi = L;
 
-  // The tuple under construction, as pool indices: seat o proposes
-  // `cand[2o]`, `cand[2o+1]`. Disjointness is checked against `mark`, which is
-  // stamped rather than cleared — an attempt writes its own stamp, so the
-  // previous attempt's marks go stale for free. `stamp` is local to this call
-  // and advances at most MAX_TUPLE_ATTEMPTS per sim, far short of wrapping.
+  // The tuple under construction, as card codes: seat o proposes `cand[2o]`,
+  // `cand[2o+1]`. Disjointness is checked against `mark`, which is stamped
+  // rather than cleared — an attempt writes its own stamp, so the previous
+  // attempt's marks go stale for free. `stamp` is local to this call and
+  // advances at most MAX_TUPLE_ATTEMPTS per sim, far short of wrapping.
   const cand = new Uint8Array(2 * N);
-  const mark = new Int32Array(L);
+  const mark = new Int32Array(52);
   let stamp = 0;
 
   // Swap journal. Undoing this sim's swaps in reverse restores the identity
@@ -270,14 +362,9 @@ export function runMultiwayCountsFromCodes(
       stamp++;
       dealt = true;
       for (let o = 0; o < N; o++) {
-        let tier = weightedTier(beliefs[o], rng);
-        if (comboCount[tier] === 0) {
-          tier = nonEmptyTiers[rng.int(nonEmptyTiers.length)];
-        }
-        const flat = combos[tier];
-        const k = rng.int(comboCount[tier]) << 1;
-        const a = flat[k];
-        const b = flat[k + 1];
+        const combo = drawCombo(samplers[o], rng);
+        const a = comboCardA(combo);
+        const b = comboCardB(combo);
         // Abandon at the first collision instead of finishing the tuple: the
         // accepted tuples and their relative weights are identical either way,
         // and six-handed most collisions land before the last seat.
@@ -297,17 +384,17 @@ export function runMultiwayCountsFromCodes(
       for (let o = 0; o < N; o++) {
         const a = cand[2 * o];
         const b = cand[2 * o + 1];
-        // Read `pos[b]` after the first swap — it moves if b sat at the top.
-        swapAt(pos[a], hi - 1);
+        // Read `pos[·]` after the first swap — b moves if it sat at the top.
+        swapAt(pos[poolIndex[a]], hi - 1);
         hi--;
-        swapAt(pos[b], hi - 1);
+        swapAt(pos[poolIndex[b]], hi - 1);
         hi--;
         const hand = oppHands[o];
-        hand[0] = pool[a];
-        hand[1] = pool[b];
+        hand[0] = a;
+        hand[1] = b;
       }
     } else {
-      // Documented fallback: give up on the beliefs and deal the whole field
+      // Documented fallback: give up on the ranges and deal the whole field
       // uniformly at random from what is live. It cannot fail — the pool-size
       // guard reserves two cards per seat — which is what makes this loop
       // terminate rather than merely usually terminate, and it is exchangeable,
@@ -387,7 +474,7 @@ export function runMultiwayCounts(
     Uint8Array.from(req.heroHole),
     Uint8Array.from(req.board),
     remainingPool(req.heroHole, req.board),
-    beliefsFor(req),
+    rangesFor(req),
     req.simulations,
     rng
   );

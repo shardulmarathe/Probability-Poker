@@ -69,7 +69,23 @@ export function actionEv(
 // The bracket above is the same arithmetic `actionEv` does, with E_continue
 // substituted for pWin: E·(Pot + s) − (1 − E)·s = E·(Pot + 2s) − s. That
 // identity is why this is an extension of the old formula rather than a rival
-// to it, and it generalises to k callers as E·(Pot + k·s) − (1 − E)·cost.
+// to it.
+//
+// It does NOT generalise to k callers as E·(Pot + k·s) − (1 − E)·cost. That
+// form factorises an expectation of a product. Heads-up it is exact because k
+// is the constant 1; multiway both the hero's share and the field size are
+// random, and they are *negatively correlated* — the hero takes a smaller
+// fraction of the pot in exactly the simulations where more opponents stayed
+// to contest it. By that correlation
+//
+//     E[share] · (Pot + E[k]·s)  >  E[share · (Pot + k·s)]
+//
+// strictly, whenever k varies at all, and the gap runs entirely in the
+// "betting looks better" direction: on a 100-chip pot it reached +12 chips
+// against five opponents, enough to flip bets that are really checks. The
+// call term is therefore accumulated one simulation at a time, with that
+// simulation's own share and its own field, and never reassembled out of the
+// two marginal means. `eContinue` and `callers` survive only as reporting.
 //
 // ALPHA. Setting E_continue = 0 — a pure bluff, no equity at all — collapses
 // the formula to
@@ -103,6 +119,25 @@ export interface FoldingOpponent {
    * opponent that cannot fold — already all-in — is modelled with zeros.
    */
   foldByCombo: Float64Array;
+  /**
+   * Chips *this* opponent must add to keep playing, which is not the same for
+   * every seat once the hero is raising rather than betting.
+   *
+   *   - facing an opening bet (`toCall = 0`): everybody owes `cost`, and
+   *     `extra = cost`, so the distinction is empty;
+   *   - facing a raise: a seat already at the current bet level — the player
+   *     whose bet the hero is raising — owes only the increment `extra`, while
+   *     a seat that has not yet matched `toCall` owes the whole `cost`.
+   *
+   * Charging `extra` to a seat that owes `cost` under-counts the pot the hero
+   * plays for by `toCall` per such seat.
+   *
+   * Defaults to `extra = max(0, cost − toCall)` when omitted, which is exact
+   * heads-up and exact for any opening bet, and understates the pot (so it
+   * understates the EV of a raise — the safe direction) for a multiway raise
+   * whose callers have not yet matched.
+   */
+  owes?: number;
 }
 
 export interface FoldEquityInput {
@@ -135,15 +170,34 @@ export interface FoldEquityBreakdown {
    * Hero's pot share against the opponents that continue, given at least one
    * does. Compare against equity-vs-range (`rangeEquity`): the gap between them
    * is the whole reason this module exists.
+   *
+   * REPORTING ONLY. `callEv` is not built from this mean — see `callEv`.
    */
   eContinue: number;
-  /** Mean number of opponents that continue, given at least one does. */
+  /**
+   * Mean number of opponents that continue, given at least one does.
+   *
+   * REPORTING ONLY, for the same reason as `eContinue`.
+   */
   callers: number;
-  /** Pot the hero is playing for when called: `pot + callers · extra`. */
+  /**
+   * Mean pot the hero is playing for when called: `pot` plus what the
+   * opponents who stayed in add, averaged over the run. With one `owes` for
+   * every seat this is `pot + callers · owes`; with a raise's mixed `owes` it
+   * is the mean of the per-simulation sums. REPORTING ONLY.
+   */
   potIfCalled: number;
   /** `pFold · pot` — the chips the bet wins uncontested. */
   foldEv: number;
-  /** `(1 − pFold) · [eContinue · potIfCalled − (1 − eContinue) · cost]`. */
+  /**
+   * `(1 − pFold) · E[ share · (pot + Σ_continuing owes) − (1 − share) · cost ]`,
+   * the expectation taken over the simulated fields.
+   *
+   * The mean is of the whole per-simulation payoff, NOT a payoff rebuilt from
+   * `eContinue` and `potIfCalled`: share and field size are negatively
+   * correlated, so `eContinue · potIfCalled` overstates the product's mean and
+   * always in the direction that makes betting look better.
+   */
   callEv: number;
   ev: number;
   /** Sims that produced `eContinue`; 0 when nobody can continue. */
@@ -166,10 +220,26 @@ export interface FoldEquityBreakdown {
  * lesson: a 55% fold rate is 55% heads-up, 30% against two, 9% against four.
  * Fold equity dies exponentially in the field size, which is why bluffing
  * multiway is bad long before any second-order dependence matters.
+ *
+ * This function used to carry a second multiway error next to that one — the
+ * call term was assembled as `E[share] · (pot + E[k] · extra)` — and the note
+ * excusing it claimed the Π decay dominated. It did not. The factorisation
+ * error *grows* with the field exactly as the decay does, because it is driven
+ * by the variance of k, and it pointed the same way as the independence error:
+ * both made bluffing into a field look better than it is, which is the precise
+ * failure this module exists to prevent. The call term is now accumulated
+ * inside the simulation, so only the independence assumption above remains.
  */
 export function foldEquityEv(input: FoldEquityInput): FoldEquityBreakdown {
   const { pot, toCall, cost, opponents } = input;
   const extra = Math.max(0, cost - toCall);
+
+  // What each seat has to put in to keep playing. Uniformly `extra` for a bet;
+  // for a raise the seats that have not matched `toCall` owe the full `cost`.
+  // See `FoldingOpponent.owes`.
+  const owes = opponents.map((o) =>
+    o.owes === undefined ? extra : Math.max(0, o.owes)
+  );
 
   const pFoldEach: number[] = [];
   const pContinue: number[] = [];
@@ -202,31 +272,39 @@ export function foldEquityEv(input: FoldEquityInput): FoldEquityBreakdown {
   let eContinue = 0;
   let callers = 0;
   let simulations = 0;
+  // The mean per-simulation payoff of the called branch. Undefined until a
+  // simulation actually runs; see the fallback below.
+  let meanPayoff: number | null = null;
+  let potIfCalled = pot;
   if (pFold < 1) {
     const run = runField(
       input.heroHole,
       input.board,
       samplers,
       pContinue,
+      { pot, cost, owes },
       input.simulations,
       makeRng(input.seed)
     );
     if (run.sims > 0) {
       eContinue = run.shareSum / run.sims;
       callers = run.contestedSum / run.sims;
+      potIfCalled = run.potSum / run.sims;
+      meanPayoff = run.evSum / run.sims;
       simulations = run.sims;
     }
   }
 
-  // `callers · extra` rather than `2s`: heads-up `callers` is 1 and this is the
-  // formula in the header comment exactly. Multiway it factorises an
-  // expectation of a product — pot share and field size are negatively
-  // correlated, so this reads slightly high — but the Π decay above dominates
-  // by orders of magnitude in every spot where the difference could matter.
-  const potIfCalled = pot + callers * extra;
+  // The call term is the mean of `share · (pot + Σ owes) − (1 − share) · cost`
+  // over the simulated fields, accumulated one field at a time in `runField`.
+  // Reassembling it here out of `eContinue` and `potIfCalled` would factorise
+  // an expectation of a product and overstate every multiway bet.
+  //
+  // With no usable simulation there is no share to speak of, and the branch
+  // collapses to the losing leg alone: the hero puts in `cost` and takes
+  // nothing, which is what the old share-of-zero arithmetic also gave.
   const foldEv = pFold * pot;
-  const callEv =
-    (1 - pFold) * (eContinue * potIfCalled - (1 - eContinue) * cost);
+  const callEv = (1 - pFold) * (meanPayoff ?? -cost);
 
   return {
     pFold,
@@ -265,6 +343,7 @@ export function rangeEquity(input: RangeEquityInput): number {
     input.board,
     samplers,
     null,
+    null,
     input.simulations,
     makeRng(input.seed)
   );
@@ -287,26 +366,56 @@ const MAX_TUPLE_ATTEMPTS = 64;
 /** Redraws of the continue/fold coins before the fallback pick below. */
 const MAX_SUBSET_ATTEMPTS = 64;
 
+/**
+ * What a simulated field is worth to the hero, priced per simulation.
+ *
+ * Kept here rather than applied by the caller because the two random pieces —
+ * the hero's share and which seats stayed in — have to meet inside the same
+ * simulation. Multiplying their averages afterwards is the bug this exists to
+ * make impossible.
+ */
+interface FieldPayoff {
+  /** Chips in the middle before the hero acts. */
+  pot: number;
+  /** Chips the hero puts in now. */
+  cost: number;
+  /** Chips each opponent adds to continue, in `samplers` order. */
+  owes: readonly number[];
+}
+
 interface FieldRun {
   /** Σ of the hero's pot share over the sims that produced one. */
   shareSum: number;
   /** Σ of the number of opponents contesting. */
   contestedSum: number;
+  /** Σ of `pot + Σ_contesting owes`. Zero without a payoff. */
+  potSum: number;
+  /** Σ of the hero's payoff, `share · potIfCalled − (1 − share) · cost`. */
+  evSum: number;
   sims: number;
 }
+
+const EMPTY_RUN: FieldRun = {
+  shareSum: 0,
+  contestedSum: 0,
+  potSum: 0,
+  evSum: 0,
+  sims: 0,
+};
 
 function runField(
   heroHole: readonly number[],
   board: readonly number[],
   samplers: readonly (ComboSampler | null)[],
   pContinue: readonly number[] | null,
+  payoff: FieldPayoff | null,
   sims: number,
   rng: Rng
 ): FieldRun {
   const n = samplers.length;
   const bl = board.length;
   const needed = 5 - bl;
-  if (n === 0 || sims <= 0) return { shareSum: 0, contestedSum: 0, sims: 0 };
+  if (n === 0 || sims <= 0) return EMPTY_RUN;
   if (bl > 5) throw new Error(`runField: board of ${bl} cards`);
   if (heroHole.length < 2) throw new Error("runField: hero holds no cards");
 
@@ -339,6 +448,8 @@ function runField(
 
   let shareSum = 0;
   let contestedSum = 0;
+  let potSum = 0;
+  let evSum = 0;
   let ran = 0;
 
   for (let s = 0; s < sims; s++) {
@@ -457,18 +568,32 @@ function runField(
       if (sc > best) best = sc;
     }
 
-    if (heroScore > best) shareSum += 1;
+    let share = 0;
+    if (heroScore > best) share = 1;
     else if (heroScore === best) {
       let tied = 1;
       for (let i = 0; i < n; i++) {
         if (inField[i] && scores[i] === heroScore) tied++;
       }
-      shareSum += 1 / tied;
+      share = 1 / tied;
+    }
+    shareSum += share;
+
+    // 5. Price this field, with this field's share. `inField` is read after
+    //    the dealing step so a seat dropped by the clash fallback is neither
+    //    counted nor charged.
+    if (payoff !== null) {
+      let potIfCalled = payoff.pot;
+      for (let i = 0; i < n; i++) {
+        if (inField[i]) potIfCalled += payoff.owes[i];
+      }
+      potSum += potIfCalled;
+      evSum += share * potIfCalled - (1 - share) * payoff.cost;
     }
 
     contestedSum += k;
     ran++;
   }
 
-  return { shareSum, contestedSum, sims: ran };
+  return { shareSum, contestedSum, potSum, evSum, sims: ran };
 }

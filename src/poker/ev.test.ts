@@ -301,8 +301,15 @@ describe("the continuing range", () => {
     expect(valueLoss).toBeLessThan(airLoss);
   });
 
-  it("reports the numbers", () => {
+  it("selects against both hands, and by the published amounts", () => {
+    // This used to be a bare console.log with no `expect` in it — a test that
+    // could not fail. The numbers it printed are worth keeping, so they are
+    // pinned instead: the selection effect costs air three-quarters of its
+    // equity and top pair about a ninth of its own, and the fold rate barely
+    // moves between the two because the model folds on the OPPONENT's hand.
     const sharp = foldBelow(BOARD, HandBucket.WeakPair);
+    const rows: string[] = [];
+    const seen: Record<string, [number, number, number]> = {};
     for (const [name, hole] of [
       ["7-2 (air)", AIR],
       ["KQ (top pair)", VALUE],
@@ -314,13 +321,32 @@ describe("the continuing range", () => {
         pot: 100,
         bet: 50,
       });
-      // eslint-disable-next-line no-console
-      console.log(
-        `${name.padEnd(15)} E_range=${eRange([...hole], 1).toFixed(4)} ` +
+      const whole = eRange([...hole], 1);
+      seen[name] = [whole, priced.eContinue, priced.pFold];
+      expect(priced.eContinue).toBeLessThan(whole);
+      expect(priced.pFold).toBeGreaterThan(0.55);
+      expect(priced.pFold).toBeLessThan(0.7);
+      rows.push(
+        `${name.padEnd(15)} E_range=${whole.toFixed(4)} ` +
           `E_continue=${priced.eContinue.toFixed(4)} ` +
           `pFold=${priced.pFold.toFixed(4)}`
       );
     }
+
+    const [airRange, airContinue] = seen["7-2 (air)"];
+    expect(airRange).toBeCloseTo(0.1845, 2);
+    expect(airContinue).toBeCloseTo(0.0473, 2);
+    // Air keeps under a third of its equity once the folders are removed.
+    expect(airContinue / airRange).toBeLessThan(0.33);
+
+    const [valueRange, valueContinue] = seen["KQ (top pair)"];
+    expect(valueRange).toBeCloseTo(0.8668, 2);
+    expect(valueContinue).toBeCloseTo(0.7549, 2);
+    // Top pair keeps almost all of it: it beats the callers too.
+    expect(valueContinue / valueRange).toBeGreaterThan(0.85);
+
+    // eslint-disable-next-line no-console
+    console.log(rows.join("\n"));
   });
 });
 
@@ -595,5 +621,457 @@ describe("alpha", () => {
     });
     expect(withEquity.eContinue).toBeGreaterThan(0);
     expect(withEquity.ev).toBeGreaterThan(pureBluff(pot, bet, alpha).ev);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// The multiway call term — an expectation of a product, not a product of means
+// ---------------------------------------------------------------------------
+//
+// The call branch is worth E[ share · (Pot + Σ owes) − (1 − share) · cost ].
+// The module used to compute E[share] · (Pot + E[k] · extra) instead. Heads-up
+// those agree, because k is the constant 1 and there is nothing to correlate.
+// Multiway they do not: the hero takes a smaller fraction of the pot in exactly
+// the simulations where more opponents stayed in, so share and k are negatively
+// correlated and the product of the means is strictly the larger of the two —
+// always in the direction that makes betting look better than it is.
+//
+// The fixtures below pin that difference against closed-form arithmetic rather
+// than against the implementation, so they convict the code the way `alpha`
+// does rather than merely describing it.
+
+const choose = (n: number, k: number) => {
+  let out = 1;
+  for (let i = 0; i < k; i++) out = (out * (n - i)) / (i + 1);
+  return out;
+};
+
+/**
+ * P(exactly k of n opponents continue | at least one does), for n independent
+ * seats folding at a flat `pFold`. This is the distribution `runField` samples
+ * when it rejects the all-fold outcome, so it is the right yardstick for the
+ * field size the call term is averaged over.
+ */
+function fieldSizes(n: number, pFold: number): number[] {
+  const q = 1 - pFold;
+  const denom = 1 - pFold ** n;
+  const out = [0];
+  for (let k = 1; k <= n; k++) {
+    out.push((choose(n, k) * q ** k * pFold ** (n - k)) / denom);
+  }
+  return out;
+}
+
+/**
+ * An opponent that beats the hero with probability exactly `beat`, whatever the
+ * board runs out — because there is no runout left.
+ *
+ * Every combo that ties the hero is given zero weight, so the hero's share of
+ * any pot is 0 or 1 and never a fraction. Against k such opponents the hero
+ * wins iff all k of them drew from the losing side, i.e. with probability
+ * (1 − beat)^k: share falls as the field grows, by construction and by a known
+ * amount. That is the negative correlation the call term has to survive.
+ */
+function mixedRange(hole: number[], board: number[], beat: number): Range {
+  const range = removeCards(uniformRange(), [...hole, ...board]);
+  const hand = new Uint8Array(7);
+  hand[0] = hole[0];
+  hand[1] = hole[1];
+  for (let k = 0; k < 5; k++) hand[2 + k] = board[k];
+  const heroScore = scoreInts(hand, 7);
+
+  const better: number[] = [];
+  const worse: number[] = [];
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    if (range[c] <= 0) continue;
+    hand[0] = comboCardA(c);
+    hand[1] = comboCardB(c);
+    const sc = scoreInts(hand, 7);
+    range[c] = 0;
+    if (sc > heroScore) better.push(c);
+    else if (sc < heroScore) worse.push(c);
+  }
+  // `WORST` has essentially nothing below it — that is what makes it a pure
+  // bluff — so a mixture built on it would be a beating range wearing a
+  // disguise. Fail loudly rather than silently pricing `beat = 1`.
+  if (better.length === 0 || worse.length === 0) {
+    throw new Error(
+      `mixedRange: ${better.length} better / ${worse.length} worse combos`
+    );
+  }
+  for (const c of better) range[c] = beat / better.length;
+  for (const c of worse) range[c] = (1 - beat) / worse.length;
+  return range;
+}
+
+/**
+ * A hand in the middle of the river board: a pair of nines with a jack kicker.
+ * Plenty of hands beat it and plenty lose to it, which is what `mixedRange`
+ * needs and what `WORST` cannot provide.
+ */
+const MIDDLE = [card(9, "s"), card(5, "c")];
+
+interface MixedSpot {
+  n: number;
+  pFold: number;
+  beat: number;
+  pot: number;
+  bet: number;
+  sims?: number;
+  seed?: number;
+}
+
+/** What the module says the spot is worth. */
+function priceMixed(spot: MixedSpot) {
+  const range = mixedRange(MIDDLE, RIVER, spot.beat);
+  return foldEquityEv({
+    heroHole: MIDDLE,
+    board: RIVER,
+    opponents: Array.from({ length: spot.n }, () => ({
+      range,
+      foldByCombo: foldFlat(spot.pFold),
+    })),
+    pot: spot.pot,
+    toCall: 0,
+    cost: spot.bet,
+    simulations: spot.sims ?? 40000,
+    seed: spot.seed ?? 0x51ee,
+  });
+}
+
+/** What the spot is actually worth, and what factorising would have said. */
+function mixedTruth(spot: MixedSpot) {
+  const P = fieldSizes(spot.n, spot.pFold);
+  let eShare = 0;
+  let eK = 0;
+  let ePayoff = 0;
+  for (let k = 1; k <= spot.n; k++) {
+    const share = (1 - spot.beat) ** k;
+    eShare += P[k] * share;
+    eK += P[k] * k;
+    ePayoff +=
+      P[k] * (share * (spot.pot + k * spot.bet) - (1 - share) * spot.bet);
+  }
+  const allFold = spot.pFold ** spot.n;
+  return {
+    eShare,
+    eK,
+    exact: allFold * spot.pot + (1 - allFold) * ePayoff,
+    factorised:
+      allFold * spot.pot +
+      (1 - allFold) *
+        (eShare * (spot.pot + eK * spot.bet) - (1 - eShare) * spot.bet),
+  };
+}
+
+/**
+ * The price the module WOULD report if it rebuilt the call term out of its two
+ * reported means. Everything here comes off the breakdown, so it is measured on
+ * the very same sample stream as `r.ev` and the gap between them is the
+ * factorisation and nothing else — not seeds, not sampling noise.
+ */
+function factorisedEv(
+  r: ReturnType<typeof foldEquityEv>,
+  pot: number,
+  cost: number,
+  toCall = 0
+) {
+  const extra = Math.max(0, cost - toCall);
+  return (
+    r.pFold * pot +
+    (1 - r.pFold) *
+      (r.eContinue * (pot + r.callers * extra) - (1 - r.eContinue) * cost)
+  );
+}
+
+describe("the multiway call term", () => {
+  it("is unchanged heads-up, where the factorisation is exact", () => {
+    // k ≡ 1 with one opponent, so there is no product to factorise and the two
+    // arrangements must agree to the last bit that double precision allows.
+    for (const [pot, bet] of [
+      [100, 50],
+      [100, 100],
+      [100, 200],
+      [37, 11],
+    ] as const) {
+      for (const fold of [foldFlat(0.3), foldBelow(BOARD, HandBucket.WeakPair)]) {
+        const r = priceBet({ hole: AIR, opponents: 1, fold, pot, bet });
+        expect(r.callers).toBe(1);
+        expect(r.potIfCalled).toBe(pot + bet);
+        expect(Math.abs(r.ev - factorisedEv(r, pot, bet))).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it("is strictly below the factorised price multiway, and by more as the field grows", () => {
+    const gaps: number[] = [];
+    for (const n of [1, 2, 3, 4, 5]) {
+      const r = priceBet({
+        hole: AIR,
+        opponents: n,
+        fold: foldFlat(0.6),
+        pot: 100,
+        bet: 100,
+      });
+      const gap = factorisedEv(r, 100, 100) - r.ev;
+      if (n === 1) expect(Math.abs(gap)).toBeLessThan(1e-9);
+      else expect(gap).toBeGreaterThan(0);
+      gaps.push(gap);
+    }
+    // The comment this replaced claimed the Π-fold decay dominated the
+    // factorisation error. It does not: the error is driven by the variance of
+    // the field size, so it GROWS with the field exactly as the decay does.
+    expect(gaps[4]).toBeGreaterThan(gaps[1]);
+    expect(gaps[4]).toBeGreaterThan(2);
+  });
+
+  it("matches the closed form, and the factorised price matches its own", () => {
+    // The absolute check. `mixedRange` makes every opponent beat the hero with
+    // a known probability, so both prices can be written down without running
+    // anything, and the module has to land on the right one of the two.
+    const spot: MixedSpot = { n: 4, pFold: 0.4, beat: 0.45, pot: 100, bet: 200 };
+    const truth = mixedTruth(spot);
+    const r = priceMixed(spot);
+
+    const measured = factorisedEv(r, spot.pot, spot.bet);
+
+    // The closed form treats the four seats as independent draws; the sampler
+    // deals them from one deck, so the hero's share comes in a whisker low.
+    // That bias is on the share, not on the arithmetic under test.
+    expect(Math.abs(r.eContinue - truth.eShare)).toBeLessThan(0.01);
+    expect(Math.abs(r.callers - truth.eK)).toBeLessThan(0.02);
+
+    // The module lands on the honest price and nowhere near the other one.
+    expect(Math.abs(r.ev - truth.exact)).toBeLessThan(6);
+    expect(Math.abs(r.ev - truth.factorised)).toBeGreaterThan(18);
+    expect(Math.abs(measured - truth.factorised)).toBeLessThan(6);
+
+    // The gap between the two arrangements is what the correlation is worth,
+    // and the share bias cancels out of it — so this is the tight assertion.
+    expect(truth.factorised - truth.exact).toBeCloseTo(24.5815, 3);
+    expect(Math.abs(measured - r.ev - (truth.factorised - truth.exact)))
+      .toBeLessThan(1);
+  });
+
+  it("flips a decision the factorised price got wrong", () => {
+    // Same spot, read as a decision. Betting risks 200 into 100 with a hand
+    // that wins 27% of the pots it contests: the factorised price calls that a
+    // +12 chip bet, the honest one a −12 chip bet. Checking is worth 0 to a
+    // hand that has to fold to any action, so the sign IS the decision.
+    const spot: MixedSpot = { n: 4, pFold: 0.4, beat: 0.45, pot: 100, bet: 200 };
+    const r = priceMixed(spot);
+    const wrong = factorisedEv(r, spot.pot, spot.bet);
+
+    expect(wrong).toBeGreaterThan(5); // "bet"
+    expect(r.ev).toBeLessThan(-5); //    "check"
+    expect(wrong - r.ev).toBeGreaterThan(15);
+  });
+
+  it("counts every opponent that stayed in, not just one of them", () => {
+    // The pot the hero plays for is pot + Σ owes over the seats that continue,
+    // so with one `owes` for everybody it has to track the mean field size.
+    // Charging a single opponent regardless of how many called would leave
+    // `potIfCalled` stuck at pot + extra.
+    const spot = { n: 4, pFold: 0.4, pot: 100, bet: 200 };
+    const r = priceMixed({ ...spot, beat: 0.45 });
+    const eK = mixedTruth({ ...spot, beat: 0.45 }).eK;
+
+    expect(eK).toBeCloseTo(2.4631, 4);
+    expect(r.callers).toBeCloseTo(eK, 1);
+    expect(r.potIfCalled).toBeCloseTo(spot.pot + r.callers * spot.bet, 6);
+    expect(Math.abs(r.potIfCalled - (spot.pot + eK * spot.bet))).toBeLessThan(5);
+    // ...which is a long way from what one caller alone would put in.
+    expect(r.potIfCalled).toBeGreaterThan(spot.pot + 1.4 * spot.bet);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Raises — where `extra` and `cost` stop being the same number
+// ---------------------------------------------------------------------------
+//
+// Every test above this line prices an opening bet, `toCall = 0`, and there
+// `extra = cost − toCall = cost`: the two are interchangeable and nothing can
+// tell them apart. A raise separates them, and they play different roles.
+//
+//   - the hero risks `cost` — the call and the raise on top of it;
+//   - a seat already at the current bet level owes only the increment `extra`;
+//   - a seat that has not matched `toCall` owes the whole `cost`.
+
+/** A pure bluff-raise: no equity at all, so only the chips matter. */
+function pureRaise(opts: {
+  pot: number;
+  toCall: number;
+  cost: number;
+  pFold: number;
+  opponents?: number;
+}) {
+  const range = beatingRange(WORST, RIVER);
+  return foldEquityEv({
+    heroHole: WORST,
+    board: RIVER,
+    opponents: Array.from({ length: opts.opponents ?? 1 }, () => ({
+      range,
+      foldByCombo: foldFlat(opts.pFold),
+    })),
+    pot: opts.pot,
+    toCall: opts.toCall,
+    cost: opts.cost,
+    simulations: 400,
+    seed: 0xa1fa,
+  });
+}
+
+/**
+ * A hero who cannot lose: opponents draw only from hands he beats, so his share
+ * is the integer 1 in every simulation and the EV is pure chip arithmetic.
+ * That makes the pot — who owes what — the only thing left to get wrong.
+ */
+function pricedRaise(opts: {
+  pot: number;
+  toCall: number;
+  cost: number;
+  pFold: number;
+  owes?: (number | undefined)[];
+  opponents?: number;
+}) {
+  const n = opts.opponents ?? 2;
+  const range = mixedRange(MIDDLE, RIVER, 0);
+  return foldEquityEv({
+    heroHole: MIDDLE,
+    board: RIVER,
+    opponents: Array.from({ length: n }, (_, i) => ({
+      range,
+      foldByCombo: foldFlat(opts.pFold),
+      owes: opts.owes?.[i],
+    })),
+    pot: opts.pot,
+    toCall: opts.toCall,
+    cost: opts.cost,
+    simulations: 40000,
+    seed: 0x51ee,
+  });
+}
+
+describe("raises", () => {
+  const POT = 125;
+  const TO_CALL = 25;
+  const COST = 75;
+  const EXTRA = COST - TO_CALL; // 50
+
+  it("risks the whole cost, not just the raise increment", () => {
+    // A bluff-raise that gets called loses the call as well as the raise. The
+    // hero is 75 chips lighter, not 50, and alpha moves accordingly.
+    for (const pFold of [0.2, 0.375, 0.5, 0.8]) {
+      const r = pureRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold });
+      expect(r.eContinue).toBe(0);
+      expect(r.ev).toBeCloseTo(pFold * POT - (1 - pFold) * COST, 10);
+    }
+  });
+
+  it("breaks even at cost / (pot + cost), not extra / (pot + extra)", () => {
+    // The raise's alpha. Charging the increment instead of the cost would move
+    // the crossing from 37.5% down to 28.6%, and a bluff-raise that needs 37.5%
+    // folds would be priced as break-even on 28.6% — a licence to bluff-raise
+    // roughly a third more often than the arithmetic allows.
+    const alpha = COST / (POT + COST);
+    const wrong = EXTRA / (POT + EXTRA);
+    expect(alpha).toBeCloseTo(0.375, 10);
+    expect(wrong).toBeCloseTo(2 / 7, 10);
+
+    expect(pureRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: alpha }).ev)
+      .toBeCloseTo(0, 8);
+    expect(
+      pureRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: wrong }).ev
+    ).toBeLessThan(-15);
+    expect(
+      pureRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: alpha - 0.02 })
+        .ev
+    ).toBeLessThan(0);
+    expect(
+      pureRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: alpha + 0.02 })
+        .ev
+    ).toBeGreaterThan(0);
+  });
+
+  it("charges a seat that has not matched toCall the full cost", () => {
+    // Two opponents. A is the player whose bet the hero is raising and is
+    // already in for `toCall`, so calling costs it the increment. B has not put
+    // anything in this street and owes the call AND the raise. Pricing B at the
+    // increment loses `toCall` chips of pot every time B calls.
+    const pFold = 0.4;
+    const q = 1 - pFold;
+    const called = 1 - pFold ** 2;
+    // P(a given seat is in | somebody is), for two independent flat coins.
+    const inGivenCalled = q / called;
+
+    const matched = pricedRaise({
+      pot: POT,
+      toCall: TO_CALL,
+      cost: COST,
+      pFold,
+      owes: [EXTRA, COST],
+    });
+    // The hero never loses in this fixture, so the pot is the whole story.
+    expect(matched.eContinue).toBe(1);
+    const truePot = POT + (EXTRA + COST) * inGivenCalled;
+    expect(truePot).toBeCloseTo(214.2857, 4);
+    expect(matched.potIfCalled).toBeCloseTo(truePot, 0);
+    expect(matched.ev).toBeCloseTo(pFold ** 2 * POT + called * truePot, 0);
+    expect(matched.ev).toBeCloseTo(200, 0);
+
+    // The default — charge everybody the increment — is what the module does
+    // when the caller does not say who has matched. It is the conservative
+    // direction: it understates the pot, and so understates the raise.
+    const assumed = pricedRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold });
+    const shortPot = POT + 2 * EXTRA * inGivenCalled;
+    expect(shortPot).toBeCloseTo(196.4286, 4);
+    expect(assumed.potIfCalled).toBeCloseTo(shortPot, 0);
+    expect(assumed.ev).toBeCloseTo(185, 0);
+    expect(assumed.ev).toBeLessThan(matched.ev);
+    // Exactly `toCall` per unmatched seat that calls, and nothing else.
+    expect(matched.potIfCalled - assumed.potIfCalled).toBeCloseTo(
+      TO_CALL * inGivenCalled,
+      1
+    );
+  });
+
+  it("leaves an opening bet alone, where every seat owes the same", () => {
+    // toCall = 0 makes extra = cost, so `owes` cannot change anything and the
+    // default has to be exactly the old behaviour for every bet ever priced.
+    const spelled = pricedRaise({
+      pot: 100,
+      toCall: 0,
+      cost: 60,
+      pFold: 0.4,
+      owes: [60, 60],
+    });
+    const defaulted = pricedRaise({
+      pot: 100,
+      toCall: 0,
+      cost: 60,
+      pFold: 0.4,
+    });
+    expect(spelled).toEqual(defaulted);
+  });
+
+  it("still separates the two multiway errors", () => {
+    // Bug 1 (factorising) reads high, bug 2 (under-charging the field) reads
+    // low, and in the raise path they partially cancelled. With both fixed the
+    // honest price is below the factorised one at the same, correct, pot.
+    const r = pricedRaise({
+      pot: POT,
+      toCall: TO_CALL,
+      cost: COST,
+      pFold: 0.4,
+      owes: [EXTRA, COST],
+      opponents: 2,
+    });
+    // A hero who always wins has no share/field correlation to lose, so here
+    // the two arrangements agree — the pot fix is visible on its own.
+    expect(r.eContinue).toBe(1);
+    expect(r.ev).toBeGreaterThan(
+      pricedRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: 0.4 }).ev
+    );
   });
 });

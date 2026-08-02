@@ -21,6 +21,7 @@ import type {
   BeliefDistribution,
   HandCategory,
   MonteCarloResult,
+  PlayerActionType,
   Street,
 } from "../../types";
 import { updateBelief } from "../bayesian";
@@ -57,13 +58,7 @@ import {
   toCall as toCallOf,
   type TableState,
 } from "../table/state";
-import {
-  BUCKET_COUNT,
-  classifyAll,
-  makeBoardContext,
-  tierFromBucket,
-  type HandBucket,
-} from "./buckets";
+import { BUCKET_COUNT, classifyAll, makeBoardContext } from "./buckets";
 import {
   createLikelihoodModel,
   likelihoodRow,
@@ -72,7 +67,13 @@ import {
   type LikelihoodModel,
 } from "./likelihood";
 import { BOT_PROFILES, chooseAction, findProfile } from "./profiles";
-import { COMBO_COUNT, removeCards, uniformRange, type Range } from "./range";
+import {
+  COMBO_COUNT,
+  normalizeRange,
+  removeCards,
+  uniformRange,
+  type Range,
+} from "./range";
 
 // ---------------------------------------------------------------------------
 // Simulation budget
@@ -189,10 +190,146 @@ export function equityRequest(
     heroHole: Array.from(encodeCards(hero.hole)),
     board: Array.from(encodeCards(state.board)),
     opponents,
-    beliefs: readsFromActions(handActions(state), state.seats.length),
+    // The read the sampler draws from, per combo rather than per tier. See
+    // `opponentRanges` — this is where `buckets.ts` reaches the equity number.
+    ranges: opponentRanges(state, seat),
     simulations: simulations ?? decisionSims(state.street, opponents.length),
     seed: decisionSeed(state, seat),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Opponent ranges
+// ---------------------------------------------------------------------------
+
+/** How much of the board a decision on each street could see. */
+const BOARD_CARDS_AT: Record<LearnStreet, number> = {
+  preflop: 0,
+  flop: 3,
+  turn: 4,
+  river: 5,
+};
+
+const learnStreet = (street: Street): LearnStreet =>
+  street === "showdown" ? "river" : street;
+
+/**
+ * Bucket tables for a board's street prefixes, built on demand and cached.
+ *
+ * A flop bet has to be scored against the flop, not against the river the hand
+ * eventually ran out to — the actor could not see those cards, so weighting its
+ * range by what they made would be reading its mind rather than its bets. Four
+ * street prefixes means at most four `classifyAll` passes per decision (~190 µs
+ * each) shared by every opponent, rather than one per opponent per action.
+ */
+function streetBuckets(board: number[]): (street: LearnStreet) => Uint8Array {
+  const cache = new Map<LearnStreet, Uint8Array>();
+  return (street) => {
+    let hit = cache.get(street);
+    if (hit === undefined) {
+      const visible = Math.min(BOARD_CARDS_AT[street], board.length);
+      hit = classifyAll(makeBoardContext(board.slice(0, visible)));
+      cache.set(street, hit);
+    }
+    return hit;
+  };
+}
+
+/** P(this action | bucket) at one node, one entry per bucket. */
+function actionByBucket(
+  model: LikelihoodModel,
+  action: PlayerActionType,
+  street: LearnStreet,
+  position: ReturnType<typeof positionOf>,
+  facing: Facing
+): Float64Array {
+  const out = new Float64Array(BUCKET_COUNT);
+  for (let b = 0; b < BUCKET_COUNT; b++) {
+    out[b] = likelihoodRow(model, { bucket: b, street, position, facing })[action];
+  }
+  return out;
+}
+
+/**
+ * Each opponent's range over all 1326 combos, from this hand's public record.
+ *
+ * The estimator's actual input, and the thing this module exists to build:
+ *
+ *   1. Start from a flat prior. Before anybody acts, every combo the deck still
+ *      allows is equally likely — that is what "dealt at random" means. The
+ *      familiar 0.40 / 0.35 / 0.25 tilt toward strength is not a prior at all,
+ *      it is the *posterior* after a seat has chosen to play, and deriving it
+ *      rather than assuming it is what lets a limp and a three-bet disagree.
+ *   2. Multiply each combo by `P(action | bucket(combo), street, position,
+ *      facing)` for every action the seat took, with `bucket` measured against
+ *      the board *as it stood on that street*. This is where `buckets.ts` pays
+ *      off: on K-7-2 the combo 7-2 is two pair and gets the weight a bet
+ *      deserves, where a preflop Chen score would have filed it under trash and
+ *      folded it out of the continuing range.
+ *   3. Renormalise after each factor, so the range is a probability
+ *      distribution at every step rather than only at the end.
+ *
+ * Card removal is applied once up front and never undone: multiplying by a
+ * per-combo factor cannot resurrect a zero, so a combo the hero can see stays
+ * impossible however the seat bets.
+ *
+ * Reads only what any player at the table could see. No seat's hole cards are
+ * consulted, which is what makes the ranges shown in Study mode the bots' real
+ * information set rather than a privileged one.
+ */
+export function opponentRanges(
+  state: TableState,
+  seat: number,
+  model: LikelihoodModel = OPPONENT_MODEL
+): Record<number, Range> {
+  const hero = seatOf(state, seat);
+  const board = Array.from(encodeCards(state.board));
+  const dead = [...encodeCards(hero.hole), ...board];
+  const seatCount = state.seats.length;
+  const bucketsAt = streetBuckets(board);
+
+  const ranges: Record<number, Range> = {};
+  for (const id of opponentsOf(state, seat)) {
+    ranges[id] = normalizeRange(removeCards(uniformRange(), dead));
+  }
+
+  // One pass over the hand's record. `facing` is not stored on an action, so it
+  // is reconstructed here from the aggression that preceded it on that street:
+  // preflop the big blind is already an open, which is why the count starts at
+  // one there and at zero on every later street.
+  let street: LearnStreet = "preflop";
+  let aggressors = 1;
+  for (const record of handActions(state)) {
+    const recordStreet = learnStreet(record.street);
+    if (recordStreet !== street) {
+      street = recordStreet;
+      aggressors = recordStreet === "preflop" ? 1 : 0;
+    }
+    const range = ranges[record.seat];
+    if (range !== undefined) {
+      const facing: Facing =
+        record.toCall <= 0
+          ? "unopened"
+          : aggressors >= 2
+            ? "facing-raise"
+            : "facing-bet";
+      const buckets = bucketsAt(street);
+      const perBucket = actionByBucket(
+        model,
+        record.action,
+        street,
+        positionOf(record.seat, state.button, seatCount),
+        facing
+      );
+      for (let c = 0; c < COMBO_COUNT; c++) range[c] *= perBucket[buckets[c]];
+      // Every likelihood is bounded below by the prior's uniform mixture, so no
+      // product can reach zero and this can never divide by nothing.
+      normalizeRange(range);
+    }
+    if (record.action === "bet" || record.action === "raise") aggressors++;
+  }
+
+  return ranges;
 }
 
 const NO_CATEGORIES = Object.freeze({
@@ -316,12 +453,17 @@ export const REFERENCE_FRACTION = 0.5;
 export const MAX_TILT_FRACTION = 1;
 
 /**
- * The bot's read on how often an opponent folds. A fresh model is the generated
- * poker prior — bucket-, street- and facing-conditioned, with no player data in
- * it — which is the right default for a bot that has observed nothing. It is
- * never written to, so one instance is shared.
+ * The bot's read on what an opponent does with each class of hand. A fresh
+ * model is the generated poker prior — bucket-, street- and facing-conditioned,
+ * with no player data in it — which is the right default for a bot that has
+ * observed nothing. It is never written to, so one instance is shared.
+ *
+ * Read in both directions. `foldByBucket` asks it how often a bet gets through;
+ * `opponentRanges` runs it backwards, asking what a seat's bets imply about
+ * what it holds. One model answering both is what keeps the range the bot bets
+ * against and the range it prices folds against the same range.
  */
-const FOLD_MODEL: LikelihoodModel = createLikelihoodModel("poker");
+const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
 
 /**
  * P(fold) at a bet of `fraction` of the pot, given the rate at the reference
@@ -368,54 +510,13 @@ export function foldByBucket(
 }
 
 /**
- * An opponent's range over all 1326 combos, from the read the table already has.
+ * A three-tier belief spread over combos by board-relative bucket.
  *
- * The three-tier belief says how much weight sits on weak / medium / strong;
- * `buckets` says which tier each combo is in *on this board*, which is the whole
- * reason `buckets.ts` exists — on K-7-2 the combo 7-2 is two pair, and a range
- * built from the preflop `tierOf` would file it under "weak" and then wonder why
- * the continuing range looks so harmless.
- *
- * The belief is a distribution over TIERS, not over combos, so each tier's total
- * weight is set to `belief[tier]` and split evenly inside it. Writing
- * `belief[tier]` straight into every combo instead is the obvious mistake and a
- * large one: the weak tier holds roughly seven times the combos the strong tier
- * does, so it would turn a 0.40 / 0.35 / 0.25 read into an effective
- * 0.70 / 0.24 / 0.06 — an opponent four times less likely to hold a real hand
- * than the table believes. This way the tier marginals match the ones
- * `equity/multiway.ts` samples from, so `rangeEquity` and `MultiwayEquity` are
- * two measurements of the same opponent rather than of two different ones.
- *
- * Card removal is applied first, so blockers thin the tier they actually hit.
+ * Lives in `equity/multiway.ts`, which is where the legacy `beliefs` field of an
+ * `EquityRequest` has to be interpreted; re-exported here because this is where
+ * it was introduced and where its tests point.
  */
-export function opponentRange(
-  belief: BeliefDistribution,
-  buckets: Uint8Array,
-  dead: number[]
-): Range {
-  const range = removeCards(uniformRange(), dead);
-  const live = new Float64Array(3);
-  const tierIndex = (c: number) => {
-    const tier = tierFromBucket(buckets[c] as HandBucket);
-    return tier === "weak" ? 0 : tier === "medium" ? 1 : 2;
-  };
-
-  for (let c = 0; c < COMBO_COUNT; c++) if (range[c] > 0) live[tierIndex(c)] += 1;
-
-  const mass = [belief.weak, belief.medium, belief.strong];
-  let total = 0;
-  for (let c = 0; c < COMBO_COUNT; c++) {
-    if (range[c] <= 0) continue;
-    const t = tierIndex(c);
-    range[c] = live[t] > 0 ? mass[t] / live[t] : 0;
-    total += range[c];
-  }
-
-  // A read that put all its weight on a tier this board leaves empty would
-  // otherwise produce a range with nothing in it. Fall back to no read at all.
-  if (!(total > 0)) return removeCards(uniformRange(), dead);
-  return range;
-}
+export { beliefRange as opponentRange } from "../equity/multiway";
 
 /** Fan a per-bucket fold rate out to per-combo, at one size. */
 function foldByCombo(
@@ -487,6 +588,11 @@ export interface PricedSizes {
  *
  * Returns null when there is nothing to price — no opponents, or a state with
  * no cards dealt (a scripted test fixture).
+ *
+ * `opponentRanges` is passed in rather than rebuilt when the caller already has
+ * it: the showdown estimate and the fold-equity estimate must price the same
+ * opponent, or the gap between `eRange` and `eContinue` stops being the
+ * selection effect and starts being two different models disagreeing.
  */
 export function priceSizes(
   state: TableState,
@@ -494,7 +600,8 @@ export function priceSizes(
   base: TableAction,
   sizings: SizingOption[],
   simulations: number,
-  seed: number
+  seed: number,
+  ranges?: Record<number, Range>
 ): PricedSizes | null {
   const opponents = opponentsOf(state, seat);
   if (opponents.length === 0 || simulations <= 0) return null;
@@ -505,8 +612,7 @@ export function priceSizes(
   const heroHole = Array.from(encodeCards(hero.hole));
   const board = Array.from(encodeCards(state.board));
   const buckets = classifyAll(makeBoardContext(board));
-  const dead = [...heroHole, ...board];
-  const beliefs = readsFromActions(handActions(state), state.seats.length);
+  const byId = ranges ?? opponentRanges(state, seat);
   const pot = state.pot;
   const toCall = toCallOf(state, seat);
   const potAfterCall = pot + toCall;
@@ -516,17 +622,15 @@ export function priceSizes(
   const facing: Facing = toCall > 0 ? "facing-raise" : "facing-bet";
   const street = (state.street === "showdown" ? "river" : state.street) as LearnStreet;
 
-  const ranges: Range[] = [];
+  const priors: Range[] = [];
   const perBucket: (Float64Array | null)[] = [];
   for (const id of opponents) {
-    ranges.push(
-      opponentRange(beliefs[id] ?? INITIAL_BELIEF, buckets, dead)
-    );
+    priors.push(byId[id] ?? uniformRange());
     perBucket.push(
       seatOf(state, id).status === "allin"
         ? null
         : foldByBucket(
-            FOLD_MODEL,
+            OPPONENT_MODEL,
             street,
             positionOf(id, state.button, state.seats.length),
             facing
@@ -537,7 +641,7 @@ export function priceSizes(
   const eRange = rangeEquity({
     heroHole,
     board,
-    ranges,
+    ranges: priors,
     simulations,
     seed: hashSeed(seed, 0xe9a4e),
   });
@@ -547,10 +651,20 @@ export function priceSizes(
   for (const action of candidates) {
     const extra = Math.max(0, action.cost - toCall);
     const fraction = potAfterCall > 0 ? extra / potAfterCall : 0;
-    const models: FoldingOpponent[] = ranges.map((range, i) => ({
-      range,
-      foldByCombo: foldByCombo(perBucket[i], buckets, fraction),
-    }));
+    // What each opponent must add to continue. A seat that already matched the
+    // current bet owes only the raise increment, but one that has not owes the
+    // whole way up to the hero's new level — charging everyone `extra` would
+    // understate the pot a raise builds. Capped by the stack: an opponent
+    // cannot put in more than it has, and the surplus would be returned.
+    const newLevel = hero.streetCommit + action.cost;
+    const models: FoldingOpponent[] = priors.map((range, i) => {
+      const opp = seatOf(state, opponents[i]);
+      return {
+        range,
+        foldByCombo: foldByCombo(perBucket[i], buckets, fraction),
+        owes: Math.max(0, Math.min(newLevel - opp.streetCommit, opp.stack)),
+      };
+    });
     byLabel[action.label] = foldEquityEv({
       heroHole,
       board,
@@ -595,7 +709,8 @@ function finish(
   seat: number,
   config: TableConfig,
   equity: MultiwayEquity,
-  foldEquitySims: number
+  foldEquitySims: number,
+  ranges: Record<number, Range>
 ): BotDecision {
   const actions = legalActions(state, seat, config);
   if (actions.length === 0) {
@@ -617,7 +732,10 @@ function finish(
         base,
         sizings,
         foldEquitySims,
-        decisionSeed(state, seat)
+        decisionSeed(state, seat),
+        // The ranges the showdown estimate was just run against, not a second
+        // set built from the same records — one read per decision, priced twice.
+        ranges
       )
     : null;
 
@@ -694,7 +812,14 @@ export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
       request.opponents.length === 0
         ? uncontestedEquity()
         : runMultiwayEquitySync(request);
-    return finish(state, seat, config, equity, foldEquityBudget(options));
+    return finish(
+      state,
+      seat,
+      config,
+      equity,
+      foldEquityBudget(options),
+      request.ranges ?? {}
+    );
   };
 }
 
@@ -711,7 +836,14 @@ export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
       request.opponents.length === 0
         ? uncontestedEquity()
         : await runMultiwayEquity(request);
-    return finish(state, seat, config, equity, foldEquityBudget(options));
+    return finish(
+      state,
+      seat,
+      config,
+      equity,
+      foldEquityBudget(options),
+      request.ranges ?? {}
+    );
   };
 }
 

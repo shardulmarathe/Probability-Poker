@@ -7,3 +7,8 @@ dist-ssr
 *.tsbuildinfo
 .vercel
 .env*
+
+# Verification screenshots — regenerate locally, not worth 16MB in git
+docs/report-shots/
+docs/table-shots/
+docs/profile-shots/

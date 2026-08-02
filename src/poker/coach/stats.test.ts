@@ -271,6 +271,28 @@ describe("3-bet", () => {
     expect(scanHand(fourBet, 3)!.foldToThreeBet).toEqual({ n: 0, d: 1 });
   });
 
+  it("does not score a fold to a cold 4-bet as a fold to the 3-bet", () => {
+    // UTG opens, CO 3-bets, and the BUTTON 4-bets before UTG can answer. UTG's
+    // fold is a fold to the 4-bet: the 3-bet never got its answer, so this hand
+    // is not an observation of the stat at all. Counting it {n:1,d:1} inflates
+    // fold-to-3-bet noticeably in any 6-max game where 4-betting happens.
+    const cold4Bet = hand({
+      seatCount: 6,
+      button: 0,
+      actions: [
+        act(3, "preflop", "raise", 10),
+        act(5, "preflop", "raise", 30), // the 3-bet
+        act(0, "preflop", "raise", 90), // cold 4-bet, in front of UTG
+        act(3, "preflop", "fold", 200), // folding to the 4-bet
+      ],
+    });
+    expect(scanHand(cold4Bet, 3)!.foldToThreeBet).toEqual({ n: 0, d: 0 });
+    // Nobody else was 3-bet either.
+    for (const seat of [0, 1, 2, 4, 5]) {
+      expect(scanHand(cold4Bet, seat)!.foldToThreeBet).toEqual({ n: 0, d: 0 });
+    }
+  });
+
   it("gives a limper who later faces the open a 3-bet opportunity", () => {
     // Seat 3 limps, seat 5 opens, seat 3 re-raises: that is the third bet.
     const limpRaise = hand({
@@ -582,6 +604,32 @@ describe("c-bet and fold to c-bet", () => {
       board: FLOP,
       folded: [1],
     });
+    expect(scanHand(report, 2)!.foldToCbet).toEqual({ n: 0, d: 1 });
+  });
+
+  it("does not score a fold to a RAISE of the c-bet as a fold to the c-bet", () => {
+    // Check, check, c-bet, raise, fold. Seat 3's fold faces the raise, not the
+    // continuation bet — `toCall > 0` alone cannot tell the two apart, and the
+    // difference is the whole meaning of the stat.
+    const report = hand({
+      seatCount: 4,
+      button: 0,
+      actions: [
+        act(0, "preflop", "raise", 10),
+        act(2, "preflop", "call", 20),
+        act(3, "preflop", "call", 20),
+        act(1, "preflop", "fold", 25),
+        act(2, "flop", "check"),
+        act(3, "flop", "check"),
+        act(0, "flop", "bet"), // the c-bet
+        act(2, "flop", "raise", 30), // check-raise
+        act(3, "flop", "fold", 90), // folding to the raise
+      ],
+      board: FLOP,
+      folded: [1, 3],
+    });
+    expect(scanHand(report, 3)!.foldToCbet).toEqual({ n: 0, d: 0 });
+    // The check-raiser did face the c-bet, and raising it is a non-fold.
     expect(scanHand(report, 2)!.foldToCbet).toEqual({ n: 0, d: 1 });
   });
 });

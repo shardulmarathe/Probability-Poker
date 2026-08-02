@@ -40,14 +40,6 @@ import { percent, rate, type PlayerStats } from "./stats";
  */
 export type PlayStyle = "Nit" | "TAG" | "LAG" | "Calling Station" | "Maniac";
 
-export const PLAY_STYLES: readonly PlayStyle[] = [
-  "Nit",
-  "TAG",
-  "LAG",
-  "Calling Station",
-  "Maniac",
-] as const;
-
 export const STYLE_BLURBS: Record<PlayStyle, string> = {
   Nit: "Tight and passive. Folds too much preflop and gets no value from the hands it does play.",
   TAG: "Tight and aggressive. Few hands, played hard — the textbook winning style.",

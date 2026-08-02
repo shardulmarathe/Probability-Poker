@@ -18,6 +18,7 @@ import {
   runBeliefCountsFromCodes,
   type MonteCarloCounts,
 } from "../poker/monteCarlo";
+import type { Range } from "../poker/model/range";
 import type { BeliefDistribution } from "../types";
 
 /**
@@ -53,8 +54,17 @@ export interface MultiwayShardJob {
   heroHole: Uint8Array;
   board: Uint8Array;
   pool: Uint8Array;
-  /** Index-aligned with the caller's opponent list, not keyed by seat id. */
-  beliefs: BeliefDistribution[];
+  /**
+   * One weight per hole-card combo per seat, index-aligned with the caller's
+   * opponent list rather than keyed by seat id.
+   *
+   * 10.6 KB per seat on the wire against the 40 bytes a `BeliefDistribution[]`
+   * cost, which is the price of the migration's whole point: a tier label
+   * cannot express "this opponent has two pair on *this* board", and a weight
+   * per combo can. Structured clone handles a `Float64Array` natively, and the
+   * shard that receives it builds its own alias table.
+   */
+  ranges: Range[];
   sims: number;
   seed: number;
 }
@@ -89,7 +99,7 @@ export function runMultiwayShard(job: MultiwayShardJob): MultiwayShardResult {
     job.heroHole,
     job.board,
     job.pool,
-    job.beliefs,
+    job.ranges,
     job.sims,
     makeRng(job.seed)
   );

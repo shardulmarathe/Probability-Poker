@@ -20,7 +20,14 @@ import {
   HandBucket,
 } from "./buckets";
 import { createLikelihoodModel } from "./likelihood";
-import { COMBO_COUNT, comboCardA, comboCardB, comboIndex } from "./range";
+import {
+  COMBO_COUNT,
+  comboCardA,
+  comboCardB,
+  comboIndex,
+  totalWeight,
+} from "./range";
+import { runMultiway } from "../equity/multiway";
 import {
   FOLD_EQUITY_SIMS,
   MAX_TILT_FRACTION,
@@ -36,6 +43,7 @@ import {
   foldByBucket,
   handActions,
   opponentRange,
+  opponentRanges,
   opponentsOf,
   priceSizes,
   profileFor,
@@ -267,6 +275,22 @@ describe("equityRequest", () => {
   it("honours an explicit simulation budget", () => {
     const table = dealt(["tag", "rock", "nit"]);
     expect(equityRequest(table, 0, 777).simulations).toBe(777);
+  });
+
+  it("carries a range per opponent, not a three-tier read", () => {
+    // The migration at the seam: what crosses into the estimator is 1326
+    // weights per seat. A tier label cannot say "two pair on this board", and
+    // that is what every equity number the bot acts on is now built from.
+    const table = dealt(["tag", "rock", "nit", "lag"]);
+    const request = equityRequest(table, 0);
+    expect(Object.keys(request.ranges ?? {}).map(Number)).toEqual(
+      request.opponents
+    );
+    for (const id of request.opponents) {
+      const range = request.ranges![id];
+      expect(range).toHaveLength(COMBO_COUNT);
+      expect(totalWeight(range)).toBeCloseTo(1, 12);
+    }
   });
 });
 
@@ -623,6 +647,166 @@ describe("opponentRange", () => {
     // ...and leaves a real range behind.
     expect(range[comboIndex(encodeCard(makeCard(14, "s")), encodeCard(makeCard(14, "h")))])
       .toBeGreaterThan(0);
+  });
+});
+
+describe("opponentRanges", () => {
+  const rankOf = (c: number) => (c >> 2) + 2;
+  const suitOf = (c: number) => c & 3; // s=0 h=1 d=2 c=3
+
+  /** Share of a range's weight on combos matching a predicate. */
+  function share(
+    range: Float64Array,
+    pred: (a: number, b: number) => boolean
+  ): number {
+    let hit = 0;
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      if (range[c] > 0 && pred(comboCardA(c), comboCardB(c))) hit += range[c];
+    }
+    return hit / totalWeight(range);
+  }
+
+  /** A spot with a chosen board and a seat that has led every street. */
+  function driven(hero: [Card, Card], board: Card[], streets: ActionRecord["street"][]) {
+    const { table, seat } = flopSpot({
+      seats: 3, hero, board, pot: 60, seed: 4242,
+    });
+    table.street = board.length === 5 ? "river" : board.length === 4 ? "turn" : "flop";
+    table.actions = streets.map((street) => ({
+      seat: 1, street, action: "bet", cost: 10, potBefore: 40, toCall: 0,
+    }));
+    return { table, seat };
+  }
+
+  it("is a probability distribution after every update", () => {
+    const { table, seat } = driven(
+      [makeCard(14, "h"), makeCard(14, "c")],
+      [
+        makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d"),
+        makeCard(9, "c"), makeCard(4, "s"),
+      ],
+      ["flop", "turn", "river"]
+    );
+    for (const range of Object.values(opponentRanges(table, seat))) {
+      expect(totalWeight(range)).toBeCloseTo(1, 12);
+    }
+  });
+
+  it("zeroes every combo the hero can see, exactly", () => {
+    const board = [makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d")];
+    const { table, seat } = driven(
+      [makeCard(14, "h"), makeCard(14, "c")],
+      board,
+      ["flop"]
+    );
+    const dead = [...table.seats[seat].hole, ...board].map(encodeCard);
+    for (const range of Object.values(opponentRanges(table, seat))) {
+      let live = 0;
+      for (let c = 0; c < COMBO_COUNT; c++) {
+        const clash =
+          dead.includes(comboCardA(c)) || dead.includes(comboCardB(c));
+        if (clash) expect(range[c]).toBe(0);
+        else if (range[c] > 0) live++;
+      }
+      // C(52 - 5, 2): every combo the deck still allows keeps some weight.
+      expect(live).toBe(1081);
+    }
+  });
+
+  it("reads a seat that bets three streets as holding the board's hands", () => {
+    // The headline: on K-7-2-9-4 the combo 7-2 is two pair, and a seat that has
+    // driven the betting is *more* likely to hold it, not less. The preflop
+    // Chen score the estimator used to bucket by said the opposite, and every
+    // equity number inherited that.
+    const board = [
+      makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d"),
+      makeCard(9, "c"), makeCard(4, "s"),
+    ];
+    const { table, seat } = driven(
+      [makeCard(14, "h"), makeCard(14, "c")],
+      board,
+      ["flop", "turn", "river"]
+    );
+    const passive = flopSpot({
+      seats: 3, hero: [makeCard(14, "h"), makeCard(14, "c")],
+      board, pot: 60, seed: 4242,
+    });
+    passive.table.street = "river";
+    passive.table.actions = [];
+
+    const driving = opponentRanges(table, seat)[1];
+    const quiet = opponentRanges(passive.table, passive.seat)[1];
+
+    const isSevenDeuce = (a: number, b: number) => {
+      const lo = Math.min(rankOf(a), rankOf(b));
+      return lo === 2 && Math.max(rankOf(a), rankOf(b)) === 7;
+    };
+    const boardRanks = [13, 9, 7, 4, 2];
+    const twoPair = (a: number, b: number) =>
+      boardRanks.includes(rankOf(a)) &&
+      boardRanks.includes(rankOf(b)) &&
+      rankOf(a) !== rankOf(b);
+
+    // Betting moves weight onto hands this board actually made...
+    expect(share(driving, isSevenDeuce)).toBeGreaterThan(
+      share(quiet, isSevenDeuce)
+    );
+    expect(share(driving, twoPair)).toBeGreaterThan(2 * share(quiet, twoPair));
+    // ...and 7-2 is a real part of it, not a rounding error.
+    expect(share(driving, isSevenDeuce)).toBeGreaterThan(0.05);
+  });
+
+  it("puts the hero's blocker into the equity number", () => {
+    // Three hearts on board and the hero holds one ace or another. Identical in
+    // every way except which ace, so the whole difference is the blocker — and
+    // unlike a tier-normalised read, a per-combo range lets it reach the equity
+    // instead of handing the missing mass back to the same tier.
+    const board = [
+      makeCard(13, "h"), makeCard(7, "h"), makeCard(2, "h"),
+      makeCard(9, "c"), makeCard(4, "s"),
+    ];
+    const nutFlush = (a: number, b: number) =>
+      suitOf(a) === 1 && suitOf(b) === 1 && (rankOf(a) === 14 || rankOf(b) === 14);
+    const flush = (a: number, b: number) => suitOf(a) === 1 && suitOf(b) === 1;
+
+    const measure = (ace: "h" | "d") => {
+      const hero: [Card, Card] = [makeCard(14, ace), makeCard(9, "s")];
+      const { table, seat } = driven(hero, board, ["flop", "turn", "river"]);
+      const range = opponentRanges(table, seat)[1];
+      const equity = runMultiway({
+        heroHole: hero.map(encodeCard),
+        board: board.map(encodeCard),
+        opponents: [1],
+        ranges: { 1: range },
+        simulations: 400_000,
+        seed: 0x810c,
+      });
+      return { range, equity: equity.equity, se: equity.se };
+    };
+
+    const blocking = measure("h");
+    const not = measure("d");
+
+    expect(share(blocking.range, nutFlush)).toBe(0);
+    expect(share(not.range, nutFlush)).toBeGreaterThan(0.05);
+    expect(share(blocking.range, flush)).toBeLessThan(
+      share(not.range, flush) - 0.03
+    );
+    // The number the bot acts on, well outside the noise on it.
+    expect(blocking.equity).toBeGreaterThan(not.equity + 4 * not.se);
+  });
+
+  it("reads only public actions — never a seat's cards", () => {
+    const board = [makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d")];
+    const hero: [Card, Card] = [makeCard(14, "h"), makeCard(14, "c")];
+    const a = driven(hero, board, ["flop"]);
+    const b = driven(hero, board, ["flop"]);
+    // Same public record, different hidden cards: the read cannot move.
+    b.table.seats[1].hole = [makeCard(5, "c"), makeCard(5, "d")];
+    b.table.seats[2].hole = [makeCard(12, "s"), makeCard(11, "s")];
+    expect(Array.from(opponentRanges(a.table, a.seat)[1])).toEqual(
+      Array.from(opponentRanges(b.table, b.seat)[1])
+    );
   });
 });
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  beliefsFor,
+  beliefRange,
   finalizeMultiway,
   mergeMultiwayCounts,
+  rangesFor,
   remainingPool,
   runMultiway,
   runMultiwayCountsFromCodes,
@@ -13,6 +14,15 @@ import { makeCard, makeDeck, removeCards } from "../cards";
 import { decodeCard, encodeCard, encodeCards } from "../core/card";
 import { makeRng } from "../core/rng";
 import { scoreInts } from "../handEvaluator";
+import { classifyAll, makeBoardContext } from "../model/buckets";
+import {
+  COMBO_COUNT,
+  comboCardA,
+  comboCardB,
+  comboIndex,
+  emptyRange,
+  type Range,
+} from "../model/range";
 import { runBeliefCountsFromCodes } from "../monteCarlo";
 import { INITIAL_BELIEF } from "../../data/constants";
 import type {
@@ -64,7 +74,7 @@ function runOverPool(
   hero: number[],
   board: number[],
   pool: number[],
-  beliefs: BeliefDistribution[],
+  ranges: Range[],
   sims: number,
   seed: number
 ): MultiwayEquity {
@@ -72,11 +82,62 @@ function runOverPool(
     Uint8Array.from(hero),
     Uint8Array.from(board),
     Uint8Array.from(pool),
-    beliefs,
+    ranges,
     sims,
     makeRng(seed)
   );
-  return finalizeMultiway(counts, seats(beliefs.length));
+  return finalizeMultiway(counts, seats(ranges.length));
+}
+
+/**
+ * The production adapter, as a fixture: a three-tier read spread over combos by
+ * board-relative bucket. Tests still read as "a loose seat and a tight seat"
+ * while the sampler underneath sees 1326 weights.
+ */
+function readRange(
+  belief: BeliefDistribution,
+  hero: number[],
+  board: number[]
+): Range {
+  return beliefRange(belief, classifyAll(makeBoardContext(board)), [
+    ...hero,
+    ...board,
+  ]);
+}
+
+function readRanges(
+  beliefs: BeliefDistribution[],
+  hero: number[],
+  board: number[]
+): Range[] {
+  return beliefs.map((b) => readRange(b, hero, board));
+}
+
+/**
+ * The OLD sampler's law, written out: uniform inside a preflop `tierOf` bucket,
+ * each bucket carrying `belief[tier]`. Nothing in production builds this any
+ * more — it is here so the heads-up equivalence below can hand the new sampler
+ * the exact distribution the old one drew from and compare like with like.
+ */
+function tierProxyRange(pool: number[], belief: BeliefDistribution): Range {
+  const range = emptyRange();
+  const byTier: Record<StrengthTier, number[]> = { weak: [], medium: [], strong: [] };
+  for (let i = 0; i < pool.length; i++) {
+    for (let j = i + 1; j < pool.length; j++) {
+      byTier[tierOf(decodeCard(pool[i]), decodeCard(pool[j]))].push(
+        comboIndex(pool[i], pool[j])
+      );
+    }
+  }
+  const nonEmpty = TIERS.filter((t) => byTier[t].length > 0);
+  const spill =
+    TIERS.filter((t) => byTier[t].length === 0).reduce((s, t) => s + belief[t], 0) /
+    nonEmpty.length;
+  for (const t of nonEmpty) {
+    const w = (belief[t] + spill) / byTier[t].length;
+    for (const c of byTier[t]) range[c] = w;
+  }
+  return range;
 }
 
 // ---- Exact enumeration ----------------------------------------------------
@@ -105,15 +166,15 @@ function choose(n: number, k: number): number {
  * The exact answer, by walking every branch the sampler could draw.
  *
  * This is the reference the Monte Carlo is checked against, so it reproduces
- * the sampler's *law* rather than an idealised one: each seat proposes P(tier)
- * x uniform over that tier's combos, with mass from an empty tier spread
- * uniformly over the non-empty ones (the sampler's remap); the field's joint
- * proposal is the product of those; and the whole tuple is kept only if the
- * hands are disjoint. So the weight of a tuple is Π p(hᵢ) — no per-seat
- * conditioning — renormalized once at the end over the disjoint tuples alone,
- * which is what whole-tuple rejection converges to. Then uniform over board
- * completions. It shares no code with the kernel — only `scoreInts` and
- * `tierOf`, which are what is being assumed rather than tested here.
+ * the sampler's *law* rather than an idealised one: each seat proposes a combo
+ * with probability proportional to its weight in that seat's range, restricted
+ * to combos the pool can actually deal; the field's joint proposal is the
+ * product of those; and the whole tuple is kept only if the hands are disjoint.
+ * So the weight of a tuple is Π p(hᵢ) — no per-seat conditioning — renormalized
+ * once at the end over the disjoint tuples alone, which is what whole-tuple
+ * rejection converges to. Then uniform over board completions. It shares no
+ * code with the kernel beyond `scoreInts` and the combo index, which are what
+ * is being assumed rather than tested here.
  *
  * The one thing it does not model is the sampler's bounded-retry fallback, and
  * `accept` is reported so callers can check that omission rather than assume
@@ -124,44 +185,30 @@ function enumerateMultiway(
   hero: number[],
   board: number[],
   pool: number[],
-  beliefs: BeliefDistribution[]
+  ranges: Range[]
 ): Exact {
   const L = pool.length;
   const cc = board.length;
   const needed = 5 - cc;
-  const N = beliefs.length;
+  const N = ranges.length;
   const handSize = 7;
 
-  const poolCards = pool.map(decodeCard);
-  const byTier: Record<StrengthTier, number[][]> = {
-    weak: [],
-    medium: [],
-    strong: [],
-  };
+  // Every combo the pool can deal, as a pair of pool indices, with each seat's
+  // normalized proposal mass on it — the kernel's `poolSampler`, enumerated.
+  const allCombos: number[][] = [];
+  const comboOf: number[] = [];
   for (let i = 0; i < L; i++) {
     for (let j = i + 1; j < L; j++) {
-      byTier[tierOf(poolCards[i], poolCards[j])].push([i, j]);
+      allCombos.push([i, j]);
+      comboOf.push(comboIndex(pool[i], pool[j]));
     }
   }
-  const nonEmpty = TIERS.filter((t) => byTier[t].length > 0);
-
-  // Flatten to (combo, proposal mass) per seat: the chance one attempt offers
-  // this exact combo, before any card-removal rejection.
-  const allCombos: number[][] = [];
-  const comboTier: StrengthTier[] = [];
-  for (const t of TIERS) {
-    for (const c of byTier[t]) {
-      allCombos.push(c);
-      comboTier.push(t);
-    }
-  }
-  const mass = beliefs.map((b) => {
-    const spill =
-      TIERS.filter((t) => byTier[t].length === 0).reduce((s, t) => s + b[t], 0) /
-      nonEmpty.length;
-    return allCombos.map(
-      (_, k) => (b[comboTier[k]] + spill) / byTier[comboTier[k]].length
-    );
+  const mass = ranges.map((range) => {
+    const w = comboOf.map((c) => (range[c] > 0 ? range[c] : 0));
+    const total = w.reduce((s, x) => s + x, 0);
+    // The kernel's fallback for a range this deck leaves nothing of: no read.
+    if (!(total > 0)) return w.map(() => 1 / w.length);
+    return w.map((x) => x / total);
   });
 
   const heroHand = new Uint8Array(handSize);
@@ -296,7 +343,9 @@ describe("multiway — a settled board is arithmetic, not sampling", () => {
     const hero = codes("Ah", "Ad");
     const board = codes("Ks", "7c", "4d", "9h", "2s");
     const pool = codes("Kh", "Kd");
-    const r = runOverPool(hero, board, pool, [UNIFORM], 500, 7);
+    const r = runOverPool(
+      hero, board, pool, readRanges([UNIFORM], hero, board), 500, 7
+    );
 
     const heroScore = scoreInts(Uint8Array.from([...hero, ...board]), 7);
     const oppScore = scoreInts(Uint8Array.from([...pool, ...board]), 7);
@@ -312,11 +361,13 @@ describe("multiway — a settled board is arithmetic, not sampling", () => {
   it("splits a three-way chop into exactly a third of the pot", () => {
     // Broadway on the board, blanks all round: nothing in anyone's hand can
     // beat A-K-Q-J-T, and no flush or full house is reachable.
+    const hero = codes("2c", "3d");
+    const board = codes("As", "Ks", "Qd", "Jh", "Tc");
     const r = runOverPool(
-      codes("2c", "3d"),
-      codes("As", "Ks", "Qd", "Jh", "Tc"),
+      hero,
+      board,
       codes("4c", "4d", "5h", "5s"),
-      [UNIFORM, UNIFORM],
+      readRanges([UNIFORM, UNIFORM], hero, board),
       500,
       11
     );
@@ -329,11 +380,13 @@ describe("multiway — a settled board is arithmetic, not sampling", () => {
   });
 
   it("reports 1 for the nuts and 0 when every opponent has it beat", () => {
+    const royalHero = codes("As", "Ks");
+    const royalBoard = codes("Qs", "Js", "Ts", "2d", "3c"); // hero has a royal
     const nuts = runOverPool(
-      codes("As", "Ks"),
-      codes("Qs", "Js", "Ts", "2d", "3c"), // hero holds a royal flush
+      royalHero,
+      royalBoard,
       codes("4h", "5h", "6c", "7d"),
-      [UNIFORM, UNIFORM],
+      readRanges([UNIFORM, UNIFORM], royalHero, royalBoard),
       400,
       3
     );
@@ -343,11 +396,13 @@ describe("multiway — a settled board is arithmetic, not sampling", () => {
 
     // Four tens in the pool, so both opponents complete the broadway straight
     // whatever the split, and the hero's ace-high never gets there.
+    const deadHero = codes("2c", "3d");
+    const deadBoard = codes("Ah", "Kd", "Qs", "Jc", "9h");
     const dead = runOverPool(
-      codes("2c", "3d"),
-      codes("Ah", "Kd", "Qs", "Jc", "9h"),
+      deadHero,
+      deadBoard,
       codes("Th", "Ts", "Td", "Tc"),
-      [UNIFORM, UNIFORM],
+      readRanges([UNIFORM, UNIFORM], deadHero, deadBoard),
       400,
       5
     );
@@ -367,8 +422,9 @@ describe("multiway — matches exhaustive enumeration", () => {
     expect(pool).toHaveLength(46);
 
     // 1035 combos x 44 rivers, every branch weighted by its exact probability.
-    const exact = enumerateMultiway(hero, board, pool, [INITIAL_BELIEF]);
-    const mc = runOverPool(hero, board, pool, [INITIAL_BELIEF], 200_000, 0xe1);
+    const ranges = readRanges([INITIAL_BELIEF], hero, board);
+    const exact = enumerateMultiway(hero, board, pool, ranges);
+    const mc = runOverPool(hero, board, pool, ranges, 200_000, 0xe1);
 
     // One seat can never collide with itself, so every proposal is accepted
     // and the retry loop is dead code on this path.
@@ -386,9 +442,9 @@ describe("multiway — matches exhaustive enumeration", () => {
 
   it("two opponents on a settled board", () => {
     const board = codes("Qs", "Jc", "7h", "3d", "2c");
-    const beliefs = [UNIFORM, UNIFORM];
-    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, beliefs);
-    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, beliefs, 200_000, 0xe2);
+    const ranges = readRanges([UNIFORM, UNIFORM], SMALL_HERO, board);
+    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, ranges);
+    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, ranges, 200_000, 0xe2);
 
     expect(fallbackRate(exact)).toBeLessThan(1e-30);
     expect(bracketsWilson(mc, exact.pWin)).toBe(true);
@@ -400,9 +456,9 @@ describe("multiway — matches exhaustive enumeration", () => {
 
   it("two opponents with a river to come", () => {
     const board = codes("Qs", "Jc", "7h", "3d");
-    const beliefs = [UNIFORM, UNIFORM];
-    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, beliefs);
-    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, beliefs, 200_000, 0xe3);
+    const ranges = readRanges([UNIFORM, UNIFORM], SMALL_HERO, board);
+    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, ranges);
+    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, ranges, 200_000, 0xe3);
 
     expect(fallbackRate(exact)).toBeLessThan(1e-30);
     expect(bracketsWilson(mc, exact.pWin)).toBe(true);
@@ -421,8 +477,9 @@ describe("multiway — matches exhaustive enumeration", () => {
       UNIFORM,
       { weak: 0.15, medium: 0.35, strong: 0.5 },
     ];
-    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, beliefs);
-    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, beliefs, 200_000, 0xe4);
+    const ranges = readRanges(beliefs, SMALL_HERO, board);
+    const exact = enumerateMultiway(SMALL_HERO, board, SMALL_POOL, ranges);
+    const mc = runOverPool(SMALL_HERO, board, SMALL_POOL, ranges, 200_000, 0xe4);
 
     // Three seats over a twelve-card pool is the tightest fixture here, and it
     // still leaves 256 consecutive rejections far below anything observable.
@@ -492,12 +549,51 @@ describe("multiway — invariants", () => {
     const withRead = runMultiway({ ...req(2, 8000), beliefs: sameBelief(2, UNIFORM) });
     const noRead = runMultiway({ ...req(2, 8000), beliefs: {} });
     expect(noRead).toEqual(withRead);
-    expect(beliefsFor({ ...req(2), beliefs: {} })).toEqual([UNIFORM, UNIFORM]);
+    expect(rangesFor({ ...req(2), beliefs: {} })).toEqual(
+      rangesFor({ ...req(2), beliefs: sameBelief(2, UNIFORM) })
+    );
+  });
+
+  it("prefers an explicit range to the belief for the same seat", () => {
+    // The migration in one assertion: a seat carries a weight per combo, and
+    // the three-tier read is only consulted when nothing better was supplied.
+    const base = req(1, 8000);
+    const pinned = emptyRange();
+    pinned[comboIndex(code("Ah"), code("Ad"))] = 1;
+
+    const viaRange = runMultiway({ ...base, ranges: { 1: pinned } });
+    // Aces on J-7-2 against pocket queens: the opponent has exactly one hand,
+    // and it is the one that beats the hero every time.
+    expect(viaRange.equity).toBeLessThan(0.2);
+    expect(viaRange.equity).not.toBeCloseTo(runMultiway(base).equity, 2);
+  });
+
+  it("zeroes the hero's cards and the board out of a range it is handed", () => {
+    // A caller that forgot card removal must not be able to deal the hero's own
+    // ace to an opponent — the request's board and hole cards win.
+    const base = req(1);
+    const flat = new Float64Array(COMBO_COUNT).fill(1) as Range;
+    const dead = [...base.heroHole, ...base.board];
+    for (const range of rangesFor({ ...base, ranges: { 1: flat } })) {
+      let live = 0;
+      for (let c = 0; c < COMBO_COUNT; c++) {
+        const clash =
+          dead.includes(comboCardA(c)) || dead.includes(comboCardB(c));
+        if (clash) expect(range[c]).toBe(0);
+        else live += range[c];
+      }
+      // C(52 - 5, 2) = 1081 combos survive, each still weighted 1.
+      expect(live).toBe(1081);
+    }
+    // ...and the caller's own array is untouched: the copy is not optional.
+    expect(flat.every((w) => w === 1)).toBe(true);
   });
 
   it("refuses a deck too small to deal the hands it was asked for", () => {
+    const hero = codes("Ah", "Kd");
+    const board = codes("Qs", "Jc", "7h", "3d");
     expect(() =>
-      runOverPool(codes("Ah", "Kd"), codes("Qs", "Jc", "7h", "3d"), codes("2c", "3c", "4c"), [UNIFORM, UNIFORM], 10, 1)
+      runOverPool(hero, board, codes("2c", "3c", "4c"), readRanges([UNIFORM, UNIFORM], hero, board), 10, 1)
     ).toThrow(/cannot deal/);
   });
 
@@ -536,42 +632,63 @@ describe("multiway — invariants", () => {
 
 describe("multiway — one opponent is the heads-up sampler", () => {
   /**
-   * Not "close to": identical, count for count.
+   * WHAT CHANGED HERE, AND WHY.
    *
-   * The kernel's availability window is built so that with a single opponent it
-   * consumes the same draws in the same order as `runBeliefCountsFromCodes` —
-   * same tier draw, same combo index, then a board completion whose Fisher-Yates
-   * bounds work out to the same `rng.int` arguments against the same
-   * permutation. Anything that perturbs the stream (an extra rejection attempt,
-   * a reordered bucket, a different swap) shows up here immediately, which is
-   * the point: the multiway kernel is a strict generalisation, and this pins it.
+   * This assertion used to be exact — `multi.wins === headsUp.wins`, count for
+   * count. It could be, because both kernels drew a seat's hand the same way:
+   * one `rng.next()` for a tier, one `rng.int()` for a combo inside it. The
+   * range sampler spends a single `rng.next()` on an alias-table draw instead,
+   * so the two consume the streams differently and every later draw in the sim
+   * is offset. The identity is gone and cannot be recovered; keeping it would
+   * mean keeping the preflop tier bucketing this migration exists to remove.
+   *
+   * What survives is the claim the identity was standing in for: hand the new
+   * sampler the *distribution* the old one drew from — `tierProxyRange`, the
+   * old law written out — and it estimates the same quantity. Measured over the
+   * four streets below at 200k sims, |pWin_multi − pWin_headsup| came out
+   * 0.0013 / 0.0004 / 0.0014 / 0.0000, against an SE-of-difference of ~0.0014.
+   * Three of the four land inside one SE; the bound is 4.
+   *
+   * The structural half of the old test is unweakened: with one opponent the
+   * field result and the head-to-head are the same question, and every tie is a
+   * two-way chop. Those are exact and stay exact.
    */
-  it("reproduces `runBeliefCounts` exactly on every street", () => {
+  it("estimates what `runBeliefCounts` estimates, on every street", () => {
     for (const boardSize of [0, 3, 4, 5]) {
       const seed = 0x5a1a + boardSize;
       const deck = makeRng(seed).shuffle(makeDeck());
       const hole = encodeCards(deck.slice(0, 2));
       const community = encodeCards(deck.slice(2, 2 + boardSize));
-      const pool = encodeCards(
-        removeCards(makeDeck(), deck.slice(0, 2 + boardSize))
-      );
+      const poolCards = removeCards(makeDeck(), deck.slice(0, 2 + boardSize));
+      const pool = encodeCards(poolCards);
 
+      const sims = 200_000;
       const headsUp = runBeliefCountsFromCodes(
-        hole, community, pool, INITIAL_BELIEF, 5000, makeRng(seed)
+        hole, community, pool, INITIAL_BELIEF, sims, makeRng(seed)
       );
       const multi = runMultiwayCountsFromCodes(
-        hole, community, pool, [INITIAL_BELIEF], 5000, makeRng(seed)
+        hole,
+        community,
+        pool,
+        [tierProxyRange(Array.from(pool), INITIAL_BELIEF)],
+        sims,
+        makeRng(seed)
       );
 
-      expect(multi.wins).toBe(headsUp.wins);
-      expect(multi.ties).toBe(headsUp.ties);
-      expect(multi.losses).toBe(headsUp.losses);
+      // Two independent estimates of one probability: SE of the difference is
+      // sqrt(2 p (1-p) / sims), at most 0.0016 here.
+      const p = headsUp.wins / sims;
+      const se = Math.sqrt((2 * p * (1 - p)) / sims);
+      expect(Math.abs(multi.wins / sims - p)).toBeLessThan(4 * se);
+      expect(Math.abs((multi.ties - headsUp.ties) / sims)).toBeLessThan(0.01);
+      expect(multi.wins + multi.ties + multi.losses).toBe(sims);
+
       // With one opponent the field result and the head-to-head are the same
-      // question, so these must be the same numbers too.
-      expect(multi.h2hWins[0]).toBe(headsUp.wins);
-      expect(multi.h2hTies[0]).toBe(headsUp.ties);
+      // question, so these must be the same numbers — exactly.
+      expect(multi.h2hWins[0]).toBe(multi.wins);
+      expect(multi.h2hTies[0]).toBe(multi.ties);
       // Every tie is heads-up, hence a two-way chop.
-      expect(multi.tieBySize[2]).toBe(headsUp.ties);
+      expect(multi.tieBySize[2]).toBe(multi.ties);
     }
   });
 
@@ -741,5 +858,153 @@ describe("multiway — dealing is symmetric in seat order", () => {
     expect(Math.abs(forward.perOpponent[2] - reversed.perOpponent[2])).toBeLessThan(se);
     // Permuting the field cannot change "beat everyone" either.
     expect(Math.abs(forward.equity - reversed.equity)).toBeLessThan(se);
+  });
+});
+
+// ---- The defect the migration removed ---------------------------------------
+
+describe("multiway — the sampler classifies against the board, not the deal", () => {
+  /**
+   * WHAT THIS SECTION IS FOR.
+   *
+   * The kernel used to bucket the pool with `bayesian.tierOf`, a preflop Chen
+   * score, and draw uniformly inside the chosen tier. Every equity number the
+   * bot acted on was built on that classifier, and the classifier is wrong the
+   * moment there is a board: 7-2 on K-7-2-9-4 is two pair and it called it
+   * trash; aces on 5-6-7-8-9 are playing the board and it called them a monster.
+   *
+   * `tierProxyRange` above is that old law, written out, so both readings can be
+   * measured on one scale — the numbers below are the old sampler's answer and
+   * the new one's for the same read on the same board.
+   */
+  const TIGHT: BeliefDistribution = { weak: 0.1, medium: 0.2, strong: 0.7 };
+
+  /** Share of a range's weight that sits on combos matching a card predicate. */
+  function share(range: Range, pred: (a: number, b: number) => boolean): number {
+    let total = 0;
+    let hit = 0;
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      const w = range[c];
+      if (!(w > 0)) continue;
+      total += w;
+      if (pred(comboCardA(c), comboCardB(c))) hit += w;
+    }
+    return total > 0 ? hit / total : 0;
+  }
+
+  const rankOf = (c: number) => (c >> 2) + 2;
+  const suitOf = (c: number) => c & 3;
+  const isSevenDeuce = (a: number, b: number) => {
+    const lo = Math.min(rankOf(a), rankOf(b));
+    const hi = Math.max(rankOf(a), rankOf(b));
+    return lo === 2 && hi === 7;
+  };
+
+  it("moves 7-2 on K-7-2-9-4 from the bottom of the range to the top", () => {
+    const hero = codes("Ah", "Ac");
+    const board = codes("Ks", "7h", "2d", "9c", "4s");
+    const pool = Array.from(remainingPool(hero, board));
+
+    const before = tierProxyRange(pool, TIGHT);
+    const after = readRange(TIGHT, hero, board);
+
+    // A tight read files 7-2 under "weak" preflop, so it is nearly excluded;
+    // on this board it is two pair and the same read now favours it.
+    expect(share(before, isSevenDeuce)).toBeLessThan(0.002);
+    expect(share(after, isSevenDeuce)).toBeGreaterThan(0.03);
+    expect(share(after, isSevenDeuce)).toBeGreaterThan(
+      15 * share(before, isSevenDeuce)
+    );
+
+    // ...and the hero's number moves with it: aces are a huge favourite against
+    // the preflop reading of this range and barely ahead of the real one.
+    const base = { heroHole: hero, board, opponents: [1], simulations: 200_000, seed: 0xf1 };
+    const eqBefore = finalizeMultiway(
+      runMultiwayCountsFromCodes(
+        Uint8Array.from(hero), Uint8Array.from(board), Uint8Array.from(pool),
+        [before], base.simulations, makeRng(base.seed)
+      ),
+      [1]
+    );
+    const eqAfter = runMultiway({ ...base, ranges: { 1: after } });
+    expect(eqBefore.equity).toBeGreaterThan(0.85);
+    expect(eqAfter.equity).toBeLessThan(0.65);
+  });
+
+  it("stops calling aces a monster when the board is a straight", () => {
+    const hero = codes("As", "Ad");
+    const board = codes("5s", "6h", "7d", "8c", "9s");
+    const pool = Array.from(remainingPool(hero, board));
+    const hasTen = (a: number, b: number) => rankOf(a) === 10 || rankOf(b) === 10;
+
+    const before = tierProxyRange(pool, TIGHT);
+    const after = readRange(TIGHT, hero, board);
+
+    // Everything but a ten (or better) is playing the board here, so the honest
+    // reading of "strong" is "holds a ten" and the preflop one is "holds aces".
+    expect(share(after, hasTen)).toBeGreaterThan(2 * share(before, hasTen));
+
+    const eqBefore = finalizeMultiway(
+      runMultiwayCountsFromCodes(
+        Uint8Array.from(hero), Uint8Array.from(board), Uint8Array.from(pool),
+        [before], 200_000, makeRng(0xf2)
+      ),
+      [1]
+    );
+    const eqAfter = runMultiway({
+      heroHole: hero, board, opponents: [1], ranges: { 1: after },
+      simulations: 200_000, seed: 0xf2,
+    });
+    // The hero never wins outright either way — the best hand available is the
+    // board — but how often the chop is taken away moves a long way.
+    expect(eqBefore.pWin).toBe(0);
+    expect(eqAfter.pWin).toBe(0);
+    expect(eqAfter.equity).toBeLessThan(eqBefore.equity - 0.15);
+  });
+
+  it("makes a blocked combo impossible, and says where that stops", () => {
+    // Three hearts out, and the hero holds the ace of one suit or another. The
+    // only difference between the two runs is which ace, so any difference in
+    // the answer is the blocker.
+    const board = codes("Kh", "7h", "2h", "9c", "4s");
+    const twoHearts = (a: number, b: number) => suitOf(a) === 1 && suitOf(b) === 1;
+    const nutFlush = (a: number, b: number) =>
+      twoHearts(a, b) && (rankOf(a) === 14 || rankOf(b) === 14);
+
+    const measure = (heroCards: string[]) => {
+      const hero = codes(...heroCards);
+      const range = readRange(TIGHT, hero, board);
+      const equity = runMultiway({
+        heroHole: hero, board, opponents: [1], ranges: { 1: range },
+        simulations: 400_000, seed: 0xf3,
+      });
+      return {
+        flush: share(range, twoHearts),
+        nut: share(range, nutFlush),
+        equity: equity.equity,
+        se: equity.se,
+      };
+    };
+
+    const blocking = measure(["Ah", "9s"]);
+    const not = measure(["Ad", "9s"]);
+
+    // The nut flush is not merely unlikely, it is impossible — and card removal
+    // does it, with no blocker rule anywhere in the model.
+    expect(blocking.nut).toBe(0);
+    expect(not.nut).toBeGreaterThan(0.04);
+    // Which thins the flush combos the opponent can hold at all.
+    expect(blocking.flush).toBeLessThan(not.flush - 0.03);
+
+    // AND YET THE EQUITY BARELY MOVES — 0.25062 against 0.25059, a fortieth of
+    // one SE. That is not a bug here, it is the ceiling on what a three-tier
+    // read can express, and it is worth pinning rather than glossing:
+    // `beliefRange` sets each tier's TOTAL weight to `belief[tier]`, so deleting
+    // the nut flush hands its mass straight back to the other strong combos and
+    // P(opponent is strong) never changes. A blocker only reaches the number
+    // when the weights are built per combo and never renormalised per tier,
+    // which is what `decider.opponentRanges` does — see its own blocker test,
+    // where the same spot moves 0.1417 to 0.1509, about 16 SE.
+    expect(Math.abs(blocking.equity - not.equity)).toBeLessThan(0.1 * not.se);
   });
 });

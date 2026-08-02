@@ -20,8 +20,15 @@
  *  - A walk in the big blind is not a fold. The big blind checking its option is
  *    a `check`, which is voluntary in no sense and passive in no sense; it
  *    counts toward neither VPIP nor the aggression denominators.
- *  - An all-in call is still a call. The engine labels it `call` with the cost
- *    clamped to the stack, and nothing here reads the label or the size.
+ *  - An all-in call is still a call. Nothing here reads the label or the size,
+ *    which is what makes that true: `rules.ts` emits `{type:"call", cost:
+ *    toCall}` unconditionally — only the *label* consults the stack — and
+ *    `engine.ts` copies that straight into `ActionRecord.cost`. So the recorded
+ *    cost of a short all-in call OVERSTATES the chips the seat actually put in
+ *    (`commitChips` moves what the stack holds). Every counter here is a count
+ *    of actions, so the overstatement cannot reach a stat; anything downstream
+ *    that prices `ActionRecord.cost` — EV work in particular — is charging
+ *    chips that never left the stack.
  *
  * Pure functions over reports. No state, no accumulation object, no ordering
  * requirement — `computeStats(a.concat(b))` equals `mergeStats(f(a), f(b))`.
@@ -76,7 +83,10 @@ export interface StatCounters {
   /**
    * Fold to 3-bet%.
    * n: the seat folded.
-   * d: hands where the seat made the opening raise, was 3-bet, and acted again.
+   * d: hands where the seat made the opening raise, was 3-bet, and acted again
+   *    *still facing the 3-bet*. A cold 4-bet landing in between removes the
+   *    opportunity rather than creating a fold: the seat is answering the
+   *    4-bet, and counting that here is the standard way this stat inflates.
    * The seat's response to the 3-bet only — a 4-bet that later folds to a 5-bet
    * is a non-fold here, because the question is what the 3-bet accomplished.
    */
@@ -134,7 +144,9 @@ export interface StatCounters {
    * Fold to flop c-bet%.
    * n: the seat folded to it.
    * d: hands where somebody else was the preflop aggressor, bet the flop, and
-   *    the seat then had to act facing that bet.
+   *    the seat then had to act facing *that* bet — nothing raised in between.
+   *    A raise of the c-bet ahead of the seat removes the opportunity: the
+   *    seat's fold answers the raise, and scoring it here inflates the stat.
    */
   foldToCbet: Counter;
 
@@ -308,6 +320,13 @@ function scanPreflop(actions: ActionRecord[], seat: number): PreflopScan {
       // The second voluntary raise over our open is the 3-bet we must answer.
       else if (raises === 2 && opener === seat && a.seat !== seat) {
         awaitingFoldToThreeBet = true;
+      } else if (raises > 2) {
+        // A cold 4-bet reached us before we got to act. Whatever we do next
+        // answers *that*, so the 3-bet never got its answer and this hand is
+        // not an observation of the stat at all — arm nothing, count nothing.
+        // (Our own 4-bet cannot land here: the block above already consumed
+        // the flag on our action, before this one folds it into `raises`.)
+        awaitingFoldToThreeBet = false;
       }
       aggressor = a.seat;
     }
@@ -390,7 +409,18 @@ export function scanHand(
       (a) => a.seat === pre.aggressor && a.action === "bet"
     );
     if (cbetAt >= 0) {
-      const answer = flop.slice(cbetAt + 1).find((a) => a.seat === seat);
+      // Our first action after the c-bet, but only while the c-bet is still
+      // what we are facing. A raise of it in front of us replaces the question:
+      // folding to a check-raise is not folding to a continuation bet, and
+      // `toCall > 0` alone cannot tell the two apart.
+      let answer: ActionRecord | undefined;
+      for (const a of flop.slice(cbetAt + 1)) {
+        if (a.seat === seat) {
+          answer = a;
+          break;
+        }
+        if (AGGRESSIVE.has(a.action)) break;
+      }
       if (answer && answer.toCall > 0) {
         c.foldToCbet.d = 1;
         c.foldToCbet.n = answer.action === "fold" ? 1 : 0;

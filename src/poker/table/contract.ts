@@ -10,6 +10,7 @@
 
 import type { BeliefDistribution, HandResult, Street } from "../../types";
 import type { FoldEquityBreakdown } from "../ev";
+import type { Range } from "../model/range";
 import type { TableSeat, TableState } from "./state";
 import type { TableAction, TableConfig } from "./rules";
 
@@ -51,8 +52,30 @@ export interface EquityRequest {
   board: number[];
   /** Seat ids still contesting the pot, excluding the hero. */
   opponents: number[];
-  /** The table's current read on each opponent, keyed by seat id. */
-  beliefs: Record<number, BeliefDistribution>;
+  /**
+   * What the sampler actually draws each opponent's hole cards from: a weight
+   * per hole-card combination, keyed by seat id.
+   *
+   * This is the whole read, not a summary of one. A three-tier belief can say
+   * an opponent is 70% likely to be strong; it cannot say *which* hands those
+   * are, so a sampler fed one has to guess — and the guess it used to make was
+   * a preflop Chen score, which files 7-2 under "weak" on K-7-2-9-4 and aces
+   * under "strong" on 5-6-7-8-9. A `Range` carries the board-relative answer
+   * and the card removal together, so blockers land in the equity number rather
+   * than only in the display.
+   */
+  ranges?: Record<number, Range>;
+  /**
+   * The table's three-tier read, kept for callers that have not been migrated
+   * (`coach/evLoss.ts` scores a finished hand from action records alone).
+   *
+   * Consulted only for a seat `ranges` has no entry for, and then it is spread
+   * over combos by *board-relative* bucket (`beliefRange`) rather than by the
+   * preflop score — so even this path no longer inherits the defect. Supplying
+   * neither is legal and means no read at all: a flat prior over every combo
+   * the deck still allows.
+   */
+  beliefs?: Record<number, BeliefDistribution>;
   simulations: number;
   seed: number;
 }

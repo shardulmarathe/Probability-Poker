@@ -30,12 +30,20 @@ import { makeRng } from "../core/rng";
 import { runBeliefMonteCarlo } from "../monteCarlo";
 import { makeCard, makeDeck, removeCards } from "../cards";
 import {
-  beliefsFor,
   finalizeMultiway,
   mergeMultiwayCounts,
+  rangesFor,
   remainingPool,
   runMultiway,
 } from "./multiway";
+import {
+  COMBO_COUNT,
+  comboCardA,
+  comboCardB,
+  comboIndex,
+  uniformRange,
+  type Range,
+} from "../model/range";
 import { INITIAL_BELIEF } from "../../data/constants";
 import type { BeliefDistribution, Card, RankValue, Suit } from "../../types";
 import type { EquityRequest } from "../table/contract";
@@ -107,6 +115,26 @@ function multiwayJob(
   };
 }
 
+/**
+ * The same field, but with an explicit `Range` per seat instead of a three-tier
+ * read — the shape `decider.ts` actually builds. Seat i tilts toward combos
+ * whose low card code is congruent to i, which is arbitrary but distinguishable:
+ * a bug that shared one range across the field, or shuffled the seat order,
+ * changes the answer.
+ */
+function multiwayRangeJob(seed: number, n = 3, boardCards = 3, sims = 4000): EquityRequest {
+  const base = multiwayJob(seed, n, boardCards, sims);
+  const ranges: Record<number, Range> = {};
+  base.opponents.forEach((id, i) => {
+    const range = uniformRange();
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      if ((comboCardA(c) + comboCardB(c)) % (n + 1) === i) range[c] *= 6;
+    }
+    ranges[id] = range;
+  });
+  return { ...base, ranges };
+}
+
 /** The multiway job replayed the way the worker path does, clones and all. */
 function viaMultiwayWorkerTransport(req: EquityRequest) {
   const wire = {
@@ -114,7 +142,7 @@ function viaMultiwayWorkerTransport(req: EquityRequest) {
     heroHole: Uint8Array.from(req.heroHole),
     board: Uint8Array.from(req.board),
     pool: remainingPool(req.heroHole, req.board),
-    beliefs: beliefsFor(req),
+    ranges: rangesFor(req),
   };
   const parts = planShards(req.simulations, req.seed).map((s, i) => {
     const msg: MultiwayShardJob = { ...wire, id: i, sims: s.sims, seed: s.seed };
@@ -256,6 +284,35 @@ describe("equity pool — multiway", () => {
     }
   });
 
+  it("carries explicit per-combo ranges across the message boundary too", () => {
+    // 1326 Float64s per seat now cross `postMessage`, not three numbers. A
+    // structured clone of a typed array is the one thing the in-process path
+    // does not exercise, and the whole read rides on it.
+    for (const board of [0, 3, 5]) {
+      for (const n of [1, 3]) {
+        const req = multiwayRangeJob(0x4ee + board + n, n, board, 4000);
+        expect(viaMultiwayWorkerTransport(req)).toEqual(
+          runMultiwayEquitySync(req)
+        );
+      }
+    }
+  });
+
+  it("draws a pinned range's only combo and nothing else", () => {
+    // End to end through the shard planner and the merge: a seat whose range
+    // allows exactly one holding must be dealt exactly that holding, so the
+    // hero's equity is the deterministic showdown against it.
+    const req = multiwayJob(0x9111, 1, 5, 4000);
+    const jacks = codes("Jd", "Js");
+    const only = new Float64Array(COMBO_COUNT) as Range;
+    only[comboIndex(jacks[0], jacks[1])] = 1;
+    const r = runMultiwayEquitySync({ ...req, ranges: { 1: only } });
+    // Hero QQ on J-7-2-9-4 against JJ: a set of jacks, every single time.
+    expect(r.pWin).toBe(0);
+    expect(r.pLoss).toBe(1);
+    expect(r.simulations).toBe(4000);
+  });
+
   it("is a pure function of seed, sims and the field", () => {
     const req = multiwayJob(0xc0c0, 3);
     expect(runMultiwayEquitySync(req)).toEqual(runMultiwayEquitySync(req));
@@ -317,7 +374,7 @@ describe("equity pool — multiway", () => {
       heroHole: Uint8Array.from(mw.heroHole),
       board: Uint8Array.from(mw.board),
       pool: remainingPool(mw.heroHole, mw.board),
-      beliefs: beliefsFor(mw),
+      ranges: rangesFor(mw),
       id: 2,
       sims: 100,
       seed: 5,

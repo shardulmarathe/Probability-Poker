@@ -341,19 +341,30 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
   return { action: best, reason: "argmax", tiltedEv };
 }
 
-/** Is some non-fold action making enough per chip risked to ignore the gate? */
+/**
+ * Is calling so obviously profitable that the style's entry gate should yield?
+ *
+ * Only *passive* actions can waive the gate, and deliberately so. The override
+ * exists for the case its constant documents — a nit in the big blind getting
+ * 6-to-1 — which is a call: cheap, priced entirely by this street, and wrong to
+ * fold. A raise is different in kind. Its EV here is a single-street number, and
+ * the chips it commits get contested on streets this model cannot see, so a
+ * marginal steal showing a small edge is not evidence the hand is worth playing.
+ * Letting raises waive the gate made every profile enter 42-54% of pots and
+ * collapsed the roster toward the maniac.
+ *
+ * The bar also scales with what the action actually risks rather than with the
+ * price of calling, which is what the constant's "per chip risked" means.
+ */
 function clearlyProfitable(
   actions: TableAction[],
   tiltedEv: Record<string, number>,
   toCall: number
 ): boolean {
-  // The bar scales with what the action actually risks, not with the price of
-  // calling. A raise puts in far more than `toCall`, so measuring it against a
-  // call-sized bar let a marginal steal clear the gate and made every profile
-  // enter ~42-54% of pots — the roster collapsed toward the maniac.
   return actions.some(
     (a) =>
       a.type !== "fold" &&
+      !isAggressive(a) &&
       tiltedEv[a.label] > ENTRY_OVERRIDE_EDGE * Math.max(a.cost, toCall, 1)
   );
 }

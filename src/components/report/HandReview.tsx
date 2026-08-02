@@ -109,6 +109,20 @@ export default function HandReview() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {report && (
+              <Link
+                to={`/replay/${report.seed}`}
+                data-testid="review-to-replay"
+                className="min-h-[36px] rounded-lg border px-2.5 py-1.5 font-display text-xs transition hover:-translate-y-px"
+                style={{
+                  borderColor: "rgba(201,162,39,0.45)",
+                  background: "rgba(201,162,39,0.12)",
+                  color: "#e2c563",
+                }}
+              >
+                Replay ▸
+              </Link>
+            )}
             {hands.length > 0 && (
               <>
                 <button

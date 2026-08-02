@@ -7,6 +7,7 @@
  * is derived from what this one shows.
  */
 
+import { useMemo } from "react";
 import { money, pct } from "../../lib/format";
 import { positionOf } from "../../poker/table/position";
 import type { TableHandReport } from "../../poker/table/contract";
@@ -51,7 +52,9 @@ const ACTION_TONE: Record<string, "quiet" | "gold" | "good" | "bad"> = {
 export function HandTab({ report, focus, seatName, isHero }: Props) {
   const you = seatResult(report, focus);
   const pots = potViews(report);
-  const equities = streetEquities(report, focus);
+  // Every head-to-head runs the two hands out; preflop that is a sampled loop,
+  // so it must not be redone on an unrelated re-render.
+  const equities = useMemo(() => streetEquities(report, focus), [report, focus]);
   const streets = actionsByStreet(report.actions);
   const totalPot = report.pots.reduce((s, p) => s + p.amount, 0);
   const winners = report.seats.filter((s) => s.won > 0);
@@ -347,7 +350,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                         </span>
                       }
                       value={h.equity}
-                      text={`${pct(h.equity)}${h.source === "inverted" ? " ·inv" : ""}`}
+                      text={`${pct(h.equity)}${h.source === "estimate" ? " ·est" : h.exact ? "" : " ±"}`}
                       color={h.equity < 0.5 ? "#d24a4a" : "#e2c563"}
                     />
                   ))}
@@ -361,8 +364,8 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                       {pct(1 - e.threat.equity)}
                     </span>{" "}
                     head-to-head
-                    {e.threat.source === "inverted"
-                      ? ", by its own estimate against the range it had you on."
+                    {e.threat.source === "estimate"
+                      ? `, by ${isHero ? "your" : "that"} seat's own estimate — its cards are not on the record.`
                       : "."}
                   </p>
                 )}
@@ -379,7 +382,10 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             equity against each opponent taken <em>alone</em>. They come apart
             fast. A hand can be a 60% favourite over every seat individually and
             still be an underdog to the field, because beating all of them at
-            once is a conjunction, not an average.
+            once is a conjunction, not an average. The “vs field” figure here is
+            the estimate the seat acted on at the time, against ranges; the bars
+            below are settled after the fact from the cards everyone actually
+            had, so the two are answers to different questions.
           </Lead>
           <Calc>
             P(beat all) ≠ min&#8202;ᵢ P(beat i) &nbsp;&nbsp; and &nbsp;&nbsp; P(beat
@@ -391,27 +397,46 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             least happy to see. That is the seat whose cards were actually
             driving your equity down; the rest were along for the ride.
           </Lead>
-          <Heading>The “inv” marker</Heading>
-          <Lead>
-            A human seat never runs a simulation, so it records nothing. But
-            equity in a matchup is one number viewed from two sides: when the
-            opponent priced its own decision it stored its equity against you, and
-            one minus that is your equity against it. Numbers recovered that way
-            are marked{" "}
-            <span className="font-mono text-gold-soft">·inv</span> — same
-            matchup, estimated from the other chair, and carrying that seat's read
-            on you rather than your knowledge of your own cards.
-          </Lead>
-          <Calc>
-            <div className="flex flex-wrap items-center gap-1">
-              your equity vs seat i =
-              <Frac n={<>1 − (their recorded equity vs you)</>} d={<>1</>} />
-            </div>
-          </Calc>
           <Why>
             Multiway, the question that matters is never “am I ahead?” — it is
             “who exactly am I behind?”. One seat with a live draw sets the price
             of the whole pot.
+          </Why>
+          <Heading>These bars are the real numbers, not estimates</Heading>
+          <Lead>
+            At the table an equity figure is always a guess about cards you
+            cannot see: a bot runs a simulation against the <em>range</em> it has
+            you on. Once the hand is over that guesswork is unnecessary — every
+            hole card is on the record — so each bar here is settled by dealing
+            the two actual hands against each other over the actual board, and
+            counting. A chop splits, so a bar is pot share, not win rate.
+          </Lead>
+          <Calc>
+            <div className="flex flex-wrap items-center gap-1">
+              your equity vs seat i =
+              <Frac
+                n={<>runouts you win + ½ (runouts you chop)</>}
+                d={<>runouts</>}
+              />
+            </div>
+          </Calc>
+          <Lead>
+            From the flop on, “runouts” means all of them — 1081 boards on the
+            flop, 44 on the turn, one on the river — so the number is exact.
+            Preflop there are 1.7 million, so it is sampled 20,000 times from the
+            hand's own seed and marked{" "}
+            <span className="font-mono text-gold-soft">±</span>; it is
+            reproducible and accurate to about a quarter of a point.{" "}
+            <span className="font-mono text-gold-soft">·est</span> would mark a
+            seat whose cards the record does not hold, falling back to the
+            estimate — you should not normally see one.
+          </Lead>
+          <Why>
+            The tempting shortcut is to take the opponent's stored equity against
+            you and subtract it from one. It is wrong, and quietly: that number
+            is <em>its</em> hand against the range it put <em>you</em> on, so
+            your real cards never enter it and it comes out the same whether you
+            held aces or 7-2.
           </Why>
         </HowCalculated>
       </Section>

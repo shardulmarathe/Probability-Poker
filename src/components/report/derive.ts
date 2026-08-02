@@ -4,11 +4,16 @@
  * The report is a factual record — cards, chips, actions, and the decisions the
  * bots actually priced. It is deliberately *not* a set of conclusions, so every
  * derived quantity on the review pages is computed here, in one place, from
- * that record alone. Nothing in this module simulates anything: if a number
- * cannot be recovered from what the engine wrote down, the review says so
- * rather than inventing it.
+ * that record alone. Nothing here invents an input: if a number cannot be
+ * recovered from what the engine wrote down, the review says so.
  *
- * The one piece of real reconstruction is `rangeView`. The table's read on a
+ * Two things are *recomputed* rather than read back, and both are recomputed
+ * from the record's own contents. `streetEquities` settles each head-to-head by
+ * running the two seats' real hole cards out over the real board (see
+ * `headsUpEquity`) — post-hand every card is face up, so the honest answer is
+ * available and no estimate needs to stand in for it. And:
+ *
+ * `rangeView` reconstructs what the sampler drew from. The table's read on a
  * seat is a three-tier belief (weak / medium / strong), and the multiway
  * sampler turns that into hole cards by bucketing every available two-card
  * combo with `tierOf` and drawing uniformly inside the chosen tier. That is
@@ -20,6 +25,8 @@
 import { INITIAL_BELIEF } from "../../data/constants";
 import { normalize, tierOf, updateBelief } from "../../poker/bayesian";
 import { decodeCard } from "../../poker/core/card";
+import { hashSeed, makeRng } from "../../poker/core/rng";
+import { scoreInts } from "../../poker/handEvaluator";
 import {
   BUCKET_COUNT,
   BUCKET_NAMES,
@@ -48,7 +55,7 @@ import type { BeliefDistribution, Street, StrengthTier } from "../../types";
 // Streets
 // ---------------------------------------------------------------------------
 
-export const BETTING_STREETS: Street[] = ["preflop", "flop", "turn", "river"];
+const BETTING_STREETS: Street[] = ["preflop", "flop", "turn", "river"];
 
 export const STREET_LABEL: Record<Street, string> = {
   preflop: "Pre-Flop",
@@ -59,7 +66,7 @@ export const STREET_LABEL: Record<Street, string> = {
 };
 
 /** Community cards face-up once a street has been dealt. */
-export const BOARD_LEN: Record<Street, number> = {
+const BOARD_LEN: Record<Street, number> = {
   preflop: 0,
   flop: 3,
   turn: 4,
@@ -67,7 +74,7 @@ export const BOARD_LEN: Record<Street, number> = {
   showdown: 5,
 };
 
-export function streetIndex(street: Street): number {
+function streetIndex(street: Street): number {
   return street === "showdown" ? 3 : BETTING_STREETS.indexOf(street);
 }
 
@@ -177,7 +184,7 @@ export const CELL_TOTAL: Uint16Array = (() => {
  * which is exactly why the belief can be projected onto the chart at all. One
  * representative combo per cell settles all 169.
  */
-export const CELL_TIER: Uint8Array = (() => {
+const CELL_TIER: Uint8Array = (() => {
   const out = new Uint8Array(GRID_CELLS);
   for (let row = 0; row < GRID_SIZE; row++) {
     for (let col = 0; col < GRID_SIZE; col++) {
@@ -363,12 +370,121 @@ export function blockerView(cards: number[]): BlockerView {
 // ---------------------------------------------------------------------------
 
 /** Last decision each seat made on each street — the most informed one. */
-export function lastDecisions(
-  decisions: BotDecision[]
-): Map<string, BotDecision> {
+function lastDecisions(decisions: BotDecision[]): Map<string, BotDecision> {
   const out = new Map<string, BotDecision>();
   for (const d of decisions) out.set(`${d.street}:${d.seat}`, d);
   return out;
+}
+
+/**
+ * Sample size for a runout too long to enumerate.
+ *
+ * A report's board is 0, 3, 4 or 5 cards, so the only runout that cannot be
+ * walked in full is the preflop one: C(48,5) = 1.7M boards against C(47,2) =
+ * 1081 on the flop, 44 on the turn and 1 on the river. 20k sims puts the
+ * standard error at p ≈ 0.13 around 0.24 points — under the display precision,
+ * and paid once per matchup per review.
+ */
+const H2H_SIMS = 20000;
+
+export interface HeadToHeadEquity {
+  /** The reviewing seat's share of the pot against this opponent alone. */
+  equity: number;
+  /** True when every runout was enumerated, so the number is not an estimate. */
+  exact: boolean;
+}
+
+/**
+ * Two known hands, run out over the board as it stood.
+ *
+ * This is the one question a hand review is uniquely able to answer honestly:
+ * at the table nobody knew the opponent's cards, but the report has them, so
+ * "what was my equity here" needs no read, no range and no belief — only the
+ * evaluator and the cards the deck had left. Chops split, so the result is pot
+ * share rather than win probability, on the same scale as `MultiwayEquity`.
+ *
+ * `seed` fixes the preflop sample: the same hand reviewed twice must not show
+ * two different numbers.
+ */
+export function headsUpEquity(
+  hero: number[],
+  villain: number[],
+  board: number[],
+  seed: number
+): HeadToHeadEquity | null {
+  if (hero.length !== 2 || villain.length !== 2 || board.length > 5) return null;
+
+  const used = new Uint8Array(52);
+  for (const c of [...hero, ...villain, ...board]) {
+    if (!(c >= 0 && c < 52) || used[c]) return null; // a card in two places
+    used[c] = 1;
+  }
+  const pool: number[] = [];
+  for (let c = 0; c < 52; c++) if (!used[c]) pool.push(c);
+
+  const needed = 5 - board.length;
+  const size = 7;
+  const h = new Uint8Array(size);
+  const v = new Uint8Array(size);
+  h[0] = hero[0];
+  h[1] = hero[1];
+  v[0] = villain[0];
+  v[1] = villain[1];
+  for (let k = 0; k < board.length; k++) {
+    h[2 + k] = board[k];
+    v[2 + k] = board[k];
+  }
+  const at = 2 + board.length;
+
+  let share = 0;
+  let runs = 0;
+  const settle = (): void => {
+    const a = scoreInts(h, size);
+    const b = scoreInts(v, size);
+    share += a > b ? 1 : a === b ? 0.5 : 0;
+    runs++;
+  };
+
+  let exact = true;
+  if (needed === 0) {
+    settle();
+  } else if (needed === 1) {
+    for (const c of pool) {
+      h[at] = c;
+      v[at] = c;
+      settle();
+    }
+  } else if (needed === 2) {
+    for (let i = 0; i < pool.length; i++) {
+      h[at] = pool[i];
+      v[at] = pool[i];
+      for (let j = i + 1; j < pool.length; j++) {
+        h[at + 1] = pool[j];
+        v[at + 1] = pool[j];
+        settle();
+      }
+    }
+  } else {
+    // Partial Fisher-Yates over a scratch copy of the pool: `needed` swaps draw
+    // `needed` distinct cards, and the deck is left permuted rather than
+    // rebuilt, so the loop allocates nothing.
+    exact = false;
+    const rng = makeRng(seed);
+    const deck = Uint8Array.from(pool);
+    for (let s = 0; s < H2H_SIMS; s++) {
+      for (let d = 0; d < needed; d++) {
+        const t = d + rng.int(deck.length - d);
+        const card = deck[t];
+        deck[t] = deck[d];
+        deck[d] = card;
+        h[at + d] = card;
+        v[at + d] = card;
+      }
+      settle();
+    }
+  }
+
+  return { equity: share / runs, exact };
 }
 
 export interface HeadToHead {
@@ -376,11 +492,22 @@ export interface HeadToHead {
   /** The reviewing seat's equity against this opponent alone. */
   equity: number;
   /**
-   * Whether the number was recorded by the reviewing seat's own estimate, or
-   * recovered by inverting the opponent's estimate of the same matchup. A
-   * human seat never runs a Monte Carlo, so every number for it is inverted.
+   * Where the number came from.
+   *
+   *  - `actual` — both seats' real hole cards, run out over the real board by
+   *    `headsUpEquity`. The true answer, available because the hand is over.
+   *  - `estimate` — the reviewing seat's own recorded Monte Carlo against this
+   *    opponent, used only when the opponent's cards are missing from the
+   *    record. Its own cards are real; the opponent's are drawn from the read.
+   *
+   * There is deliberately no third case. The opponent's `perOpponent[focus]`
+   * inverts to "the bot's read on you, versus the bot's hand" — the reviewing
+   * seat's real cards never enter it, so it returns the same number whether the
+   * seat held aces or 7-2. It is not this seat's equity and is not shown as it.
    */
-  source: "own" | "inverted";
+  source: "actual" | "estimate";
+  /** False when the number was sampled rather than enumerated. */
+  exact: boolean;
 }
 
 export interface StreetEquity {
@@ -396,53 +523,79 @@ export interface StreetEquity {
 /**
  * Per-street equity from the reviewing seat's point of view.
  *
- * `perOpponent` is symmetric information recorded asymmetrically: a bot stores
- * its equity against every seat it is facing, so when the reviewing seat is a
- * human — which never runs a simulation and therefore records nothing — the
- * same matchup can still be read off the opponent's own decision and inverted.
- * That is the only way a human's hand review shows real numbers at all, and it
- * is labelled as inverted wherever it appears.
+ * The decisions decide *who* appears — a matchup is on the panel iff one of the
+ * two seats priced a decision naming the other, which is exactly "we were both
+ * still in the pot here". They do not decide the *number*. A bot's recorded
+ * `perOpponent[x]` is its own cards against a hand sampled from its read on x,
+ * so it is only ever the equity of the seat that recorded it; inverting it to
+ * fill in the other chair produces a figure the reviewing seat's real cards
+ * never entered, identical whether that seat held aces or 7-2. Post-hand there
+ * is no need for the substitution at all: both hands are face up, so the panel
+ * runs them out and reports what the matchup actually was.
  */
 export function streetEquities(
   report: TableHandReport,
   focus: number
 ): StreetEquity[] {
   const last = lastDecisions(report.decisions);
+  const hole = new Map<number, number[]>();
+  for (const s of report.seats) if (s.hole.length === 2) hole.set(s.seat, s.hole);
   const out: StreetEquity[] = [];
 
   for (const street of BETTING_STREETS) {
     if (BOARD_LEN[street] > report.board.length) continue;
     const own = last.get(`${street}:${focus}`) ?? null;
+    const board = report.board.slice(0, BOARD_LEN[street]);
 
     // Every decision on the street is scanned rather than only the last one
     // per seat. A seat that folds early stops appearing in anybody's
     // `perOpponent` from that point on, so taking only the final decision of
     // each opponent would silently erase the whole panel for exactly the hands
-    // where folding was the decision under review. Later entries overwrite
-    // earlier ones, so what survives is the most informed estimate that still
-    // had the reviewing seat in the pot.
-    const mine = new Map<number, number>();
-    const theirs = new Map<number, number>();
+    // where folding was the decision under review.
+    const seats = new Set<number>();
+    const estimated = new Map<number, number>();
     for (const d of report.decisions) {
       if (d.street !== street) continue;
       if (d.seat === focus) {
         for (const [key, value] of Object.entries(d.equity.perOpponent ?? {})) {
-          mine.set(Number(key), value);
+          seats.add(Number(key));
+          estimated.set(Number(key), value); // later = more informed
         }
-      } else {
-        const value = d.equity.perOpponent?.[focus];
-        if (typeof value === "number") theirs.set(d.seat, 1 - value);
+      } else if (typeof d.equity.perOpponent?.[focus] === "number") {
+        seats.add(d.seat);
       }
     }
+    seats.delete(focus);
 
-    const seats = [...new Set([...mine.keys(), ...theirs.keys()])].sort(
-      (a, b) => a - b
-    );
-    const vs: HeadToHead[] = seats.map((seat) =>
-      mine.has(seat)
-        ? { seat, equity: mine.get(seat)!, source: "own" as const }
-        : { seat, equity: theirs.get(seat)!, source: "inverted" as const }
-    );
+    const mine = hole.get(focus);
+    const vs: HeadToHead[] = [];
+    for (const seat of [...seats].sort((a, b) => a - b)) {
+      const theirs = hole.get(seat);
+      const real =
+        mine && theirs
+          ? headsUpEquity(
+              mine,
+              theirs,
+              board,
+              // Fixed per (hand, street, matchup) so a review is reproducible,
+              // and distinct across them so the samples are independent.
+              hashSeed(report.seed, streetIndex(street), focus, seat)
+            )
+          : null;
+      if (real) {
+        vs.push({ seat, equity: real.equity, source: "actual", exact: real.exact });
+      } else if (estimated.has(seat)) {
+        // No cards on record for the opponent — a hand that ended before this
+        // seat was ever dealt in should not happen, but the reviewing seat's
+        // own estimate is at least *its* equity, so fall back rather than lie.
+        vs.push({
+          seat,
+          equity: estimated.get(seat)!,
+          source: "estimate",
+          exact: false,
+        });
+      }
+    }
 
     if (vs.length === 0 && own === null) continue;
     const threat = vs.reduce<HeadToHead | null>(

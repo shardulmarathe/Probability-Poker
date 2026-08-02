@@ -27,7 +27,13 @@ import { updateBelief } from "../bayesian";
 import { encodeCards } from "../core/card";
 import { hashSeed, makeRng } from "../core/rng";
 import { runMultiwayEquity, runMultiwayEquitySync } from "../equity/pool";
-import { actionEv } from "../ev";
+import {
+  actionEv,
+  foldEquityEv,
+  rangeEquity,
+  type FoldEquityBreakdown,
+  type FoldingOpponent,
+} from "../ev";
 import type {
   ActionRecord,
   BotDecider,
@@ -37,9 +43,11 @@ import type {
   MultiwayEquity,
   SyncBotDecider,
 } from "../table/contract";
+import { positionOf } from "../table/position";
 import {
   legalActions,
   sizingLadder,
+  type SizingOption,
   type TableAction,
   type TableConfig,
 } from "../table/rules";
@@ -49,7 +57,22 @@ import {
   toCall as toCallOf,
   type TableState,
 } from "../table/state";
+import {
+  BUCKET_COUNT,
+  classifyAll,
+  makeBoardContext,
+  tierFromBucket,
+  type HandBucket,
+} from "./buckets";
+import {
+  createLikelihoodModel,
+  likelihoodRow,
+  type Facing,
+  type LearnStreet,
+  type LikelihoodModel,
+} from "./likelihood";
 import { BOT_PROFILES, chooseAction, findProfile } from "./profiles";
+import { COMBO_COUNT, removeCards, uniformRange, type Range } from "./range";
 
 // ---------------------------------------------------------------------------
 // Simulation budget
@@ -241,6 +264,311 @@ export function evByAction(
 }
 
 // ---------------------------------------------------------------------------
+// Fold equity
+// ---------------------------------------------------------------------------
+
+/**
+ * Sims spent on one candidate size's continuing-range equity.
+ *
+ * Smaller than the showdown budget on purpose. That estimate decides between
+ * folding and calling, where a 1% error changes the answer; this one decides
+ * between two bet sizes whose EVs are usually within a few percent of each
+ * other anyway, and it is paid once per rung of the ladder rather than once per
+ * decision. 800 puts the standard error near 1.7% on a coin-flip spot.
+ */
+export const FOLD_EQUITY_SIMS = 800;
+
+/**
+ * How hard the price moves the fold rate, in log-odds per log of the pot
+ * fraction. 1 means the odds of a fold scale linearly with the size: a pot-size
+ * bet folds out twice the odds a half-pot bet does.
+ */
+export const SIZE_SENSITIVITY = 1;
+
+/**
+ * The size the likelihood model's fold rates are taken to describe.
+ *
+ * The model conditions on bucket, street, position and facing but not on size,
+ * so its numbers are an average over the sizes people actually bet. Half pot is
+ * both the middle rung of `sizingLadder` and every profile's default
+ * `preferredSizing`, which makes it the honest anchor.
+ */
+export const REFERENCE_FRACTION = 0.5;
+
+/**
+ * Largest pot fraction the reference rate is extrapolated to. Above this the
+ * fold rate is held flat.
+ *
+ * This bound is doing real work, not tidying an edge case. A logistic stretched
+ * from half pot out to a twenty-times-pot shove says every bucket folds ~96% —
+ * aces included — because a uniform shift in log-odds moves p = 0.44 and
+ * p = 0.60 by the same odds ratio and the two converge on 1 together. The
+ * strength correlation is what fold equity is priced from, so losing it makes a
+ * shove with the worst hand at the table read as the highest-EV action on the
+ * board. Which it did, before this line: 72o for +5.4 into a $15 pot.
+ *
+ * A pot-sized bet is the ladder's top rung, so the cap only ever binds on an
+ * overbet all-in — the one size no rung of the model was built from. Holding
+ * the rate flat there is the honest reading: there is no evidence that betting
+ * more than the pot buys more folds, because the hands still there at pot are
+ * calling on strength rather than on price.
+ */
+export const MAX_TILT_FRACTION = 1;
+
+/**
+ * The bot's read on how often an opponent folds. A fresh model is the generated
+ * poker prior — bucket-, street- and facing-conditioned, with no player data in
+ * it — which is the right default for a bot that has observed nothing. It is
+ * never written to, so one instance is shared.
+ */
+const FOLD_MODEL: LikelihoodModel = createLikelihoodModel("poker");
+
+/**
+ * P(fold) at a bet of `fraction` of the pot, given the rate at the reference
+ * size.
+ *
+ * Working in log-odds is what keeps this a probability at both ends: no clamp
+ * is needed, an opponent that never folds still never folds however large the
+ * bet, and the curve is monotone in the size. The shift is
+ * `k · log(fraction / REFERENCE_FRACTION)`, i.e. the odds of a fold are
+ * multiplied by the ratio of the prices offered.
+ */
+export function foldAtSize(pFoldReference: number, fraction: number): number {
+  if (!(fraction > 0)) return pFoldReference;
+  if (!(pFoldReference > 0)) return 0;
+  if (pFoldReference >= 1) return 1;
+  const priced = Math.min(fraction, MAX_TILT_FRACTION);
+  const odds =
+    (pFoldReference / (1 - pFoldReference)) *
+    Math.pow(priced / REFERENCE_FRACTION, SIZE_SENSITIVITY);
+  return odds / (1 + odds);
+}
+
+/**
+ * P(fold | bucket) for one opponent at the reference size, one entry per bucket.
+ *
+ * Renormalised over the moves that are actually available: facing a bet the
+ * only choices are fold, call and raise, and the prior parks ~2% on the two
+ * illegal ones so it can never treat a mislabelled observation as infinitely
+ * strong evidence. Keeping that 2% here would understate every fold rate.
+ */
+export function foldByBucket(
+  model: LikelihoodModel,
+  street: LearnStreet,
+  position: ReturnType<typeof positionOf>,
+  facing: Facing
+): Float64Array {
+  const out = new Float64Array(BUCKET_COUNT);
+  for (let b = 0; b < BUCKET_COUNT; b++) {
+    const row = likelihoodRow(model, { bucket: b, street, position, facing });
+    const denom = row.fold + row.call + row.raise;
+    out[b] = denom > 0 ? row.fold / denom : 0;
+  }
+  return out;
+}
+
+/**
+ * An opponent's range over all 1326 combos, from the read the table already has.
+ *
+ * The three-tier belief says how much weight sits on weak / medium / strong;
+ * `buckets` says which tier each combo is in *on this board*, which is the whole
+ * reason `buckets.ts` exists — on K-7-2 the combo 7-2 is two pair, and a range
+ * built from the preflop `tierOf` would file it under "weak" and then wonder why
+ * the continuing range looks so harmless.
+ *
+ * The belief is a distribution over TIERS, not over combos, so each tier's total
+ * weight is set to `belief[tier]` and split evenly inside it. Writing
+ * `belief[tier]` straight into every combo instead is the obvious mistake and a
+ * large one: the weak tier holds roughly seven times the combos the strong tier
+ * does, so it would turn a 0.40 / 0.35 / 0.25 read into an effective
+ * 0.70 / 0.24 / 0.06 — an opponent four times less likely to hold a real hand
+ * than the table believes. This way the tier marginals match the ones
+ * `equity/multiway.ts` samples from, so `rangeEquity` and `MultiwayEquity` are
+ * two measurements of the same opponent rather than of two different ones.
+ *
+ * Card removal is applied first, so blockers thin the tier they actually hit.
+ */
+export function opponentRange(
+  belief: BeliefDistribution,
+  buckets: Uint8Array,
+  dead: number[]
+): Range {
+  const range = removeCards(uniformRange(), dead);
+  const live = new Float64Array(3);
+  const tierIndex = (c: number) => {
+    const tier = tierFromBucket(buckets[c] as HandBucket);
+    return tier === "weak" ? 0 : tier === "medium" ? 1 : 2;
+  };
+
+  for (let c = 0; c < COMBO_COUNT; c++) if (range[c] > 0) live[tierIndex(c)] += 1;
+
+  const mass = [belief.weak, belief.medium, belief.strong];
+  let total = 0;
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    if (range[c] <= 0) continue;
+    const t = tierIndex(c);
+    range[c] = live[t] > 0 ? mass[t] / live[t] : 0;
+    total += range[c];
+  }
+
+  // A read that put all its weight on a tier this board leaves empty would
+  // otherwise produce a range with nothing in it. Fall back to no read at all.
+  if (!(total > 0)) return removeCards(uniformRange(), dead);
+  return range;
+}
+
+/** Fan a per-bucket fold rate out to per-combo, at one size. */
+function foldByCombo(
+  perBucket: Float64Array | null,
+  buckets: Uint8Array,
+  fraction: number
+): Float64Array {
+  const out = new Float64Array(COMBO_COUNT);
+  // An all-in opponent has no decision left to make; it calls by definition.
+  if (!perBucket) return out;
+  const sized = new Float64Array(BUCKET_COUNT);
+  for (let b = 0; b < BUCKET_COUNT; b++) {
+    sized[b] = foldAtSize(perBucket[b], fraction);
+  }
+  for (let c = 0; c < COMBO_COUNT; c++) out[c] = sized[buckets[c]];
+  return out;
+}
+
+/**
+ * Bet and raise sizes worth pricing: the legal minimum plus every rung of the
+ * ladder, deduped and clamped. Labels match `profiles.sizedBluff`'s so a rung
+ * chosen by the bluff branch is already in the EV table.
+ */
+export function sizedCandidates(
+  base: TableAction,
+  sizings: SizingOption[]
+): TableAction[] {
+  const min = base.min ?? base.cost;
+  const max = base.max ?? base.cost;
+  const out: TableAction[] = [base];
+  const seen = new Set<number>([base.cost]);
+  for (const option of sizings) {
+    const cost = Math.min(Math.max(option.cost, min), max);
+    if (seen.has(cost)) continue;
+    seen.add(cost);
+    const amount = base.amount - base.cost + cost;
+    out.push({
+      ...base,
+      cost,
+      amount,
+      label:
+        cost >= max
+          ? `All-in $${cost}`
+          : base.type === "bet"
+            ? `Bet $${cost}`
+            : `Raise to $${amount}`,
+    });
+  }
+  return out;
+}
+
+export interface PricedSizes {
+  /** Every size considered, in ladder order. */
+  candidates: TableAction[];
+  /** The fold-equity derivation for each, keyed by label. */
+  byLabel: Record<string, FoldEquityBreakdown>;
+  /** Hero's pot share against the opponents' full ranges. */
+  eRange: number;
+}
+
+/**
+ * Price every candidate size with its own fold equity.
+ *
+ * Each rung gets its own continuing range, because that is the point: a bigger
+ * bet folds out more of the opponent's range, which raises the fold term and
+ * lowers the equity of what is left. Pricing every size against one shared
+ * continuing range would reintroduce exactly the error this module exists to
+ * remove, one level up.
+ *
+ * Returns null when there is nothing to price — no opponents, or a state with
+ * no cards dealt (a scripted test fixture).
+ */
+export function priceSizes(
+  state: TableState,
+  seat: number,
+  base: TableAction,
+  sizings: SizingOption[],
+  simulations: number,
+  seed: number
+): PricedSizes | null {
+  const opponents = opponentsOf(state, seat);
+  if (opponents.length === 0 || simulations <= 0) return null;
+
+  const hero = seatOf(state, seat);
+  if (hero.hole.length < 2) return null;
+
+  const heroHole = Array.from(encodeCards(hero.hole));
+  const board = Array.from(encodeCards(state.board));
+  const buckets = classifyAll(makeBoardContext(board));
+  const dead = [...heroHole, ...board];
+  const beliefs = readsFromActions(handActions(state), state.seats.length);
+  const pot = state.pot;
+  const toCall = toCallOf(state, seat);
+  const potAfterCall = pot + toCall;
+
+  // Postflop the opponents are answering a bet; when the hero is raising, they
+  // are answering a raise, which the prior treats as the stronger message.
+  const facing: Facing = toCall > 0 ? "facing-raise" : "facing-bet";
+  const street = (state.street === "showdown" ? "river" : state.street) as LearnStreet;
+
+  const ranges: Range[] = [];
+  const perBucket: (Float64Array | null)[] = [];
+  for (const id of opponents) {
+    ranges.push(
+      opponentRange(beliefs[id] ?? INITIAL_BELIEF, buckets, dead)
+    );
+    perBucket.push(
+      seatOf(state, id).status === "allin"
+        ? null
+        : foldByBucket(
+            FOLD_MODEL,
+            street,
+            positionOf(id, state.button, state.seats.length),
+            facing
+          )
+    );
+  }
+
+  const eRange = rangeEquity({
+    heroHole,
+    board,
+    ranges,
+    simulations,
+    seed: hashSeed(seed, 0xe9a4e),
+  });
+
+  const candidates = sizedCandidates(base, sizings);
+  const byLabel: Record<string, FoldEquityBreakdown> = {};
+  for (const action of candidates) {
+    const extra = Math.max(0, action.cost - toCall);
+    const fraction = potAfterCall > 0 ? extra / potAfterCall : 0;
+    const models: FoldingOpponent[] = ranges.map((range, i) => ({
+      range,
+      foldByCombo: foldByCombo(perBucket[i], buckets, fraction),
+    }));
+    byLabel[action.label] = foldEquityEv({
+      heroHole,
+      board,
+      opponents: models,
+      pot,
+      toCall,
+      cost: action.cost,
+      simulations,
+      // One seed for every rung: common random numbers, so the argmax compares
+      // sizes on the same sampled boards rather than on their sampling noise.
+      seed: hashSeed(seed, 0xf01de9),
+    });
+  }
+
+  return { candidates, byLabel, eRange };
+}
+
+// ---------------------------------------------------------------------------
 // The decision
 // ---------------------------------------------------------------------------
 
@@ -249,16 +577,25 @@ export function profileFor(id: string | undefined): BotProfile {
   return (id ? findProfile(id) : undefined) ?? BOT_PROFILES.professor;
 }
 
+const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
+
 /**
  * Turn an equity estimate into a move. Split out of the two entry points below
  * so the synchronous and asynchronous paths differ in *nothing* but how the
  * Monte Carlo was scheduled.
+ *
+ * Two prices are formed here, not one. Checks, calls and folds are priced by
+ * `actionEv`, which assumes the hand goes to showdown — correct, since none of
+ * them can make anybody fold. Bets and raises are priced by `foldEquityEv`,
+ * once per candidate size, and it is that second price which lets a hand with
+ * no showdown value be worth betting at all.
  */
 function finish(
   state: TableState,
   seat: number,
   config: TableConfig,
-  equity: MultiwayEquity
+  equity: MultiwayEquity,
+  foldEquitySims: number
 ): BotDecision {
   const actions = legalActions(state, seat, config);
   if (actions.length === 0) {
@@ -270,10 +607,35 @@ function finish(
   const toCall = toCallOf(state, seat);
   const evs = evByAction(actions, equity, potBefore, toCall);
   const profile = profileFor(hero.profile);
+  const sizings = sizingLadder(state, seat, config);
+
+  const base = actions.find(isAggressive);
+  const priced = base
+    ? priceSizes(
+        state,
+        seat,
+        base,
+        sizings,
+        foldEquitySims,
+        decisionSeed(state, seat)
+      )
+    : null;
+
+  // Every size the ladder offers becomes its own candidate, so the argmax below
+  // is over sizes as well as over action types.
+  let candidates = actions;
+  if (priced) {
+    for (const action of priced.candidates) {
+      evs[action.label] = priced.byLabel[action.label].ev;
+    }
+    candidates = actions.flatMap((a) =>
+      isAggressive(a) ? priced.candidates : [a]
+    );
+  }
 
   const choice = chooseAction({
     profile,
-    actions,
+    actions: candidates,
     evByAction: evs,
     street: state.street,
     hole: hero.hole,
@@ -283,7 +645,7 @@ function finish(
     strength: equity.equity,
     potBefore,
     toCall,
-    sizings: sizingLadder(state, seat, config),
+    sizings,
     // A separate stream from the equity run's, derived from the same key, so a
     // profile's bluff coin flip cannot correlate with its own Monte Carlo draw.
     rng: makeRng(hashSeed(decisionSeed(state, seat), 0x51ced1ce)),
@@ -299,6 +661,8 @@ function finish(
     evByAction: evs,
     beliefs: readsFromActions(handActions(state), state.seats.length),
     profile: profile.id,
+    foldEquity: priced?.byLabel,
+    equityVsRange: priced?.eRange,
   };
 }
 
@@ -308,6 +672,15 @@ export interface DeciderOptions {
    * to run whole hands quickly; the game leaves it unset.
    */
   simulations?: number;
+}
+
+/**
+ * Sims for the fold-equity runs. Capped well below the showdown budget (see
+ * `FOLD_EQUITY_SIMS`), but never above an explicit override — a test that asks
+ * for 400 sims wants a fast decision, not a fast Monte Carlo and a slow one.
+ */
+function foldEquityBudget(options: DeciderOptions): number {
+  return Math.min(FOLD_EQUITY_SIMS, options.simulations ?? FOLD_EQUITY_SIMS);
 }
 
 /**
@@ -321,7 +694,7 @@ export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
       request.opponents.length === 0
         ? uncontestedEquity()
         : runMultiwayEquitySync(request);
-    return finish(state, seat, config, equity);
+    return finish(state, seat, config, equity, foldEquityBudget(options));
   };
 }
 
@@ -338,7 +711,7 @@ export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
       request.opponents.length === 0
         ? uncontestedEquity()
         : await runMultiwayEquity(request);
-    return finish(state, seat, config, equity);
+    return finish(state, seat, config, equity, foldEquityBudget(options));
   };
 }
 

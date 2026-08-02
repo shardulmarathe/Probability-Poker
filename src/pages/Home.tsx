@@ -26,8 +26,8 @@ const CONCEPTS: Concept[] = [
     suit: "\u2665",
     red: true,
     title: "Monte Carlo Simulation",
-    eq: "5000 Simulations",
-    desc: "Thousands of randomized poker outcomes estimate true win probability.",
+    eq: "40,000 Simulations",
+    desc: "Tens of thousands of randomized outcomes estimate true win probability.",
   },
   {
     suit: "\u2666",

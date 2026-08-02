@@ -347,8 +347,15 @@ function clearlyProfitable(
   tiltedEv: Record<string, number>,
   toCall: number
 ): boolean {
-  const bar = ENTRY_OVERRIDE_EDGE * Math.max(toCall, 1);
-  return actions.some((a) => a.type !== "fold" && tiltedEv[a.label] > bar);
+  // The bar scales with what the action actually risks, not with the price of
+  // calling. A raise puts in far more than `toCall`, so measuring it against a
+  // call-sized bar let a marginal steal clear the gate and made every profile
+  // enter ~42-54% of pots — the roster collapsed toward the maniac.
+  return actions.some(
+    (a) =>
+      a.type !== "fold" &&
+      tiltedEv[a.label] > ENTRY_OVERRIDE_EDGE * Math.max(a.cost, toCall, 1)
+  );
 }
 
 /**

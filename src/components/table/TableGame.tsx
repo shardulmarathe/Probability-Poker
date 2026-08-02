@@ -307,6 +307,20 @@ function TopBar({
             </button>
           ))}
         </div>
+        {/* The hand review shares this route group's store, so the history
+            survives the hop. See the `/review` routes in App.tsx. */}
+        <Link
+          to="/review"
+          data-testid="open-review"
+          className="rounded-full border px-2.5 py-1 font-display text-[0.6rem] uppercase tracking-[0.18em] transition hover:-translate-y-px sm:text-[0.65rem]"
+          style={{
+            borderColor: "rgba(201,162,39,0.5)",
+            background: "rgba(201,162,39,0.12)",
+            color: "#e2c563",
+          }}
+        >
+          Review
+        </Link>
         {observer && <Rail>WATCHING</Rail>}
         <Rail>HAND #{handNumber}</Rail>
       </div>

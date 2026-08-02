@@ -8,21 +8,39 @@ import {
   startHand,
   type Table,
 } from "../table/engine";
-import { legalActions } from "../table/rules";
+import { legalActions, sizingLadder } from "../table/rules";
 import { totalChips } from "../table/state";
 import type { ActionRecord, MultiwayEquity } from "../table/contract";
+import { makeRng } from "../core/rng";
+import { encodeCard } from "../core/card";
 import {
+  BUCKET_COUNT,
+  classifyAll,
+  makeBoardContext,
+  HandBucket,
+} from "./buckets";
+import { createLikelihoodModel } from "./likelihood";
+import { COMBO_COUNT, comboCardA, comboCardB, comboIndex } from "./range";
+import {
+  FOLD_EQUITY_SIMS,
+  MAX_TILT_FRACTION,
   MIN_DECISION_SIMS,
+  REFERENCE_FRACTION,
   TABLE_DECISION_SIMS,
   decisionSeed,
   decisionSims,
   equityRequest,
   evByAction,
   evInput,
+  foldAtSize,
+  foldByBucket,
   handActions,
+  opponentRange,
   opponentsOf,
+  priceSizes,
   profileFor,
   readsFromActions,
+  sizedCandidates,
   tableDecider,
   uncontestedEquity,
 } from "./decider";
@@ -459,5 +477,432 @@ describe("driving the engine", () => {
       playHandHeadless(table, FAST);
       expect(totalChips(table)).toBe(bank + table.rebuys);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fold equity
+// ---------------------------------------------------------------------------
+
+describe("foldAtSize", () => {
+  it("is the identity at the reference size", () => {
+    expect(foldAtSize(0.42, REFERENCE_FRACTION)).toBeCloseTo(0.42, 12);
+  });
+
+  it("folds more to a bigger bet and less to a smaller one", () => {
+    const half = foldAtSize(0.42, 0.5);
+    expect(foldAtSize(0.42, 0.33)).toBeLessThan(half);
+    expect(foldAtSize(0.42, 1)).toBeGreaterThan(half);
+  });
+
+  it("stays a probability at every size", () => {
+    for (const f of [0.01, 0.1, 0.5, 1, 4, 40, 400]) {
+      for (const base of [0.01, 0.42, 0.99]) {
+        const p = foldAtSize(base, f);
+        expect(p).toBeGreaterThanOrEqual(0);
+        expect(p).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("never gets a calling station to fold", () => {
+    // The station's whole identity is that price does not move it. A model that
+    // let a big enough bet fold it out would hand the bot a free bluff against
+    // the one opponent type that never folds.
+    for (const f of [1, 4, 20, 200]) expect(foldAtSize(0.02, f)).toBeLessThan(0.05);
+  });
+
+  it("stops crediting size past the cap", () => {
+    // Without this the logistic extrapolates a half-pot rate out to a
+    // twenty-times-pot shove and folds out aces 96% of the time.
+    const capped = foldAtSize(0.44, MAX_TILT_FRACTION);
+    expect(foldAtSize(0.44, 20)).toBe(capped);
+    expect(capped).toBeLessThan(0.7);
+  });
+
+  it("keeps strong hands folding less than weak ones at every size", () => {
+    // The property the whole term rests on: if size compressed the difference
+    // away, the continuing range would stop being the strong part of the range.
+    for (const f of [0.33, 0.5, 1, MAX_TILT_FRACTION * 4]) {
+      expect(foldAtSize(0.3, f)).toBeLessThan(foldAtSize(0.7, f));
+    }
+  });
+});
+
+describe("foldByBucket", () => {
+  const model = createLikelihoodModel("poker");
+
+  it("falls from air to monsters", () => {
+    const row = foldByBucket(model, "river", "BTN", "facing-bet");
+    expect(row).toHaveLength(BUCKET_COUNT);
+    for (let b = 1; b < BUCKET_COUNT; b++) {
+      expect(row[b]).toBeLessThan(row[b - 1]);
+    }
+  });
+
+  it("is a probability over the moves that are actually legal", () => {
+    // Facing a bet the choices are fold, call and raise; the prior parks ~2% on
+    // check and bet so no single observation can be infinitely strong evidence.
+    // Leaving that 2% in would understate every fold rate by the same amount.
+    const row = foldByBucket(model, "river", "BTN", "facing-bet");
+    for (const p of row) {
+      expect(p).toBeGreaterThan(0);
+      expect(p).toBeLessThan(1);
+    }
+  });
+
+  it("folds far more than MDF, which is what makes the bot bluff so much", () => {
+    // Worth pinning explicitly, because it explains every bluff frequency this
+    // file measures. Against a half-pot bet the minimum defence frequency is
+    // 1 − alpha = 2/3, i.e. an opponent that folds more than 1/3 of its range
+    // is beatable by betting *any* two cards. The shipped `poker` prior folds
+    // far more than that, so the EV-maximiser correctly exploits it by betting
+    // almost everything heads-up. That is the opponent model being loose, not
+    // the EV arithmetic being wrong — and it is the number to change if the
+    // bots should bluff less, rather than anything in `ev.ts`.
+    const row = foldByBucket(model, "flop", "BTN", "facing-bet");
+    let mean = 0;
+    for (const p of row) mean += p / BUCKET_COUNT;
+    const alphaHalfPot = 1 / 3;
+    // eslint-disable-next-line no-console
+    console.log(
+      `prior fold rate at half pot: ${(100 * mean).toFixed(1)}% ` +
+        `(alpha = ${(100 * alphaHalfPot).toFixed(1)}%, MDF = 66.7%)`
+    );
+    expect(mean).toBeGreaterThan(alphaHalfPot);
+  });
+
+  it("says a river bet is read more sharply than a preflop one", () => {
+    // The hand is complete on the river, so what a player holds and what they
+    // do with it are at their most correlated — the model's own claim, and the
+    // continuing range is sharper for it.
+    const river = foldByBucket(model, "river", "BTN", "facing-bet");
+    const preflop = foldByBucket(model, "preflop", "BTN", "facing-bet");
+    const spread = (r: Float64Array) => r[0] - r[BUCKET_COUNT - 1];
+    expect(spread(river)).toBeGreaterThan(spread(preflop));
+  });
+});
+
+describe("opponentRange", () => {
+  const board = [makeCard(13, "s"), makeCard(9, "h"), makeCard(4, "d")].map(
+    encodeCard
+  );
+  const hole = [makeCard(7, "c"), makeCard(2, "d")].map(encodeCard);
+  const buckets = classifyAll(makeBoardContext(board));
+
+  it("puts the belief's mass on each tier, not on each combo", () => {
+    // The regression this exists for: writing `belief[tier]` into every combo
+    // makes the effective strong mass 0.06 rather than 0.25, because the weak
+    // tier holds seven times the combos.
+    const range = opponentRange(INITIAL_BELIEF, buckets, [...hole, ...board]);
+    const mass = { weak: 0, medium: 0, strong: 0 };
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      const b = buckets[c] as HandBucket;
+      const tier =
+        b >= HandBucket.Overpair
+          ? "strong"
+          : b >= HandBucket.WeakPair
+            ? "medium"
+            : "weak";
+      mass[tier] += range[c];
+    }
+    expect(mass.weak).toBeCloseTo(INITIAL_BELIEF.weak, 6);
+    expect(mass.medium).toBeCloseTo(INITIAL_BELIEF.medium, 6);
+    expect(mass.strong).toBeCloseTo(INITIAL_BELIEF.strong, 6);
+  });
+
+  it("zeroes every combo the hero can see", () => {
+    const range = opponentRange(INITIAL_BELIEF, buckets, [...hole, ...board]);
+    for (const seen of [...hole, ...board]) {
+      for (let c = 0; c < COMBO_COUNT; c++) {
+        if (comboCardA(c) === seen || comboCardB(c) === seen) {
+          expect(range[c]).toBe(0);
+        }
+      }
+    }
+    // ...and leaves a real range behind.
+    expect(range[comboIndex(encodeCard(makeCard(14, "s")), encodeCard(makeCard(14, "h")))])
+      .toBeGreaterThan(0);
+  });
+});
+
+describe("sizedCandidates", () => {
+  it("offers every rung of the ladder, deduped and legal", () => {
+    const table = dealt(["tag", "rock", "nit", "lag"]);
+    const seat = table.toAct as number;
+    const base = legalActions(table, seat, table.config).find(
+      (a) => a.type === "bet" || a.type === "raise"
+    )!;
+    const candidates = sizedCandidates(base, sizingLadder(table, seat, table.config));
+
+    expect(candidates.length).toBeGreaterThan(1);
+    expect(candidates[0]).toBe(base);
+    const costs = candidates.map((c) => c.cost);
+    expect(new Set(costs).size).toBe(costs.length);
+    for (const c of candidates) {
+      expect(c.cost).toBeGreaterThanOrEqual(base.min!);
+      expect(c.cost).toBeLessThanOrEqual(base.max!);
+      expect(c.type).toBe(base.type);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The bot bluffs
+// ---------------------------------------------------------------------------
+
+/**
+ * Put a table on the flop with a chosen board, hero holding and pot, everyone
+ * still in and nobody having bet. Built by hand rather than by playing to the
+ * flop so the spot is exactly the one under test.
+ */
+function flopSpot(options: {
+  seats: number;
+  hero: [Card, Card];
+  board: Card[];
+  pot: number;
+  seed: number;
+  profile?: string;
+}): { table: Table; seat: number } {
+  const table = seatedTable(
+    Array(options.seats).fill(options.profile ?? "professor"),
+    options.seed
+  );
+  startHand(table);
+  const seat = 0;
+  table.street = "flop";
+  table.board = options.board;
+  table.pot = options.pot;
+  table.currentBet = 0;
+  table.lastRaiseSize = 0;
+  table.lastAggressor = null;
+  table.actions = [];
+  for (const s of table.seats) {
+    s.status = "active";
+    s.streetCommit = 0;
+    s.hasActed = false;
+    s.mayRaise = true;
+    s.stack = 200;
+  }
+  table.seats[seat].hole = [options.hero[0], options.hero[1]];
+  table.toAct = seat;
+  return { table, seat };
+}
+
+const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const;
+const SUITS = ["s", "h", "d", "c"] as const;
+
+/** A seeded random deal of a flop plus two hole cards, all distinct. */
+function randomSpot(seed: number): { hero: [Card, Card]; board: Card[] } {
+  const rng = makeRng(seed);
+  const codes = rng.shuffle(Array.from({ length: 52 }, (_, i) => i)).slice(0, 5);
+  const toCard = (code: number): Card =>
+    makeCard(RANKS[code >> 2], SUITS[code & 3]);
+  return {
+    hero: [toCard(codes[0]), toCard(codes[1])],
+    board: [toCard(codes[2]), toCard(codes[3]), toCard(codes[4])],
+  };
+}
+
+const bucketOf = (hero: [Card, Card], board: Card[]): HandBucket => {
+  const buckets = classifyAll(makeBoardContext(board.map(encodeCard)));
+  return buckets[
+    comboIndex(encodeCard(hero[0]), encodeCard(hero[1]))
+  ] as HandBucket;
+};
+
+/**
+ * Bet frequency for holdings in `keep`, over `trials` seeded flops.
+ *
+ * The profile is the professor throughout: `bluffRate` 0 and `aggression` 1, so
+ * `chooseAction` is a plain argmax and every bet measured here was chosen by the
+ * EV arithmetic rather than by a personality's coin flip.
+ */
+function betRate(options: {
+  seats: number;
+  keep: (b: HandBucket) => boolean;
+  trials: number;
+  pot?: number;
+}): { rate: number; n: number } {
+  const decide = tableDecider({ simulations: 400 });
+  let bets = 0;
+  let n = 0;
+  for (let t = 0; t < options.trials; t++) {
+    const { hero, board } = randomSpot(0x5eed + t);
+    if (!options.keep(bucketOf(hero, board))) continue;
+    const { table, seat } = flopSpot({
+      seats: options.seats,
+      hero,
+      board,
+      pot: options.pot ?? 60,
+      seed: 0xb10f + t,
+    });
+    if (decide(table, seat, table.config).action.type === "bet") bets++;
+    n++;
+  }
+  return { rate: n > 0 ? bets / n : 0, n };
+}
+
+const isAir = (b: HandBucket) => b <= HandBucket.WeakDraw;
+const isStrong = (b: HandBucket) => b >= HandBucket.TwoPair;
+
+describe("bluffing, end to end", () => {
+  it("bets air a measurable fraction of the time", () => {
+    // The headline claim. Before fold equity this number was exactly zero and
+    // could not have been anything else: with no fold term a hand with no
+    // showdown value scores worse betting than checking at every size.
+    const air = betRate({ seats: 3, keep: isAir, trials: 400 });
+    // eslint-disable-next-line no-console
+    console.log(`air bet rate (2 opponents): ${(100 * air.rate).toFixed(1)}% of ${air.n}`);
+    expect(air.n).toBeGreaterThan(30);
+    expect(air.rate).toBeGreaterThan(0);
+  });
+
+  it("bets strong hands more often than air", () => {
+    // Fold equity must not flatten the strength gradient — a bot that bluffs as
+    // often as it value bets is as unreadable as one that never bluffs, and
+    // just as wrong. Two pair or better is ~4% of random flops, hence the
+    // larger sweep for the same number of measurements.
+    const air = betRate({ seats: 4, keep: isAir, trials: 400 });
+    const strong = betRate({ seats: 4, keep: isStrong, trials: 1200 });
+    // eslint-disable-next-line no-console
+    console.log(
+      `3 opponents — air ${(100 * air.rate).toFixed(1)}% of ${air.n}, ` +
+        `strong ${(100 * strong.rate).toFixed(1)}% of ${strong.n}`
+    );
+    expect(strong.n).toBeGreaterThan(20);
+    expect(strong.rate).toBeGreaterThan(air.rate);
+  });
+
+  it("bluffs less into a bigger field", () => {
+    const rows: string[] = [];
+    const rates: number[] = [];
+    for (const opponents of [1, 2, 3, 5]) {
+      const air = betRate({ seats: opponents + 1, keep: isAir, trials: 240 });
+      rates.push(air.rate);
+      rows.push(`${opponents} opp: ${(100 * air.rate).toFixed(1)}% of ${air.n}`);
+    }
+    // eslint-disable-next-line no-console
+    console.log("air bet rate by field size:\n  " + rows.join("\n  "));
+    // Π P(fold_i) decays geometrically, so the far end must be well under the
+    // near end. Adjacent rungs can tie when both are near a boundary.
+    expect(rates[3]).toBeLessThan(rates[0]);
+    expect(rates[2]).toBeLessThanOrEqual(rates[0]);
+  });
+});
+
+describe("pricing sizes", () => {
+  const spot = () =>
+    flopSpot({
+      seats: 3,
+      hero: [makeCard(7, "c"), makeCard(2, "d")],
+      board: [makeCard(13, "s"), makeCard(9, "h"), makeCard(4, "d")],
+      pot: 60,
+      seed: 77,
+    });
+
+  it("prices every rung with its own fold equity", () => {
+    const { table, seat } = spot();
+    const base = legalActions(table, seat, table.config).find(
+      (a) => a.type === "bet"
+    )!;
+    const priced = priceSizes(
+      table,
+      seat,
+      base,
+      sizingLadder(table, seat, table.config),
+      FOLD_EQUITY_SIMS,
+      99
+    )!;
+
+    expect(priced).not.toBeNull();
+    expect(priced.candidates.length).toBeGreaterThan(2);
+    // A bigger bet buys more folds and leaves a stronger range behind. That
+    // trade is the reason each size needs its own continuing range.
+    const rungs = priced.candidates.map((c) => priced.byLabel[c.label]);
+    const bigger = [...priced.candidates]
+      .map((c, i) => ({ cost: c.cost, pFold: rungs[i].pFold }))
+      .sort((a, b) => a.cost - b.cost);
+    for (let i = 1; i < bigger.length; i++) {
+      expect(bigger[i].pFold).toBeGreaterThanOrEqual(bigger[i - 1].pFold);
+    }
+  });
+
+  it("records the derivation on the decision", () => {
+    const { table, seat } = spot();
+    const decision = tableDecider({ simulations: 400 })(table, seat, table.config);
+    expect(decision.equityVsRange).toBeGreaterThan(0);
+    const breakdowns = Object.values(decision.foldEquity ?? {});
+    expect(breakdowns.length).toBeGreaterThan(0);
+    for (const b of breakdowns) {
+      expect(b.pFold).toBeGreaterThanOrEqual(0);
+      expect(b.pFold).toBeLessThanOrEqual(1);
+      expect(b.ev).toBeCloseTo(b.foldEv + b.callEv, 8);
+      expect(decision.evByAction).toHaveProperty(
+        Object.keys(decision.foldEquity!)[0]
+      );
+    }
+  });
+
+  it("gives an all-in opponent no fold equity at all", () => {
+    // An all-in seat has no decision left to make, so it cannot be bluffed. A
+    // model that let it fold would price a bet against chips already committed.
+    const { table, seat } = spot();
+    for (const s of table.seats) if (s.id !== seat) s.status = "allin";
+    const base = legalActions(table, seat, table.config).find(
+      (a) => a.type === "bet"
+    );
+    // With everyone all-in there is nobody left to bet against.
+    expect(base).toBeUndefined();
+
+    const { table: t2, seat: s2 } = spot();
+    t2.seats[1].status = "allin";
+    const b2 = legalActions(t2, s2, t2.config).find((a) => a.type === "bet")!;
+    const priced = priceSizes(
+      t2,
+      s2,
+      b2,
+      sizingLadder(t2, s2, t2.config),
+      FOLD_EQUITY_SIMS,
+      99
+    )!;
+    for (const label of Object.keys(priced.byLabel)) {
+      // Opponents are in seat order: the all-in one never folds.
+      expect(priced.byLabel[label].pFoldEach[0]).toBe(0);
+      expect(priced.byLabel[label].pFold).toBe(0);
+    }
+  });
+
+  it("is deterministic, breakdown included", () => {
+    const a = spot();
+    const b = spot();
+    const decide = tableDecider({ simulations: 400 });
+    const first = decide(a.table, a.seat, a.table.config);
+    const second = decide(b.table, b.seat, b.table.config);
+    expect(second.action).toEqual(first.action);
+    expect(second.evByAction).toEqual(first.evByAction);
+    expect(second.foldEquity).toEqual(first.foldEquity);
+    expect(second.equityVsRange).toBe(first.equityVsRange);
+  });
+
+  it("stays inside the thinking budget", () => {
+    // Six-handed on the flop at the real budget: one multiway Monte Carlo plus
+    // one continuing-range run per rung of the ladder.
+    const decide = tableDecider();
+    const { table, seat } = flopSpot({
+      seats: 6,
+      hero: [makeCard(7, "c"), makeCard(2, "d")],
+      board: [makeCard(13, "s"), makeCard(9, "h"), makeCard(4, "d")],
+      pot: 60,
+      seed: 31337,
+    });
+    decide(table, seat, table.config); // warm the JIT and the bucket tables
+    const started = performance.now();
+    const runs = 5;
+    for (let i = 0; i < runs; i++) decide(table, seat, table.config);
+    const each = (performance.now() - started) / runs;
+    // eslint-disable-next-line no-console
+    console.log(`six-handed flop decision: ${each.toFixed(1)}ms`);
+    expect(each).toBeLessThan(250);
   });
 });

@@ -9,6 +9,7 @@
  */
 
 import type { BeliefDistribution, HandResult, Street } from "../../types";
+import type { FoldEquityBreakdown } from "../ev";
 import type { TableSeat, TableState } from "./state";
 import type { TableAction, TableConfig } from "./rules";
 
@@ -104,6 +105,24 @@ export interface BotDecision {
   evByAction: Record<string, number>;
   beliefs: Record<number, BeliefDistribution>;
   profile: BotArchetype;
+  /**
+   * Why each bet or raise size scored what it did: the fold probability, the
+   * equity against the range that continues, and the two EV terms they combine
+   * into. Keyed by the same labels as `evByAction`, and present only for the
+   * bet/raise entries — checks, calls and folds have no fold-equity term.
+   *
+   * Optional because a scripted decider (the engine's tests) does not price
+   * anything, and because a seat with nobody left to act against has no fold
+   * equity to record.
+   */
+  foldEquity?: Record<string, FoldEquityBreakdown>;
+  /**
+   * Hero's pot share against the opponents' full ranges, on the same scale as
+   * each size's `eContinue`. The pair is the audit trail for a bluff: betting
+   * is profitable precisely when the folds bought are worth more than the gap
+   * between these two numbers costs.
+   */
+  equityVsRange?: number;
 }
 
 /**

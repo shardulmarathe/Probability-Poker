@@ -1,0 +1,7 @@
+node_modules
+dist
+.git
+docs/table-shots
+*.tsbuildinfo
+.env*
+.vercel

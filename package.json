@@ -10,10 +10,14 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:api": "vitest run --config api/vitest.config.ts",
     "og": "node scripts/capture-og.mjs"
   },
   "dependencies": {
+    "@neondatabase/neon-js": "^0.6.2-beta",
+    "@neondatabase/serverless": "^1.1.0",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/node": "^5.9.3",
     "@vercel/speed-insights": "^2.0.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -22,6 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",

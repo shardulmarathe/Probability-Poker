@@ -91,9 +91,13 @@ put the database URL behind that prefix.
 Cards are stored as integers `0..51` (`(rank - 2) * 4 + suitIndex`, suits ordered `s,h,d,c`),
 matching the engine's internal encoding.
 
+> **Deviation note:** `neon_auth.user(id)` is `uuid` under Managed Better Auth, so every
+> `user_id` column below is `uuid` (not `text`) to keep foreign keys valid. The client should
+> treat user ids as opaque strings.
+
 ```sql
 create table profiles (
-  user_id      text primary key references neon_auth.user(id) on delete cascade,
+  user_id      uuid primary key references neon_auth.user(id) on delete cascade,
   display_name text not null,
   prefs        jsonb not null default '{}',
   created_at   timestamptz not null default now()
@@ -102,7 +106,7 @@ create table profiles (
 -- One sit-down at a table.
 create table sessions (
   id           uuid primary key default gen_random_uuid(),
-  user_id      text not null references neon_auth.user(id) on delete cascade,
+  user_id      uuid not null references neon_auth.user(id) on delete cascade,
   seat_count   smallint not null check (seat_count between 2 and 6),
   stack_bb     smallint not null,          -- 20 / 50 / 100 / 200
   small_blind  integer not null,
@@ -116,7 +120,7 @@ create table sessions (
 create table hands (
   id            uuid primary key default gen_random_uuid(),
   session_id    uuid not null references sessions(id) on delete cascade,
-  user_id       text not null references neon_auth.user(id) on delete cascade,
+  user_id       uuid not null references neon_auth.user(id) on delete cascade,
   hand_number   integer not null,
   seed          bigint not null,
   button        smallint not null,
@@ -133,7 +137,7 @@ create table hands (
 create table decisions (
   id           bigserial primary key,
   hand_id      uuid not null references hands(id) on delete cascade,
-  user_id      text not null references neon_auth.user(id) on delete cascade,
+  user_id      uuid not null references neon_auth.user(id) on delete cascade,
   seat         smallint not null,
   actor        text not null,              -- 'human' | archetype id
   street       text not null,
@@ -151,7 +155,7 @@ create table decisions (
 
 -- Learned P(action | bucket, street, position) tallies for the human.
 create table player_models (
-  user_id    text primary key references neon_auth.user(id) on delete cascade,
+  user_id    uuid primary key references neon_auth.user(id) on delete cascade,
   model      jsonb not null,
   hands_seen integer not null default 0,
   updated_at timestamptz not null default now()
@@ -159,7 +163,7 @@ create table player_models (
 
 -- Rolled-up tracker stats, incrementally maintained.
 create table player_stats (
-  user_id     text primary key references neon_auth.user(id) on delete cascade,
+  user_id     uuid primary key references neon_auth.user(id) on delete cascade,
   hands       integer not null default 0,
   vpip_n integer not null default 0, vpip_d integer not null default 0,
   pfr_n  integer not null default 0, pfr_d  integer not null default 0,
@@ -172,10 +176,10 @@ create table player_stats (
   updated_at  timestamptz not null default now()
 );
 
-create index on hands (user_id, created_at desc);
-create index on hands (session_id, hand_number);
-create index on decisions (hand_id);
-create index on decisions (user_id, street);
+create index hands_user_id_created_at_idx on hands (user_id, created_at desc);
+create index hands_session_id_hand_number_idx on hands (session_id, hand_number);
+create index decisions_hand_id_idx on decisions (hand_id);
+create index decisions_user_id_street_idx on decisions (user_id, street);
 ```
 
 Stats are stored as numerator/denominator pairs rather than percentages so they can be updated

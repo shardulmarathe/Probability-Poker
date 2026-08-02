@@ -754,11 +754,84 @@ describe("preflop entry gate", () => {
         hole: S72o,
         evByAction: { Fold: 0, "Call $10": bar + 20, "Raise to $30": 0 },
         strength: 0.75,
+        closesAction: true,
         rng: FORBIDDEN,
       })
     );
     expect(choice.reason).toBe("argmax");
     expect(choice.action.type).toBe("call");
+  });
+
+  it("refuses to override on a call that does not close the action", () => {
+    // Same spot, same price, one bit different: seats behind still owe chips,
+    // so the pot the EV was measured against is a forecast rather than a
+    // quotation. `ev.callEv` raises exactly these numbers, which is why the
+    // override has to stop reading them — see `clearlyProfitable`.
+    const bar = ENTRY_OVERRIDE_EDGE * 10;
+    const spot = (closesAction: boolean) =>
+      chooseAction(
+        base("nit", {
+          street: "preflop",
+          hole: S72o,
+          evByAction: { Fold: 0, "Call $10": bar + 20, "Raise to $30": 0 },
+          strength: 0.75,
+          closesAction,
+          rng: FORBIDDEN,
+        })
+      );
+    expect(spot(true).reason).toBe("argmax");
+    expect(spot(false).reason).toBe("entry-fold");
+    expect(spot(false).action.type).toBe("fold");
+  });
+
+  it("does not let closing-ness reach a hand that clears the gate on its own", () => {
+    // The flag is a veto on the override, not a second entry gate. A hand above
+    // the threshold never consults it, so a nit holding aces plays them whether
+    // or not the seats behind have acted.
+    for (const closesAction of [true, false]) {
+      const choice = chooseAction(
+        base("nit", {
+          street: "preflop",
+          hole: AA,
+          evByAction: { Fold: 0, "Call $10": 12, "Raise to $30": 3 },
+          strength: 0.75,
+          closesAction,
+          rng: FORBIDDEN,
+        })
+      );
+      expect(choice.reason).toBe("argmax");
+      expect(choice.action.type).toBe("call");
+    }
+  });
+
+  it("assumes a call closes when the caller does not say", () => {
+    // Every caller with a table to read it from passes the flag; a synthetic
+    // spot has none. Omitting it must leave the override exactly where it was,
+    // because the permissive direction is the one that cannot silently tighten
+    // a roster nobody has re-measured.
+    const bar = ENTRY_OVERRIDE_EDGE * 10;
+    const evByAction = { Fold: 0, "Call $10": bar + 20, "Raise to $30": 0 };
+    const omitted = chooseAction(
+      base("nit", {
+        street: "preflop",
+        hole: S72o,
+        evByAction,
+        strength: 0.75,
+        rng: FORBIDDEN,
+      })
+    );
+    const spelled = chooseAction(
+      base("nit", {
+        street: "preflop",
+        hole: S72o,
+        evByAction,
+        strength: 0.75,
+        closesAction: true,
+        rng: FORBIDDEN,
+      })
+    );
+    expect(omitted.reason).toBe(spelled.reason);
+    expect(omitted.action).toEqual(spelled.action);
   });
 
   it("does not apply after the flop", () => {

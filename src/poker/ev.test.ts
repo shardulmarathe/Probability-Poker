@@ -4,6 +4,7 @@ import { makeCard } from "./cards";
 import { encodeCard } from "./core/card";
 import {
   actionEv,
+  callEv,
   foldEquityEv,
   rangeEquity,
   type FoldingOpponent,
@@ -558,6 +559,12 @@ describe("alpha", () => {
       const r = pureBluff(pot, bet, alpha);
       expect(r.pFold).toBeCloseTo(alpha, 10);
       expect(r.ev).toBeCloseTo(0, 8);
+      // Nothing here is a sampling estimate: `eContinue` is the integer 0 and
+      // every simulation pays exactly -s, so the residual is floating-point
+      // rounding on `alpha·P - (1-alpha)·s` and nothing else. Pinned four orders
+      // tighter than the tolerance above, which is what makes this an arithmetic
+      // check on `foldEquityEv` rather than a statistical one.
+      expect(Math.abs(r.ev)).toBeLessThan(1e-12);
       rows.push(
         `P=${pot} s=${bet}: alpha=${(100 * alpha).toFixed(1)}% ` +
           `MDF=${(100 * mdf).toFixed(1)}% EV(alpha)=${r.ev.toExponential(2)}`
@@ -1073,5 +1080,171 @@ describe("raises", () => {
     expect(r.ev).toBeGreaterThan(
       pricedRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: 0.4 }).ev
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// callEv — a call that does not close the action
+// ---------------------------------------------------------------------------
+//
+// The two things this has to get right are opposites, so both are pinned. It
+// must price the call against the pot the seats behind will build (or it stays
+// on a different basis from the raise it is compared against, which is the bug),
+// and it must not award a single chip of fold equity (or a call becomes a raise
+// that costs less, which would be a worse bug than the one it replaces).
+
+describe("callEv", () => {
+  /** A hero calling `toCall` into `pot`, with `behind` seats yet to act. */
+  function priceCall(options: {
+    hole?: number[];
+    /** Seats already at the current bet: no decision left, and add nothing. */
+    matched: number;
+    /** Seats still to act, each owing this much, each folding at this rate. */
+    behind?: { owes: number; fold: number }[];
+    pot: number;
+    toCall: number;
+  }) {
+    const hole = options.hole ?? AIR;
+    const opponents: FoldingOpponent[] = [];
+    for (let i = 0; i < options.matched; i++) {
+      // Deliberately handed a fold model that folds everything: `callEv` has to
+      // overwrite it, and a test that passed zeros in could not tell.
+      opponents.push({ ...opponent(hole, BOARD, foldFlat(1)), owes: 0 });
+    }
+    for (const b of options.behind ?? []) {
+      opponents.push({ ...opponent(hole, BOARD, foldFlat(b.fold)), owes: b.owes });
+    }
+    return callEv({
+      heroHole: hole,
+      board: BOARD,
+      opponents,
+      pot: options.pot,
+      toCall: options.toCall,
+      simulations: SIMS,
+      seed: 0xca11,
+    });
+  }
+
+  it("gives a call no fold equity at all, however the caller models the field", () => {
+    // The seat whose bet is being called cannot fold to the call, so the
+    // all-fold branch is unreachable and `pFold` is 0 by construction — not
+    // small, not usually, exactly 0.
+    const r = priceCall({
+      matched: 1,
+      behind: [{ owes: 20, fold: 0.9 }],
+      pot: 100,
+      toCall: 20,
+    });
+    expect(r.pFoldEach[0]).toBe(0);
+    expect(r.pFold).toBe(0);
+    expect(r.foldEv).toBe(0);
+    expect(r.ev).toBe(r.callEv);
+  });
+
+  it("collapses onto actionEv's basis when nobody behind owes anything", () => {
+    // Every opponent already matched: the pot cannot grow, so the priced pot is
+    // the pot as it stands and the payoff is `share·pot - (1-share)·toCall` —
+    // exactly the arithmetic `actionEv` does. This is why `decider.priceCall`
+    // can decline to re-price a closing call and leave the old number standing.
+    const POT = 100;
+    const TO_CALL = 20;
+    const r = priceCall({ matched: 3, pot: POT, toCall: TO_CALL });
+    expect(r.potIfCalled).toBe(POT);
+    expect(r.callers).toBe(3);
+    const share = r.eContinue;
+    expect(r.ev).toBeCloseTo(share * POT - (1 - share) * TO_CALL, 6);
+  });
+
+  it("prices the call against the pot the seats behind build", () => {
+    // The correction, isolated. Same hero, same field, same price: the only
+    // difference is whether the two seats yet to act are treated as already in
+    // (`actionEv`'s assumption) or as seats that must pay 20 each to continue.
+    const behind = [
+      { owes: 20, fold: 0.5 },
+      { owes: 20, fold: 0.5 },
+    ];
+    const priced = priceCall({ matched: 1, behind, pot: 100, toCall: 20 });
+    const assumed = priceCall({ matched: 3, pot: 100, toCall: 20 });
+
+    // Two mechanisms, both pointing the same way: the seats that continue add
+    // chips, and the ones that fold stop contesting the hero's share.
+    expect(priced.potIfCalled).toBeGreaterThan(assumed.potIfCalled);
+    expect(priced.eContinue).toBeGreaterThan(assumed.eContinue);
+    expect(priced.ev).toBeGreaterThan(assumed.ev);
+    // eslint-disable-next-line no-console
+    console.log(
+      `call priced on the reached pot: ${priced.ev.toFixed(2)} ` +
+        `(pot ${priced.potIfCalled.toFixed(1)}) vs on the standing pot: ` +
+        `${assumed.ev.toFixed(2)} (pot ${assumed.potIfCalled.toFixed(1)})`
+    );
+  });
+
+  it("still lets a raise beat a call when the folds it buys are worth something", () => {
+    // The asymmetry the roster rests on. Same air, same board, same field: the
+    // raise gets a fold branch, the call does not, so the raise wins on hands
+    // that cannot win a showdown. If this ever fails, `callEv` has grown fold
+    // equity and every passive profile has quietly become an aggressive one.
+    const POT = 100;
+    const called = priceCall({
+      matched: 1,
+      behind: [{ owes: 20, fold: 0.7 }],
+      pot: POT,
+      toCall: 20,
+    });
+    const raised = foldEquityEv({
+      heroHole: AIR,
+      board: BOARD,
+      opponents: [
+        { ...opponent(AIR, BOARD, foldFlat(0.7)), owes: 60 },
+        { ...opponent(AIR, BOARD, foldFlat(0.7)), owes: 80 },
+      ],
+      pot: POT,
+      toCall: 20,
+      cost: 80,
+      simulations: SIMS,
+      seed: 0xca11,
+    });
+    expect(raised.pFold).toBeGreaterThan(0);
+    expect(called.pFold).toBe(0);
+    expect(raised.ev).toBeGreaterThan(called.ev);
+  });
+
+  it("charges each seat behind only what that seat owes", () => {
+    // The small blind owes less than a seat that has put in nothing, and the pot
+    // has to reflect that. One shared `owes` would over-count the cheap seat.
+    const cheap = priceCall({
+      matched: 1,
+      behind: [{ owes: 5, fold: 0 }],
+      pot: 100,
+      toCall: 20,
+    });
+    const full = priceCall({
+      matched: 1,
+      behind: [{ owes: 20, fold: 0 }],
+      pot: 100,
+      toCall: 20,
+    });
+    // Nobody folds in either, so the fields are identical and the whole gap is
+    // the 15 chips the second seat has to add.
+    expect(cheap.callers).toBe(2);
+    expect(full.callers).toBe(2);
+    expect(full.potIfCalled - cheap.potIfCalled).toBeCloseTo(15, 6);
+  });
+
+  it("treats a missing owes as nothing owed", () => {
+    // `FoldingOpponent.owes` is optional because a bet charges every seat the
+    // same. A call is the other case: an omitted `owes` is a seat with no
+    // decision left, which is what `decider.priceCall` never has to spell out.
+    const implicit = callEv({
+      heroHole: AIR,
+      board: BOARD,
+      opponents: [opponent(AIR, BOARD, foldFlat(0.9))],
+      pot: 100,
+      toCall: 20,
+      simulations: SIMS,
+      seed: 0xca11,
+    });
+    const explicit = priceCall({ matched: 1, pot: 100, toCall: 20 });
+    expect(implicit).toEqual(explicit);
   });
 });

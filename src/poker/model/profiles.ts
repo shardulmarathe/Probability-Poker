@@ -238,6 +238,20 @@ export interface ActionChoiceInput {
   strength: number;
   potBefore: number;
   toCall: number;
+  /**
+   * Whether calling would CLOSE the action — no seat behind still has a live
+   * decision, so the pot the call is priced against is the final one.
+   *
+   * Read by the entry-gate override and by nothing else; see
+   * `clearlyProfitable` for why it is the override's precondition.
+   *
+   * Omitted means "assume it closes", which is what a caller with no table to
+   * read it from (a scripted spot, a synthetic fixture) gets. That is the
+   * permissive direction on purpose: the flag exists to withdraw the override,
+   * and withdrawing it from every caller that has not been taught the
+   * distinction would tighten the roster invisibly.
+   */
+  closesAction?: boolean;
   /** From `sizingLadder`; the bluff picks the rung nearest `preferredSizing`. */
   sizings?: SizingOption[];
   /** Seeded, per decision. Nothing here ever calls `Math.random`. */
@@ -355,7 +369,12 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
     fold &&
     input.street === "preflop" &&
     !meetsEntry(profile, input.hole) &&
-    !clearlyProfitable(actions, tiltedEv, input.toCall)
+    !clearlyProfitable(
+      actions,
+      tiltedEv,
+      input.toCall,
+      input.closesAction ?? true
+    )
   ) {
     return { action: fold, reason: "entry-fold", tiltedEv };
   }
@@ -430,14 +449,30 @@ function bestPassive(
  * Letting raises waive the gate made every profile enter 42-54% of pots and
  * collapsed the roster toward the maniac.
  *
+ * A call that does NOT close the action is single-street in exactly that same
+ * sense, and is excluded for exactly that same reason. "Getting 6-to-1" is only
+ * a fact about the price when the price is settled: with seats behind still
+ * owing chips, the pot the call is priced against is one they will grow, so the
+ * number compared to the bar is a forecast rather than a quotation. The
+ * distinction did not matter while `ev.actionEv` priced every such call against
+ * a pot too small to clear the bar; it matters the moment that pot is priced
+ * correctly (`ev.callEv`), because the correction adds `share · E[Σ owed]` to
+ * every non-closing call monotonically and can therefore only make this fire
+ * more. Measured over 220 six-handed hands, letting it: the nit's override
+ * firings went 8 -> 59 and its VPIP 9.5% -> 25.9%, collapsing into the rock
+ * (26.4) and the tag (27.7) and destroying the roster's width ordering at the
+ * tight end. Width belongs to `entryThreshold` and to nothing else.
+ *
  * The bar also scales with what the action actually risks rather than with the
  * price of calling, which is what the constant's "per chip risked" means.
  */
 function clearlyProfitable(
   actions: TableAction[],
   tiltedEv: Record<string, number>,
-  toCall: number
+  toCall: number,
+  closesAction: boolean
 ): boolean {
+  if (!closesAction) return false;
   return actions.some(
     (a) =>
       a.type !== "fold" &&

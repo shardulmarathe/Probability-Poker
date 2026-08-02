@@ -12,3 +12,7 @@ dist-ssr
 docs/report-shots/
 docs/table-shots/
 docs/profile-shots/
+
+# macOS/sync artefacts — duplicate copies tsc compiles but nothing imports
+* [0-9].ts
+* [0-9].tsx

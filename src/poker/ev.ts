@@ -32,6 +32,12 @@ import {
  * `foldEquityEv` below is the version that does not assume a call; this one is
  * kept unchanged because calls, checks and folds have no fold-equity term and
  * several callers price only those.
+ *
+ * NOTE a second assumption, in the `pot` argument: the pot is taken to be final.
+ * That is exact for a call that CLOSES the action and wrong for one that does
+ * not — see `callEv` below, which is the version that does not assume the call
+ * is the last word. This one remains correct, and remains the price used, for
+ * every closing call.
  */
 export function actionEv(
   action: LegalAction,
@@ -317,6 +323,100 @@ export function foldEquityEv(input: FoldEquityInput): FoldEquityBreakdown {
     ev: foldEv + callEv,
     simulations,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Calls that do not close the action
+// ---------------------------------------------------------------------------
+//
+// `actionEv` prices a call against the pot AS IT STANDS. That is exact when the
+// call closes the action — heads-up, or last to act with everybody else already
+// matched — because every chip that will ever enter the pot is already in it.
+// For any other call it is wrong, and wrong on both legs of one expression.
+//
+// The equity a call is priced with is the hero's share against the WHOLE field
+// still contesting, seats behind included (`decider.equityRequest` asks about
+// every contesting seat). So the losing leg already pays for those seats
+// sticking around. The winning leg does not collect for it: the pot it wins is
+// the pot from before any of them called. Six-handed preflop that pairs a share
+// of ~1/6 with a pot of one and a half blinds:
+//
+//     call   = share x pot             - (1 - share) x toCall  ~  -4 chips
+//     raise  = share x (pot + Σ owed)  - (1 - share) x cost    ~ +12 chips
+//
+// for the same holding. The raise is on the right basis; the call is on a basis
+// that assumes a six-way showdown for a heads-up pot. The two are therefore not
+// comparable at all, and the bias is not small: over 220 six-handed hands the
+// call came out negative while the best aggressive line came out positive in
+// 37.5% of spots. `profiles.tiltEv` is a multiplier and multipliers preserve
+// sign, so no `aggression` value can reorder any of them.
+//
+// The fix is to price a non-closing call against the pot it will plausibly
+// REACH, with the same field simulation a raise is priced with: each seat that
+// still owes chips continues at its own P(continue), and the hero's share is
+// taken against the field that actually shows up, one simulation at a time.
+// That is a common basis, not parity — the two prices are still free to differ,
+// and now the difference means something.
+//
+// WHAT MUST NOT COME WITH IT IS FOLD EQUITY. Nobody folds to a call. The seat
+// whose bet is being called has already committed and has no decision left, so
+// the "everybody folds and the hero takes the pot" branch `foldEquityEv` prices
+// is unreachable. That is why this is a *specialisation* of `foldEquityEv`
+// rather than another call of it with different numbers: zeroing the fold model
+// of every already-matched seat drives `pFold` to 0 by construction and the
+// formula collapses onto its call term alone. A raise therefore still beats a
+// call whenever the folds it buys are genuinely worth something, which is the
+// asymmetry the whole roster rests on.
+
+export interface CallEvInput {
+  heroHole: readonly number[];
+  board: readonly number[];
+  /**
+   * EVERY opponent still contesting, the already-matched ones included — they
+   * are in the showdown whatever the seats behind do, so leaving them out would
+   * price the hero's share against the wrong field.
+   *
+   * `owes` is what separates the two kinds. A seat with `owes > 0` is still to
+   * act and continues at `1 - foldByCombo`; a seat with `owes` zero or absent
+   * has no decision left, and its fold model is overwritten with zeros here
+   * whatever the caller passed.
+   */
+  opponents: readonly FoldingOpponent[];
+  /** Chips already in the middle, before the hero calls. */
+  pot: number;
+  /** Chips the hero must add to call. Also the hero's whole cost. */
+  toCall: number;
+  simulations: number;
+  seed: number;
+}
+
+/** A seat with no decision left to make: it never folds. Read-only, so shared. */
+const NEVER_FOLDS = new Float64Array(COMBO_COUNT);
+
+/**
+ * Price a call against the pot the seats behind will build.
+ *
+ * Delegates to `foldEquityEv` with `cost = toCall`, which is what puts the two
+ * prices on one basis by construction rather than by agreement: one field
+ * simulation, one pricing formula, and one place a multiway error could live.
+ * Returns the same breakdown, whose `foldEv` is 0 and whose `callEv` is
+ * therefore the whole of `ev`.
+ *
+ * PRECONDITION: at least one opponent owes nothing — the seat whose bet is
+ * being called. It always holds for a real call, because a seat cannot bet and
+ * then not be at its own bet, and it is what makes `pFold === 0` structural
+ * rather than incidental. `ev.test.ts` pins it. Handed a field where every seat
+ * could still fold, this returns `foldEquityEv`'s answer, which awards the pot
+ * on the all-fold branch — correct arithmetic for a state that cannot arise.
+ */
+export function callEv(input: CallEvInput): FoldEquityBreakdown {
+  const opponents = input.opponents.map((o) => {
+    const owes = Math.max(0, o.owes ?? 0);
+    return owes > 0
+      ? { ...o, owes }
+      : { ...o, owes: 0, foldByCombo: NEVER_FOLDS };
+  });
+  return foldEquityEv({ ...input, opponents, cost: input.toCall });
 }
 
 export interface RangeEquityInput {

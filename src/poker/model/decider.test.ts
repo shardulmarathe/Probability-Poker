@@ -34,6 +34,7 @@ import {
   MIN_DECISION_SIMS,
   REFERENCE_FRACTION,
   TABLE_DECISION_SIMS,
+  closesAction,
   decisionSeed,
   decisionSims,
   equityRequest,
@@ -45,6 +46,7 @@ import {
   opponentRange,
   opponentRanges,
   opponentsOf,
+  priceCall,
   priceSizes,
   profileFor,
   readsFromActions,
@@ -1088,5 +1090,148 @@ describe("pricing sizes", () => {
     // eslint-disable-next-line no-console
     console.log(`six-handed flop decision: ${each.toFixed(1)}ms`);
     expect(each).toBeLessThan(250);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pricing a call
+// ---------------------------------------------------------------------------
+//
+// The whole risk in re-pricing calls is that it leaks into the calls that were
+// already right. A closing call must come out of the decider bit-for-bit
+// unchanged — not close, not within the sampling error of a second Monte Carlo,
+// identical — or the fix has traded a correct number for a noisier one.
+
+/**
+ * A flop spot where a bet of `bet` stands and the hero must call it.
+ *
+ * `behind` is how many opponents have yet to act; the rest have already matched.
+ * `behind: 0` is therefore a closing call, and heads-up it is the only kind.
+ */
+function callSpot(options: {
+  seats: number;
+  behind: number;
+  bet?: number;
+  seed?: number;
+}): { table: Table; seat: number; bet: number } {
+  const bet = options.bet ?? 20;
+  const { table, seat } = flopSpot({
+    seats: options.seats,
+    hero: [makeCard(7, "c"), makeCard(2, "d")],
+    board: [makeCard(13, "s"), makeCard(9, "h"), makeCard(4, "d")],
+    pot: 60,
+    seed: options.seed ?? 4242,
+  });
+
+  const opponents = table.seats.filter((s) => s.id !== seat);
+  const matched = opponents.length - options.behind;
+  if (matched < 1) throw new Error("callSpot: somebody has to have bet");
+  opponents.forEach((s, i) => {
+    const isIn = i < matched;
+    s.streetCommit = isIn ? bet : 0;
+    s.hasActed = isIn;
+    s.stack = 200 - s.streetCommit;
+    if (isIn) table.pot += bet;
+  });
+  table.currentBet = bet;
+  table.lastRaiseSize = bet;
+  table.lastAggressor = opponents[0].id;
+  return { table, seat, bet };
+}
+
+const callOf = (table: Table, seat: number) =>
+  legalActions(table, seat, table.config).find((a) => a.type === "call")!;
+
+describe("pricing a call", () => {
+  it("calls a heads-up call closing, and declines to re-price it", () => {
+    const { table, seat } = callSpot({ seats: 2, behind: 0 });
+    expect(closesAction(table, seat)).toBe(true);
+    expect(
+      priceCall(table, seat, callOf(table, seat), FOLD_EQUITY_SIMS, 99)
+    ).toBeNull();
+  });
+
+  it("calls a six-handed call closing once every other seat has matched", () => {
+    const { table, seat } = callSpot({ seats: 6, behind: 0 });
+    expect(opponentsOf(table, seat)).toHaveLength(5);
+    expect(closesAction(table, seat)).toBe(true);
+    expect(
+      priceCall(table, seat, callOf(table, seat), FOLD_EQUITY_SIMS, 99)
+    ).toBeNull();
+  });
+
+  it("does not call it closing while one seat still owes chips", () => {
+    const { table, seat } = callSpot({ seats: 6, behind: 1 });
+    expect(closesAction(table, seat)).toBe(false);
+    const priced = priceCall(
+      table,
+      seat,
+      callOf(table, seat),
+      FOLD_EQUITY_SIMS,
+      99
+    )!;
+    expect(priced).not.toBeNull();
+    // No fold equity, and a pot bigger than the one standing — the two halves
+    // of what `ev.callEv` is for.
+    expect(priced.pFold).toBe(0);
+    expect(priced.foldEv).toBe(0);
+    expect(priced.potIfCalled).toBeGreaterThan(table.pot);
+  });
+
+  it("leaves a closing call's EV bit-identical to actionEv's", () => {
+    // Reconstructed from the decision's own equity estimate, so this is an
+    // equality between two evaluations of the same formula, not a tolerance.
+    for (const seats of [2, 6]) {
+      const { table, seat } = callSpot({ seats, behind: 0 });
+      const decision = FAST(table, seat, table.config);
+      const label = callOf(table, seat).label;
+      const old = evByAction(
+        legalActions(table, seat, table.config),
+        decision.equity,
+        decision.potBefore,
+        decision.toCall
+      );
+      expect(decision.evByAction[label]).toBe(old[label]);
+    }
+  });
+
+  it("moves a non-closing call's EV off actionEv's number, upward", () => {
+    const { table, seat } = callSpot({ seats: 6, behind: 3 });
+    const decision = FAST(table, seat, table.config);
+    const label = callOf(table, seat).label;
+    const old = evByAction(
+      legalActions(table, seat, table.config),
+      decision.equity,
+      decision.potBefore,
+      decision.toCall
+    );
+    expect(decision.evByAction[label]).not.toBe(old[label]);
+    // Monotone: the correction adds the chips the seats behind bring, and
+    // subtracts the ones that fold from the field contesting the hero's share.
+    expect(decision.evByAction[label]).toBeGreaterThan(old[label]);
+    // eslint-disable-next-line no-console
+    console.log(
+      `six-handed call, 3 seats behind: ${decision.evByAction[label].toFixed(2)} ` +
+        `on the reached pot vs ${old[label].toFixed(2)} on the standing pot`
+    );
+  });
+
+  it("declines to price a call that costs nothing", () => {
+    // The big blind's option is a check, not a call, and there is no such
+    // action — but a scripted state can still ask, and a zero-cost call has no
+    // pot to correct.
+    const { table, seat } = callSpot({ seats: 3, behind: 1 });
+    const free = { ...callOf(table, seat), cost: 0 };
+    expect(priceCall(table, seat, free, FOLD_EQUITY_SIMS, 99)).toBeNull();
+  });
+
+  it("is deterministic for the same seed", () => {
+    const a = callSpot({ seats: 6, behind: 2 });
+    const b = callSpot({ seats: 6, behind: 2 });
+    expect(
+      priceCall(a.table, a.seat, callOf(a.table, a.seat), FOLD_EQUITY_SIMS, 7)
+    ).toEqual(
+      priceCall(b.table, b.seat, callOf(b.table, b.seat), FOLD_EQUITY_SIMS, 7)
+    );
   });
 });

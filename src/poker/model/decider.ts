@@ -30,6 +30,7 @@ import { hashSeed, makeRng } from "../core/rng";
 import { runMultiwayEquity, runMultiwayEquitySync } from "../equity/pool";
 import {
   actionEv,
+  callEv,
   foldEquityEv,
   rangeEquity,
   type FoldEquityBreakdown,
@@ -177,6 +178,27 @@ export function opponentsOf(state: TableState, seat: number): number[] {
   return contestingSeats(state)
     .filter((s) => s.id !== seat)
     .map((s) => s.id);
+}
+
+/**
+ * Would a call by `seat` close the action — is the pot it is priced against
+ * already the final one?
+ *
+ * The test is that no opponent still owes chips. That is *not* the same as
+ * `state.bettingClosed` one action early, and the difference is deliberate: a
+ * big blind holding its option has matched the bet but not acted, so it can
+ * still raise. A raise behind does not grow the pot the hero's call was priced
+ * into — it hands the hero a fresh decision at a fresh price, which is priced on
+ * its own when it arrives. Only chips that arrive *without* another hero
+ * decision in between can make the price a forecast rather than a quotation, and
+ * those are exactly the chips a seat still owes.
+ *
+ * So this is precisely the predicate under which `actionEv` is exact and
+ * `priceCall` returns null, which is why both read it from here: one notion of
+ * closing-ness, in one place, or the entry gate and the pricing drift apart.
+ */
+export function closesAction(state: TableState, seat: number): boolean {
+  return opponentsOf(state, seat).every((id) => toCallOf(state, id) === 0);
 }
 
 export function equityRequest(
@@ -683,6 +705,121 @@ export function priceSizes(
 }
 
 // ---------------------------------------------------------------------------
+// Pricing a call
+// ---------------------------------------------------------------------------
+
+/** A seat with no decision left to make. Shared: `callEv` only ever reads it. */
+const NO_FOLD = new Float64Array(COMBO_COUNT);
+
+/**
+ * What a seat yet to act on this street is answering.
+ *
+ * Reconstructed the way `opponentRanges` reconstructs it — from the aggression
+ * already on this street, with the big blind counting as the preflop open —
+ * because the seats behind a caller face precisely what the caller faced.
+ * Calling adds no aggression, so it cannot change the question. This is why
+ * `priceSizes`'s `facing` cannot be reused: there the hero is the one betting,
+ * and the seats behind are answering the hero.
+ */
+function facingThisStreet(state: TableState): Facing {
+  const street = learnStreet(state.street);
+  let aggressors = street === "preflop" ? 1 : 0;
+  for (const record of handActions(state)) {
+    if (learnStreet(record.street) !== street) continue;
+    if (record.action === "bet" || record.action === "raise") aggressors++;
+  }
+  return aggressors >= 2 ? "facing-raise" : aggressors >= 1 ? "facing-bet" : "unopened";
+}
+
+/**
+ * Price a call against the pot the seats still to act will build.
+ *
+ * Returns null — leaving `actionEv`'s price standing, unchanged to the last bit
+ * — whenever no opponent still owes chips. That is the case the old formula
+ * gets exactly right, because the pot as it stands is already the final one, so
+ * re-estimating it would trade a correct number for a noisier one; heads-up it
+ * is every call there is. See `ev.callEv` for why the other case needs a
+ * different basis.
+ *
+ * `ranges` is passed in rather than rebuilt for the same reason `priceSizes`
+ * takes it: the showdown estimate, the raise's fold equity and the call's field
+ * must all be reading one opponent, not three.
+ */
+export function priceCall(
+  state: TableState,
+  seat: number,
+  call: TableAction,
+  simulations: number,
+  seed: number,
+  ranges?: Record<number, Range>
+): FoldEquityBreakdown | null {
+  const opponents = opponentsOf(state, seat);
+  if (opponents.length === 0 || simulations <= 0) return null;
+
+  const hero = seatOf(state, seat);
+  if (hero.hole.length < 2) return null;
+
+  const toCall = call.cost;
+  if (toCall <= 0) return null;
+
+  // Nobody can add anything, so the pot as it stands IS the final pot,
+  // `actionEv` is exact, and there is nothing here to correct.
+  if (closesAction(state, seat)) return null;
+
+  // Chips each opponent still owes to keep playing.
+  const owed = opponents.map((id) => toCallOf(state, id));
+
+  const heroHole = Array.from(encodeCards(hero.hole));
+  const board = Array.from(encodeCards(state.board));
+  const buckets = classifyAll(makeBoardContext(board));
+  const byId = ranges ?? opponentRanges(state, seat);
+  const pot = state.pot;
+  const potAfterCall = pot + toCall;
+  const street = learnStreet(state.street);
+  const facing = facingThisStreet(state);
+
+  const models: FoldingOpponent[] = opponents.map((id, i) => {
+    const range = byId[id] ?? uniformRange();
+    const owes = owed[i];
+    // The bettor, an earlier caller, anyone all-in: already in for this street,
+    // so it neither folds to the call nor adds to the pot. It stays in the
+    // field because it is still in the hand.
+    if (owes === 0) return { range, foldByCombo: NO_FOLD, owes: 0 };
+    // Every seat behind is priced at the price *it* is being offered — what it
+    // owes against the pot it would be calling into. Not one shared fraction:
+    // the small blind is getting a materially better price than a seat that has
+    // yet to put in a chip, and folding it out at the same rate would be pricing
+    // the wrong decision. `owes > 0` already implies a live stack, so an all-in
+    // seat can only reach the branch above and needs no `status` test here.
+    const fraction = potAfterCall > 0 ? owes / potAfterCall : 0;
+    return {
+      range,
+      foldByCombo: foldByCombo(
+        foldByBucket(
+          OPPONENT_MODEL,
+          street,
+          positionOf(id, state.button, state.seats.length),
+          facing
+        ),
+        buckets,
+        fraction
+      ),
+      owes,
+    };
+  });
+
+  return callEv({
+    heroHole,
+    board,
+    opponents: models,
+    pot,
+    toCall,
+    simulations,
+    seed: hashSeed(seed, 0xca11e4),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // The decision
 // ---------------------------------------------------------------------------
 
@@ -698,11 +835,17 @@ const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
  * so the synchronous and asynchronous paths differ in *nothing* but how the
  * Monte Carlo was scheduled.
  *
- * Two prices are formed here, not one. Checks, calls and folds are priced by
- * `actionEv`, which assumes the hand goes to showdown — correct, since none of
- * them can make anybody fold. Bets and raises are priced by `foldEquityEv`,
- * once per candidate size, and it is that second price which lets a hand with
- * no showdown value be worth betting at all.
+ * Three prices are formed here, not one, and the point of the third is that all
+ * of them are measured against the same pot.
+ *
+ *   - Checks, folds and *closing* calls: `actionEv`. It assumes the hand goes to
+ *     showdown for the pot as it stands, which is exactly right when nobody left
+ *     can add a chip.
+ *   - Bets and raises: `foldEquityEv`, once per candidate size. This is the
+ *     price that lets a hand with no showdown value be worth betting at all.
+ *   - Calls that do NOT close the action: `callEv`, which is `foldEquityEv` with
+ *     the fold branch removed — same field simulation, same pot, no fold equity,
+ *     because nobody folds to a call.
  */
 function finish(
   state: TableState,
@@ -739,6 +882,23 @@ function finish(
       )
     : null;
 
+  // A call that does not close the action is re-priced against the pot the seats
+  // behind will build, on the same basis `priceSizes` prices a raise — otherwise
+  // the argmax below compares a heads-up pot against a multiway one. A closing
+  // call keeps `evByAction`'s number exactly.
+  const call = actions.find((a) => a.type === "call");
+  const pricedCall = call
+    ? priceCall(
+        state,
+        seat,
+        call,
+        foldEquitySims,
+        decisionSeed(state, seat),
+        ranges
+      )
+    : null;
+  if (call && pricedCall) evs[call.label] = pricedCall.ev;
+
   // Every size the ladder offers becomes its own candidate, so the argmax below
   // is over sizes as well as over action types.
   let candidates = actions;
@@ -763,6 +923,9 @@ function finish(
     strength: equity.equity,
     potBefore,
     toCall,
+    // Only the entry-gate override reads this, and only to decline to fire on a
+    // call whose pot is not yet settled. See `profiles.clearlyProfitable`.
+    closesAction: closesAction(state, seat),
     sizings,
     // A separate stream from the equity run's, derived from the same key, so a
     // profile's bluff coin flip cannot correlate with its own Monte Carlo draw.

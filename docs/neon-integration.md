@@ -10,23 +10,56 @@ client side follows.
 
 ---
 
+## Using the Neon MCP server
+
+The developer has the **Neon MCP server** connected in Cursor, so the database work is done
+through it rather than by hand. That changes the workflow in three useful ways:
+
+1. **No credential shuttling.** Cursor creates or selects the project and reads the connection
+   string through the MCP; nobody pastes a `DATABASE_URL` into a chat window.
+2. **Branch-first migrations.** Neon's migration tooling applies DDL to a temporary branch, lets
+   you inspect the result, and only then commits to the main branch. Use that flow — an
+   unreviewed migration then costs a discarded branch instead of a restore.
+3. **Neon Auth provisioning** can be set up through the MCP too, which is what populates
+   `neon_auth.user`.
+
+Exact tool names depend on the MCP server version, so discover them rather than assuming; the
+intent above is what matters. **Everything still has to end up as committed SQL in
+`db/migrations/`** — a migration that exists only as an MCP call is not reproducible for anyone
+else, including a fresh deploy.
+
+> **A caution worth stating once:** the Neon MCP has write access to a real database. Point it at
+> a development branch, read the DDL it proposes before committing a migration to main, and never
+> let it operate against production data it did not create.
+
+---
+
 ## Prompt to run in Cursor
 
 > Add persistence to this Vite + React + TypeScript app using **Neon Postgres** and **Neon Auth**,
-> deployed on Vercel. Do not modify anything under `src/poker/`, `src/workers/`, or
-> `src/components/` — those are the game engine and UI, owned elsewhere. Your work is confined to
-> `api/`, `db/`, and adding auth wiring in `src/lib/auth.ts` plus a provider in `src/main.tsx`.
+> deployed on Vercel. **Use the connected Neon MCP server** for all database work — creating the
+> project, provisioning Neon Auth, and applying migrations. Prefer the branch-first migration flow
+> (apply to a temporary branch, verify, then commit to main) over running raw DDL against main.
 >
-> Follow the schema and endpoint contract in `docs/neon-integration.md` exactly. Where the contract
-> is silent, prefer the simplest thing that satisfies it, and note the decision in that file.
+> Do not modify anything under `src/poker/`, `src/workers/`, `src/components/`, `src/store/`, or
+> `src/pages/` — those are the game engine and UI, owned elsewhere. Your work is confined to
+> `api/`, `db/`, `src/lib/auth.ts`, and mounting a provider in `src/main.tsx`.
+>
+> Follow the schema and endpoint contract in `docs/neon-integration.md` exactly — another
+> workstream is building the client against that same contract. If you must deviate, update that
+> file so both halves stay in sync.
 >
 > Requirements:
-> 1. Neon Auth (Managed Better Auth) for email/password sign-up and sign-in.
-> 2. The SQL migrations in `db/migrations/`, runnable in order against a fresh database.
+> 1. Neon Auth (**Managed Better Auth**, not the legacy Stack Auth) for email/password sign-up.
+> 2. Every schema change also committed as ordered SQL in `db/migrations/`, so a fresh database can
+>    be built without the MCP. Verify by applying them to a clean Neon branch.
 > 3. Vercel serverless functions under `api/` implementing the listed endpoints.
-> 4. Every handler validates the session and scopes **all** queries by the authenticated `user_id`.
->    A user must never be able to read or write another user's rows. Add a test that proves it.
-> 5. The app must remain fully playable signed-out — persistence is additive, never required.
+> 4. Every handler validates the session and scopes **all** queries by the `user_id` taken from the
+>    **session, never the request body**. Add a two-user test proving A cannot read B's hands.
+> 5. `hand/record` is **idempotent** on `(session_id, hand_number)` — the client retries from a
+>    write-behind queue, so duplicates will happen and must not create rows.
+> 6. The app stays fully playable signed-out. Persistence is additive and must never block gameplay.
+> 7. Report which Neon project and branch you used, and paste the final migration SQL.
 
 ---
 

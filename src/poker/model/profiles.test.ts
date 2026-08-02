@@ -562,6 +562,156 @@ describe("bluffing", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Passive discipline — the other half of the bluff coin
+// ---------------------------------------------------------------------------
+
+describe("passive discipline", () => {
+  /**
+   * The spot the whole recalibration turns on, and the one `tiltEv` cannot
+   * reach: raising is priced clearly positive and calling clearly negative,
+   * which is what `ev.ts` produces for a multiway preflop pot (a raise is
+   * priced against the pot every caller will build, a call against the pot as
+   * it stands). A multiplier preserves sign, so no `aggression` in (0, ∞) can
+   * put the raise below the call here.
+   */
+  const split = (id: BuiltArchetype, over: Partial<ActionChoiceInput> = {}) =>
+    chooseAction(
+      base(id, {
+        evByAction: { Fold: 0, "Call $10": -5, "Raise to $30": 12 },
+        street: "flop",
+        // Below VALUE_BET_FLOOR: there is nothing here to bet for value, so by
+        // this module's own definition the raise is a bluff.
+        strength: 0.2,
+        rng: ALWAYS_MISS,
+        ...over,
+      })
+    );
+
+  /** Never fires the bluff coin, so the passive branch is what is measured. */
+  const ALWAYS_MISS: Rng = {
+    next: () => 0.999999,
+    int: () => 0,
+    shuffle: (a) => a.slice(),
+  };
+
+  it("shows the multiplier genuinely cannot express this", () => {
+    // Not a claim about the constants — a claim about the shape of the rule.
+    // Every aggression the roster could carry, and every one it could not.
+    for (const aggression of [0.01, 0.1, 0.55, 0.7, 0.8, 0.999]) {
+      expect(tiltEv(12, aggression)).toBeGreaterThan(-5);
+    }
+  });
+
+  it("makes a passive profile call where the argmax would raise", () => {
+    for (const id of ["nit", "rock", "station"] as BuiltArchetype[]) {
+      const choice = split(id);
+      expect(choice.reason, id).toBe("passive");
+      expect(choice.action.type, id).toBe("call");
+      // The tilt still ran and is still reported; it simply did not decide.
+      expect(choice.tiltedEv["Raise to $30"]).toBeCloseTo(
+        12 * BOT_PROFILES[id].aggression,
+        10
+      );
+    }
+  });
+
+  it("leaves the professor and the aggressive profiles on the argmax", () => {
+    for (const id of ["professor", "tag", "lag", "maniac"] as BuiltArchetype[]) {
+      const choice = split(id);
+      expect(choice.reason, id).toBe("argmax");
+      expect(choice.action.type, id).toBe("raise");
+    }
+  });
+
+  it("does not apply to a hand worth betting for value", () => {
+    // At or above the floor there is value to bet, and `aggression` decides by
+    // the multiplier exactly as it always did. The two mechanisms have disjoint
+    // domains, split by VALUE_BET_FLOOR.
+    for (const id of ["nit", "rock", "station"] as BuiltArchetype[]) {
+      const choice = split(id, { strength: VALUE_BET_FLOOR, rng: FORBIDDEN });
+      expect(choice.reason, id).toBe("argmax");
+      expect(choice.action.type, id).toBe("raise");
+    }
+  });
+
+  it("declines to raise but never converts a raise into a fold", () => {
+    // Width is `entryThreshold`'s job and nothing else's. Folding here would
+    // make `aggression` a second, hidden entry gate and would move VPIP —
+    // measured, from 53% to ~19% for the station, against a declared 67%.
+    const choice = split("station", {
+      // Calling is worse than folding, and the station calls anyway.
+      evByAction: { Fold: 0, "Call $10": -40, "Raise to $30": 12 },
+    });
+    expect(choice.reason).toBe("passive");
+    expect(choice.action.type).toBe("call");
+  });
+
+  it("falls back to the argmax when there is no passive continuation", () => {
+    // Answering an all-in: fold or call, nothing in between. With no check or
+    // call in the set there is nothing to downgrade to, so rule 3 decides.
+    const choice = chooseAction(
+      base("station", {
+        actions: [FOLD, RAISE],
+        evByAction: { Fold: 0, "Raise to $30": 12 },
+        strength: 0.2,
+        rng: ALWAYS_MISS,
+      })
+    );
+    expect(choice.reason).toBe("argmax");
+    expect(choice.action.type).toBe("raise");
+  });
+
+  it("prefers a check to a call when both are free of aggression", () => {
+    const choice = chooseAction(
+      base("station", {
+        actions: [CHECK, BET],
+        evByAction: { Check: 3, "Bet $10": 12 },
+        toCall: 0,
+        strength: 0.2,
+        rng: ALWAYS_MISS,
+      })
+    );
+    expect(choice.reason).toBe("passive");
+    expect(choice.action.type).toBe("check");
+  });
+
+  it("reads the same coin as the bluff, drawing no extra entropy", () => {
+    // A passive profile below the floor consumes exactly one draw, whichever
+    // way the coin lands — so a replay cannot desynchronise on this rule.
+    const draws = (id: BuiltArchetype): number => {
+      let n = 0;
+      const counting: Rng = {
+        next: () => {
+          n += 1;
+          return 0.999999;
+        },
+        int: () => 0,
+        shuffle: (a) => a.slice(),
+      };
+      split(id, { rng: counting });
+      return n;
+    };
+    expect(draws("station")).toBe(1);
+    expect(draws("maniac")).toBe(1);
+    // bluffRate 0 draws nothing at all, which is what keeps the professor pure.
+    expect(draws("professor")).toBe(0);
+  });
+
+  it("keeps the bluff itself firing at the declared rate", () => {
+    // The suppression is the coin's other face, so it must not eat the bluffs.
+    const rng = makeRng(31337);
+    let bluffs = 0;
+    const TRIALS = 20000;
+    for (let i = 0; i < TRIALS; i++) {
+      if (split("station", { rng }).reason === "bluff") bluffs++;
+    }
+    expect(Math.abs(bluffs / TRIALS - BOT_PROFILES.station.bluffRate)).toBeLessThan(
+      0.01
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Preflop entry gate
 // ---------------------------------------------------------------------------
 

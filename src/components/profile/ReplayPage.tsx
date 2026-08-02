@@ -38,6 +38,18 @@ export default function ReplayPage() {
 
   const config = useMemo(() => ({ smallBlind, bigBlind }), [smallBlind, bigBlind]);
 
+  // Hands are addressed by deal seed below, so the seat count is known before
+  // the report is; `seatCount` here is the archive's widest table, which is all
+  // `seatName` needs. Names go into the replay table itself so the engine's own
+  // narration ("Textbook Tara raises to $40") matches the seats on screen.
+  const options = useMemo(
+    () => ({
+      config,
+      seats: Array.from({ length: 6 }, (_, i) => ({ name: seatName(i) })),
+    }),
+    [config, seatName]
+  );
+
   // Hands are addressed by deal seed, not hand number: numbers restart at 1 for
   // every new table, so a link to "#3" would mean a different hand tomorrow.
   const requested = params.seed ? Number(params.seed) : undefined;
@@ -45,8 +57,8 @@ export default function ReplayPage() {
     hands.find((h) => h.seed === requested) ?? hands[hands.length - 1] ?? null;
 
   const replay = useMemo(
-    () => (report ? replayHand(report, { config }) : null),
-    [report, config]
+    () => (report ? replayHand(report, options) : null),
+    [report, options]
   );
 
   // Land on the deal whenever the hand changes, rather than on whatever frame
@@ -226,7 +238,7 @@ export default function ReplayPage() {
           <Section title="What if" subtitle="One decision changed — everything after it is simulated">
             <CounterfactualPanel
               report={report}
-              config={config}
+              options={options}
               seat={seat}
               seatName={seatName}
             />
@@ -235,7 +247,7 @@ export default function ReplayPage() {
 
         {tab === "lineup" && replay.fidelity.ok && (
           <Section title="Other table" subtitle="Same cards, different opponents — all of it simulated">
-            <LineupPanel report={report} config={config} seat={seat} seatName={seatName} />
+            <LineupPanel report={report} options={options} seat={seat} seatName={seatName} />
           </Section>
         )}
       </div>

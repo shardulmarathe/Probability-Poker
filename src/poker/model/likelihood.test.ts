@@ -7,6 +7,9 @@ import {
   LEARNING_PRIOR_DENOM,
 } from "../../data/constants";
 import { updateBelief } from "../bayesian";
+import { makeRng } from "../core/rng";
+import { classifyAll, makeBoardContext } from "./buckets";
+import { COMBO_COUNT } from "./range";
 import { observe } from "./learn";
 import {
   ACTIONS,
@@ -144,6 +147,133 @@ describe("default prior", () => {
     expect(priorRow("poker", 0, "river", "unopened").check).toBeCloseTo(0.8645, 4);
     expect(priorRow("poker", 7, "river", "unopened").check).toBeCloseTo(0.1658, 4);
     expect(priorRow("poker", 8, "river", "unopened").check).toBeCloseTo(0.1031, 4);
+  });
+
+  // -------------------------------------------------------------------------
+  // Minimum defence frequency
+  // -------------------------------------------------------------------------
+  //
+  // The bound the prior's fold LEVEL is set by, asserted directly rather than
+  // pinned as a decimal, so it goes on holding if the shape constants move.
+  //
+  // Against a bet of `s` into a pot of `P`, a bluff risking `s` to win `P` is
+  // free money if it gets through more than `alpha = s / (P + s)` of the time,
+  // so no unexploitable opponent folds more than alpha: half pot 1/3, three
+  // quarters 3/7, pot 1/2. The shipped prior used to fold 46.4% of a range to a
+  // half-pot bet — 13 points past the bound — and every bet in the game is
+  // priced against it, which is why the bots bet nearly everything.
+
+  /** Renormalised over the moves that are legal facing a bet, as decider does. */
+  const foldGivenLegal = (b: Bucket, street: LearnStreet, facing: Facing): number => {
+    const row = priorRow("poker", b, street, facing);
+    return row.fold / (row.fold + row.call + row.raise);
+  };
+
+  /**
+   * The fold rate against a real range, not a flat average over the nine
+   * buckets. A random range is air-heavy and air is what folds, so the two
+   * differ by 6-12 points and it is this one that prices a bet.
+   */
+  function rangeFoldRate(
+    street: LearnStreet,
+    facing: Facing,
+    fraction: number
+  ): number {
+    // Mirrors decider.foldAtSize, whose log-odds shift is what makes one anchor
+    // hold every size: odds(s) = odds(REFERENCE) x s / REFERENCE.
+    const REFERENCE = 0.5;
+    const sized = Array.from({ length: BUCKET_COUNT }, (_, b) => {
+      const p = foldGivenLegal(b, street, facing);
+      const odds = (p / (1 - p)) * (Math.min(fraction, 1) / REFERENCE);
+      return odds / (1 + odds);
+    });
+
+    const boards = BOARD_CARDS_AT[street];
+    const rng = makeRng(0x1d5);
+    let acc = 0;
+    const TRIALS = 40;
+    for (let t = 0; t < TRIALS; t += 1) {
+      const deck = rng.shuffle(Array.from({ length: 52 }, (_, i) => i));
+      const buckets = classifyAll(makeBoardContext(deck.slice(0, boards)));
+      let sum = 0;
+      for (let c = 0; c < COMBO_COUNT; c += 1) sum += sized[buckets[c]];
+      acc += sum / COMBO_COUNT;
+    }
+    return acc / TRIALS;
+  }
+
+  const BOARD_CARDS_AT: Record<LearnStreet, number> = {
+    preflop: 0,
+    flop: 3,
+    turn: 4,
+    river: 5,
+  };
+
+  /** The identity the whole cap rests on. */
+  const alpha = (fraction: number): number => fraction / (1 + fraction);
+
+  it("never folds more than alpha, at any size, street or node", () => {
+    expect(alpha(0.5)).toBeCloseTo(1 / 3, 12);
+    expect(alpha(0.75)).toBeCloseTo(3 / 7, 12);
+    expect(alpha(1)).toBe(0.5);
+
+    for (const street of STREETS) {
+      for (const facing of ["facing-bet", "facing-raise"] as Facing[]) {
+        for (const fraction of [0.5, 0.75, 1]) {
+          const folded = rangeFoldRate(street, facing, fraction);
+          expect(
+            folded,
+            `${street}/${facing} at ${fraction} pot: folds ${(100 * folded).toFixed(
+              1
+            )}% vs alpha ${(100 * alpha(fraction)).toFixed(1)}%`
+          ).toBeLessThanOrEqual(alpha(fraction));
+        }
+      }
+    }
+  });
+
+  it("stays close to the bound rather than collapsing under it", () => {
+    // A prior that folded nothing would satisfy MDF trivially and be useless:
+    // it would price every bluff at zero fold equity. The binding cell — the
+    // flop facing a raise, whose bucket mix is the most air-heavy — sits within
+    // a point of alpha, which is what makes this a cap rather than a rewrite.
+    const binding = rangeFoldRate("flop", "facing-raise", 0.5);
+    expect(binding).toBeGreaterThan(0.3);
+    expect(binding).toBeLessThanOrEqual(1 / 3);
+  });
+
+  it("leaves everything except the fold/call split exactly where it was", () => {
+    // The cap moves weight from fold to call after the row is normalised, so
+    // the aggressive and give-up weights it does not touch are bit-identical to
+    // the uncapped prior. That is the property that makes it the minimum edit —
+    // and it is why the raise pins above did not move when the level did.
+    for (const street of STREETS) {
+      for (const facing of FACINGS) {
+        for (let b = 0; b < BUCKET_COUNT; b += 1) {
+          const row = priorRow("poker", b, street, facing);
+          // Row still sums to one: the surplus went somewhere legal.
+          expect(sumRow(row)).toBeCloseTo(1, 12);
+          // Folding never became more likely than calling's own floor allows.
+          expect(row.fold).toBeGreaterThan(0.015);
+        }
+      }
+    }
+    // The uncapped node is untouched: nothing has been bet, so nothing to defend.
+    expect(priorRow("poker", 0, "river", "unopened").fold).toBeCloseTo(0.03143, 4);
+  });
+
+  it("still folds more facing a raise than facing a bet, from every bucket", () => {
+    // Both nodes are scaled by the same factor precisely so the cap cannot
+    // reorder them; two separately-solved factors inverted this at the air
+    // bucket, which is why there is one constant and not two.
+    for (const street of STREETS) {
+      for (let b = 0; b < BUCKET_COUNT; b += 1) {
+        expect(
+          foldGivenLegal(b, street, "facing-raise"),
+          `${street} bucket ${b}`
+        ).toBeGreaterThan(foldGivenLegal(b, street, "facing-bet"));
+      }
+    }
   });
 
   it("has a flat variant equal to the writeup's alpha/delta", () => {

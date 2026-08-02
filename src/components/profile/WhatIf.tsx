@@ -27,8 +27,8 @@ import {
   type LineupReplay,
 } from "../../poker/replay";
 import { BOT_ARCHETYPES, BOT_PROFILES } from "../../poker/model/profiles";
+import type { SimulationOptions } from "../../poker/replay";
 import type { TableHandReport } from "../../poker/table/contract";
-import type { TableConfig } from "../../poker/table/rules";
 import { positionOf } from "../../poker/table/position";
 import { CardRow, EmptyPanel } from "../report/ui";
 import { Scrubber } from "./Scrubber";
@@ -72,6 +72,12 @@ export function SimulatedBanner({
   );
 }
 
+/** "You" is already possessive in the only way English allows here. */
+function possessive(name: string): string {
+  if (name === "You") return "your";
+  return name.endsWith("s") ? `${name}'` : `${name}'s`;
+}
+
 function netColor(value: number): string {
   return value > 0 ? "#7fd3a8" : value < 0 ? "#e58a8a" : "rgba(244,237,228,0.5)";
 }
@@ -85,12 +91,12 @@ const signed = (value: number): string =>
 
 export function CounterfactualPanel({
   report,
-  config,
+  options,
   seat,
   seatName,
 }: {
   report: TableHandReport;
-  config: TableConfig;
+  options: SimulationOptions;
   seat: number;
   seatName: (seat: number) => string;
 }) {
@@ -102,13 +108,13 @@ export function CounterfactualPanel({
 
   const chosen = index ?? indexes[0] ?? null;
   const alternatives = useMemo(
-    () => (chosen === null ? [] : alternativesAt(report, chosen, { config })),
-    [report, chosen, config]
+    () => (chosen === null ? [] : alternativesAt(report, chosen, options)),
+    [report, chosen, options]
   );
 
   const run = (alternative: Alternative) => {
     if (chosen === null) return;
-    const outcome = runCounterfactual(report, chosen, alternative, { config });
+    const outcome = runCounterfactual(report, chosen, alternative, options);
     if (outcome.ok) {
       setResult(outcome);
       setError(null);
@@ -130,10 +136,10 @@ export function CounterfactualPanel({
   return (
     <div data-testid="counterfactual">
       <p className="text-[0.8rem] leading-relaxed text-ivory/65">
-        Pick one of {seatName(seat)}'s decisions and play a different move. The
-        cards stay exactly as they were dealt; everything the table does
-        afterwards is re-derived by the bots, because their real answers were
-        answers to a hand that no longer exists.
+        Pick one of {possessive(seatName(seat))} decisions and play a different
+        move. The cards stay exactly as they were dealt; everything the table
+        does afterwards is re-derived by the bots, because their real answers
+        were answers to a hand that no longer exists.
       </p>
 
       {/* --------------------- Decision picker --------------------- */}
@@ -281,12 +287,12 @@ function Outcome({
 
 export function LineupPanel({
   report,
-  config,
+  options,
   seat,
   seatName,
 }: {
   report: TableHandReport;
-  config: TableConfig;
+  options: SimulationOptions;
   seat: number;
   seatName: (seat: number) => string;
 }) {
@@ -300,7 +306,7 @@ export function LineupPanel({
   const [frame, setFrame] = useState(0);
 
   const run = () => {
-    const outcome = replayWithLineup(report, profiles, { config });
+    const outcome = replayWithLineup(report, profiles, options);
     if (outcome.ok) {
       setResult(outcome);
       setError(null);

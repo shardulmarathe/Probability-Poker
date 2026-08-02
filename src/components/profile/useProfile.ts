@@ -64,7 +64,11 @@ export function useHandRecorder(): void {
 }
 
 export interface ProfileView extends ProfileArchive {
-  /** Hands from previous sessions, before this one was folded in. */
+  /**
+   * Archived hands this session did not play — the ones that survived a reload.
+   * Not the raw stored count: the recorder writes as it goes, so by the time
+   * the page reads storage this session's hands are already in it.
+   */
   storedCount: number;
   /** Seat the profile is written from. */
   seat: number;
@@ -84,9 +88,11 @@ export function useProfileArchive(): ProfileView {
 
   const archive = useMemo(() => {
     const stored = loadArchive();
+    const thisSession = new Set(live.map((h) => h.seed));
     return {
       stored,
       hands: mergeHands(stored.hands, live),
+      earlier: stored.hands.filter((h) => !thisSession.has(h.seed)).length,
     };
     // `version` forces a re-read after a reset, which localStorage cannot
     // announce on its own.
@@ -124,7 +130,7 @@ export function useProfileArchive(): ProfileView {
     bigBlind: table.config.bigBlind,
     heroSeat,
     updatedAt: archive.stored.updatedAt,
-    storedCount: archive.stored.hands.length,
+    storedCount: archive.earlier,
     seat,
     setSeat: setSeatOverride,
     seatCount,

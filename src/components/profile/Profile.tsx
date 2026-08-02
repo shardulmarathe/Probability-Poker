@@ -13,8 +13,8 @@
  * in, rather than blocking on a second of arithmetic.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { classifyStats } from "../../poker/coach/archetype";
 import { analyzeHands, type SessionEvLoss } from "../../poker/coach/evLoss";
 import { computeStats } from "../../poker/coach/stats";
@@ -35,8 +35,34 @@ import { useProfileArchive } from "./useProfile";
 const EV_WINDOW = 120;
 
 export default function Profile() {
-  const { hands, seat, setSeat, seatCount, seatName, storedCount, reset, bigBlind } =
-    useProfileArchive();
+  const navigate = useNavigate();
+  const {
+    hands,
+    seat,
+    setSeat,
+    seatCount,
+    seatName,
+    storedCount,
+    reset,
+    smallBlind,
+    bigBlind,
+  } = useProfileArchive();
+
+  // A leak names a hand number; the replay is addressed by deal seed, because
+  // hand numbers restart with every new table.
+  const seedOf = useMemo(() => {
+    const byNumber = new Map<number, number>();
+    for (const hand of hands) byNumber.set(hand.handNumber, hand.seed);
+    return byNumber;
+  }, [hands]);
+
+  const openReplay = useCallback(
+    (decision: { handNumber: number }) => {
+      const seed = seedOf.get(decision.handNumber);
+      if (seed !== undefined) navigate(`/replay/${seed}`);
+    },
+    [navigate, seedOf]
+  );
 
   const stats = useMemo(() => computeStats(hands, seat), [hands, seat]);
   const verdict = useMemo(() => classifyStats(stats), [stats]);
@@ -104,7 +130,7 @@ export default function Profile() {
               {hands.length === 0
                 ? "Nothing recorded yet. Every finished hand is archived here."
                 : `${hands.length} hand${hands.length === 1 ? "" : "s"} recorded${
-                    storedCount > 0 ? `, ${storedCount} from earlier sessions` : ""
+                    storedCount > 0 ? `, ${storedCount} restored from your archive` : ""
                   }.`}
             </p>
           </div>
@@ -118,7 +144,9 @@ export default function Profile() {
             >
               Replay a hand
             </Link>
-            <Rail>{bigBlind} bb</Rail>
+            <Rail>
+              ${smallBlind} / ${bigBlind}
+            </Rail>
           </div>
         </header>
 
@@ -169,7 +197,7 @@ export default function Profile() {
           </div>
         ) : (
           <div className="mt-5 grid gap-3 sm:gap-4 lg:grid-cols-2">
-            <Section title="This session" subtitle="Chips and showdowns" wide>
+            <Section title="Totals" subtitle="Across every recorded hand" wide>
               <SessionHeadline stats={stats} />
             </Section>
 
@@ -227,7 +255,7 @@ export default function Profile() {
               wide
             >
               {session ? (
-                <LeakList session={session} />
+                <LeakList session={session} onReplay={openReplay} />
               ) : (
                 <p className="py-6 text-center text-sm text-ivory/50">
                   {pricing ? "Pricing…" : "Nothing priced yet."}

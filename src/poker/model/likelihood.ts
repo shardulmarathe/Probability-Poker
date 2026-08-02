@@ -278,11 +278,78 @@ const ROLE: Record<PlayerActionType, "aggro" | "mid" | "give"> = {
  * Actions that are not legal at a node (calling when nobody has bet) get 0.01
  * rather than 0: they should be vanishingly unlikely, but a hard zero would make
  * one mislabelled observation an infinitely strong Bayes factor.
+ *
+ * These are the *shape* of the prior. Its fold LEVEL is set separately, one line
+ * down, because the level is bounded by something these numbers know nothing
+ * about — see `MDF_FOLD_SCALE`.
  */
 const BASE_MIX: Record<Facing, ActionWeights> = {
   unopened: { check: 0.55, bet: 0.42, call: 0.01, raise: 0.01, fold: 0.01 },
   "facing-bet": { fold: 0.42, call: 0.44, raise: 0.12, check: 0.01, bet: 0.01 },
   "facing-raise": { fold: 0.52, call: 0.38, raise: 0.08, check: 0.01, bet: 0.01 },
+};
+
+/**
+ * MINIMUM DEFENCE FREQUENCY — the ceiling on how much this prior may fold.
+ *
+ * Against a bet of `s` into a pot of `P`, a bluff risking `s` to win `P` breaks
+ * even when it gets through with probability
+ *
+ *     alpha = s / (P + s)
+ *
+ * so an opponent folding more than `alpha` can be beaten by betting *any two
+ * cards*, and an unexploitable one folds at most `alpha` — equivalently it
+ * defends the MDF `1 - alpha`. Half pot alpha = 1/3, three quarters 3/7, pot 1/2.
+ *
+ * The uncapped rows above folded 46.4% of a range to a half-pot bet: 13 points
+ * looser than any unexploitable opponent. Every bet and raise in the game is
+ * priced against this table (`decider.foldByBucket` -> `ev.foldEquityEv`), so
+ * those 13 points were a standing subsidy on aggression, and an EV maximiser
+ * correctly collected it by betting close to everything. This constant removes
+ * the subsidy.
+ *
+ * WHAT IS ANCHORED. The bound is on the *range-weighted* fold frequency — the
+ * share of the hands an opponent actually holds that go in the muck — which is
+ * what `foldEquityEv` integrates. Not the flat mean over the nine buckets: a
+ * random range is air-heavy and air is what folds, so the range-weighted rate
+ * runs 6-12 points above the per-bucket mean, and pinning the smaller number
+ * would leave the one that prices a bet still over the line.
+ *
+ * WHY ONE SIZE IS ENOUGH. `decider.foldAtSize` shifts the log-odds of a fold by
+ * `log(s / REFERENCE_FRACTION)` at unit sensitivity, i.e. odds(s) = odds(0.5) x
+ * 2s. Alpha in odds form is exactly `s / P = s`. So odds(0.5) = 1/2 — that is,
+ * p = 1/3 — gives odds(s) = s at every size: the MDF frontier is a fixed point
+ * of the sizing law, and anchoring the reference size holds the whole curve.
+ * Measured at 0.50 / 0.75 / 1.00 pot the rows below come out at 32.4 / 41.3 /
+ * 47.9% facing a bet and 32.6 / 41.7 / 48.5% facing a raise, against alphas of
+ * 33.3 / 42.9 / 50.0%.
+ *
+ * WHY A SCALAR. MDF constrains the total share of a range that folds, not how
+ * that share is spread over hand classes. The prior's spread was never the
+ * problem; its level was. So the fold weight is scaled by a constant and the
+ * surplus handed to `call` — after normalisation, so the row still sums to one
+ * and `bet`, `raise` and `check` keep the values they had before this constant
+ * existed. Strength ordering, street sharpening and the raise weights are all
+ * untouched, which is why this is the smallest edit that makes the claim true.
+ *
+ * WHY ONE SCALAR AND NOT TWO. Both defended nodes face the same bound at the
+ * same reference size, so they get the same factor: it is the largest scale at
+ * which no (street, facing, size) cell exceeds its alpha. Facing a raise binds
+ * because it starts higher, and the flop binds among streets because its bucket
+ * mix is the most air-heavy; facing a bet then lands comfortably under. Scaling
+ * both by the same number is also what keeps the facing comparison exactly as it
+ * was — a three-bet still folds out more than a bet does from every single
+ * bucket, because a shared positive factor cannot reorder anything. Two
+ * separately-solved factors did invert that at the air bucket.
+ */
+const MDF_FOLD_SCALE = 0.47;
+
+/** Nodes where a bet has to be answered, and MDF therefore binds. */
+const DEFENDED: Record<Facing, boolean> = {
+  // Nothing has been bet, so there is no bound and nothing is scaled.
+  unopened: false,
+  "facing-bet": true,
+  "facing-raise": true,
 };
 
 /**
@@ -358,6 +425,15 @@ function pokerPriorRow(
   }
 
   const normalized = normalizeWeights(raw);
+
+  // The MDF cap. Between fold and call only, so the row still sums to one and
+  // every other action keeps the value it had before this line existed.
+  if (DEFENDED[facing]) {
+    const kept = normalized.fold * MDF_FOLD_SCALE;
+    normalized.call += normalized.fold - kept;
+    normalized.fold = kept;
+  }
+
   const out = {} as ActionWeights;
   for (const a of ACTIONS) {
     out[a] = (1 - PRIOR_MIX) * normalized[a] + PRIOR_MIX / ACTIONS.length;

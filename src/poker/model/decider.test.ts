@@ -575,25 +575,25 @@ describe("foldByBucket", () => {
     }
   });
 
-  it("folds far more than MDF, which is what makes the bot bluff so much", () => {
-    // Worth pinning explicitly, because it explains every bluff frequency this
-    // file measures. Against a half-pot bet the minimum defence frequency is
+  it("respects MDF, which is what stops the bot bluffing everything", () => {
+    // Worth pinning explicitly, because it sets every bluff frequency this file
+    // measures. Against a half-pot bet the minimum defence frequency is
     // 1 − alpha = 2/3, i.e. an opponent that folds more than 1/3 of its range
-    // is beatable by betting *any* two cards. The shipped `poker` prior folds
-    // far more than that, so the EV-maximiser correctly exploits it by betting
-    // almost everything heads-up. That is the opponent model being loose, not
-    // the EV arithmetic being wrong — and it is the number to change if the
-    // bots should bluff less, rather than anything in `ev.ts`.
+    // is beatable by betting *any* two cards. This assertion used to read
+    // `toBeGreaterThan` and the prior folded 46.4% here — 13 points past the
+    // bound — which was a standing subsidy on aggression that the EV maximiser
+    // correctly collected by betting almost everything. `likelihood.ts`'s
+    // MDF_FOLD_SCALE removes it; the bound is asserted range-weighted and at
+    // every size in `likelihood.test.ts`, and this is the per-bucket mean at
+    // the node the fold-equity term is priced from most often.
     const row = foldByBucket(model, "flop", "BTN", "facing-bet");
     let mean = 0;
     for (const p of row) mean += p / BUCKET_COUNT;
     const alphaHalfPot = 1 / 3;
-    // eslint-disable-next-line no-console
-    console.log(
-      `prior fold rate at half pot: ${(100 * mean).toFixed(1)}% ` +
-        `(alpha = ${(100 * alphaHalfPot).toFixed(1)}%, MDF = 66.7%)`
-    );
-    expect(mean).toBeGreaterThan(alphaHalfPot);
+    expect(mean).toBeLessThanOrEqual(alphaHalfPot);
+    // Not collapsed to nothing either: a prior that never folds prices every
+    // bluff at zero fold equity, which is a different bug of the same size.
+    expect(mean).toBeGreaterThan(0.2);
   });
 
   it("says a river bet is read more sharply than a preflop one", () => {

@@ -35,7 +35,12 @@ const pctFraction = (c: Counter): number | null => {
   return r === null ? null : r;
 };
 
-export const STAT_SPECS: StatSpec[] = [
+/**
+ * Deliberately not exported. This module's other exports are all components,
+ * and a stray constant among them costs React Fast Refresh — the whole file
+ * reloads on every edit instead of re-rendering in place.
+ */
+const STAT_SPECS: StatSpec[] = [
   {
     key: "vpip",
     label: "VPIP",

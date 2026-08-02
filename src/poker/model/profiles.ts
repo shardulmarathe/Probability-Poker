@@ -244,7 +244,7 @@ export interface ActionChoiceInput {
   rng: Rng;
 }
 
-export type ChoiceReason = "argmax" | "entry-fold" | "bluff";
+export type ChoiceReason = "argmax" | "entry-fold" | "bluff" | "passive";
 
 export interface ActionChoice {
   action: TableAction;
@@ -277,17 +277,62 @@ export function meetsEntry(profile: BotProfile, hole: Card[]): boolean {
 }
 
 /**
+ * WHY `aggression` ALONE CANNOT MAKE A PROFILE PASSIVE
+ *
+ * `tiltEv` is a multiplier, so it preserves sign: `tiltEv(ev, a)` and `ev` are
+ * on the same side of zero for every `a > 0`. That is fine while the two actions
+ * being compared are on the same side of zero themselves, and it is what the
+ * measured "AF lands on the multiplier" property rests on. It is useless the
+ * moment they are not — and preflop multiway they never are.
+ *
+ * The reason is in how the two prices are formed. A call is priced by
+ * `ev.actionEv` against the pot *as it stands*, because a call is assumed to
+ * close the action; a bet or raise is priced by `ev.foldEquityEv` against the
+ * pot every caller will have built by the time the hand is decided. Six-handed
+ * with an even share of the equity those come out at roughly
+ *
+ *     call   =  share x pot        - (1 - share) x toCall     ~  -4 chips
+ *     raise  =  share x (pot + Σ owed) - (1 - share) x cost   ~  +12 chips
+ *
+ * for the same holding, so raising is priced positive and calling negative for
+ * essentially every hand. No `aggression` in (0, ∞) reorders a positive number
+ * below a negative one, and measurement agrees: over 220 six-handed hands only
+ * 4.3% of the spots where the aggressive line led could be flipped by *any*
+ * multiplier below 1. That is why every profile's PFR tracked its VPIP, and it
+ * is not something a different constant in `BOT_PROFILES` can fix.
+ *
+ * What can, without a new parameter: this module already names the equity below
+ * which a bet cannot be for value (`VALUE_BET_FLOOR`), and already carries the
+ * rate at which each profile fires there (`bluffRate`). Below the floor every
+ * aggressive action is a bluff *by this module's own definition*, so letting the
+ * argmax take one whenever a one-street EV model likes the price made the
+ * declared `bluffRate` a fiction — a station with `bluffRate: 0.01` was firing
+ * at air in roughly half its spots. Rule 2 below therefore decides both ways for
+ * a profile that is passive by parameter: it fires at `bluffRate` and declines
+ * otherwise. Aggressive profiles keep the maximiser's freedom, so `aggression`
+ * still has exactly one mechanism on each side of 1 — `tiltEv` promotes above
+ * it, this rule demotes below it — and the professor at exactly 1 is untouched.
+ */
+
+/** Whether a profile is passive by parameter. The professor sits exactly at 1. */
+const isPassive = (profile: BotProfile) => profile.aggression < 1;
+
+/**
  * Pick an action for a seat with this personality.
  *
  * Three rules, in order, because each is allowed to veto the next:
  *   1. Preflop discipline — below the entry threshold, fold rather than pay to
  *      see a flop, unless the price makes it clearly profitable anyway.
- *   2. Bluff — with a hand too weak to value bet, fire anyway at `bluffRate`.
+ *   2. Bluff, or decline to. With a hand too weak to value bet, fire anyway at
+ *      `bluffRate`; a passive profile that does not fire declines the aggressive
+ *      line entirely rather than letting the argmax take it (see above).
  *   3. Otherwise take the highest EV, with aggressive actions tilted first.
  *
  * The only randomness is rule 2's coin flip, drawn from the injected `Rng`, and
  * it is drawn only when a bluff is actually possible. So a profile with
- * `bluffRate === 0` consumes no entropy at all and is a pure argmax.
+ * `bluffRate === 0` consumes no entropy at all and is a pure argmax. Rule 2's
+ * new second half reads that same coin rather than drawing another, so passivity
+ * costs no extra entropy and cannot desynchronise a replay.
  */
 export function chooseAction(input: ActionChoiceInput): ActionChoice {
   const { profile, actions, evByAction, rng } = input;
@@ -318,13 +363,17 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
   // 2. Bluff. Nothing worth betting for value, so the only reason to bet is to
   //    make someone fold — which is exactly what `bluffRate` measures.
   const aggressive = actions.find(isAggressive);
-  if (
-    aggressive &&
-    profile.bluffRate > 0 &&
-    input.strength < VALUE_BET_FLOOR &&
-    rng.next() < profile.bluffRate
-  ) {
-    return { action: sizedBluff(aggressive, input), reason: "bluff", tiltedEv };
+  if (aggressive && input.strength < VALUE_BET_FLOOR) {
+    if (profile.bluffRate > 0 && rng.next() < profile.bluffRate) {
+      return { action: sizedBluff(aggressive, input), reason: "bluff", tiltedEv };
+    }
+    // …and the other side of that same coin: a profile that is passive by
+    // parameter does not fire at a hand it cannot value bet, so it takes its
+    // passive continuation instead of letting rule 3 raise for it.
+    if (isPassive(profile)) {
+      const passive = bestPassive(actions, tiltedEv);
+      if (passive) return { action: passive, reason: "passive", tiltedEv };
+    }
   }
 
   // 3. Argmax. Strict `>` keeps the first action in `legalActions` order on a
@@ -339,6 +388,34 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
     }
   }
   return { action: best, reason: "argmax", tiltedEv };
+}
+
+/**
+ * The best way to keep playing without building the pot: a check or a call.
+ *
+ * Folding is deliberately not a candidate. Declining to *raise* is a statement
+ * about aggression; whether the hand is worth playing at all was already settled
+ * by rule 1, and re-deciding it here would turn `aggression` into a second,
+ * hidden entry gate. Measured, that is not a nicety: falling back to the plain
+ * argmax over fold-and-call instead would have dropped the station's VPIP from
+ * 53% to ~19% against a declared 67%, because `ev.actionEv` prices a multiway
+ * call negative (see the note above) in 63% of the spots the entry gate admits.
+ * Width belongs to `entryThreshold` and to nothing else.
+ *
+ * Returns undefined when there is no passive continuation — an all-in to answer,
+ * where the only moves are call-or-fold with no rung in between — and rule 3
+ * then decides normally.
+ */
+function bestPassive(
+  actions: TableAction[],
+  tiltedEv: Record<string, number>
+): TableAction | undefined {
+  let best: TableAction | undefined;
+  for (const action of actions) {
+    if (isAggressive(action) || action.type === "fold") continue;
+    if (!best || tiltedEv[action.label] > tiltedEv[best.label]) best = action;
+  }
+  return best;
 }
 
 /**

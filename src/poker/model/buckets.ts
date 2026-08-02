@@ -31,7 +31,7 @@
  */
 
 import { holeScore } from "../bayesian";
-import { decodeCard } from "../core/card";
+import { decodeCard, encodeCard, encodeCards } from "../core/card";
 import { categoryOf, scoreInts } from "../handEvaluator";
 import {
   COMBO_COUNT,
@@ -95,23 +95,6 @@ export const BUCKET_NAMES: Record<HandBucket, string> = {
   [HandBucket.Overpair]: "Overpair",
   [HandBucket.TwoPair]: "Two Pair",
   [HandBucket.Monster]: "Monster",
-};
-
-/**
- * Preflop labels for the same ordinals. Preflop there is no board and so no
- * "top pair"; the index is a `holeScore` band, and calling band 5 "Top Pair" in
- * the UI would be a lie. Same scale, different vocabulary.
- */
-export const PREFLOP_BUCKET_NAMES: Record<HandBucket, string> = {
-  [HandBucket.Air]: "Trash",
-  [HandBucket.WeakDraw]: "Junk",
-  [HandBucket.StrongDraw]: "Speculative",
-  [HandBucket.WeakPair]: "Marginal",
-  [HandBucket.MidPair]: "Playable",
-  [HandBucket.TopPair]: "Solid",
-  [HandBucket.Overpair]: "Strong",
-  [HandBucket.TwoPair]: "Premium",
-  [HandBucket.Monster]: "Elite",
 };
 
 /**
@@ -195,6 +178,21 @@ export interface BoardContext {
   readonly rankCount: number;
   /** Index into `ranks` for each rank 2..14, 255 when the rank is absent. */
   readonly rankSlot: Uint8Array;
+  /**
+   * Highest rank the board holds two or more of, 0 if the board is unpaired.
+   *
+   * A paired board spends one of the two available pair slots on its own pair,
+   * which is what decides whether a hole-card pair actually plays. See
+   * `madeBucket` and `pairBucket`.
+   */
+  readonly boardPairRank: number;
+  /**
+   * Second-highest such rank, 0 if the board holds fewer than two pairs.
+   *
+   * Both of the board's pairs play on a double-paired board, so a hole-card
+   * pair below this one never reaches the five-card hand at all.
+   */
+  readonly boardPair2Rank: number;
   /** Board cards of each suit, indexed by suit code 0..3. */
   readonly suitCount: Uint8Array;
   /**
@@ -217,7 +215,12 @@ export function makeBoardContext(board: ArrayLike<number>): BoardContext {
 
   for (let i = 0; i < len; i++) {
     const c = board[i];
-    if (c < 0 || c > 51) throw new Error(`makeBoardContext: bad card code ${c}`);
+    // `c < 0 || c > 51` alone is false for NaN, undefined and null, so a bad
+    // code would sail through and index as 0 (the ace of spades) or corrupt a
+    // whole classification pass. Every sibling entry point checks; so does this.
+    if (!Number.isInteger(c) || c < 0 || c > 51) {
+      throw new Error(`makeBoardContext: bad card code ${c}`);
+    }
     cards[i] = c;
     suitCount[c & 3]++;
     counts[(c >> 2) + 2]++;
@@ -226,10 +229,18 @@ export function makeBoardContext(board: ArrayLike<number>): BoardContext {
 
   const ranks = new Uint8Array(len);
   let rankCount = 0;
+  // Descending, so the first two ranks the board holds a pair of are found in
+  // the same sweep that fills `ranks`.
+  let boardPairRank = 0;
+  let boardPair2Rank = 0;
   for (let r = 14; r >= 2; r--) {
     if (counts[r] > 0) {
       rankSlot[r] = rankCount;
       ranks[rankCount++] = r;
+      if (counts[r] >= 2) {
+        if (boardPairRank === 0) boardPairRank = r;
+        else if (boardPair2Rank === 0) boardPair2Rank = r;
+      }
     }
   }
 
@@ -253,6 +264,8 @@ export function makeBoardContext(board: ArrayLike<number>): BoardContext {
     ranks,
     rankCount,
     rankSlot,
+    boardPairRank,
+    boardPair2Rank,
     suitCount,
     hand,
   };
@@ -287,6 +300,13 @@ export function classifyHole(
  * test per combo to protect a result nobody looks at.
  */
 export function classifyAll(ctx: BoardContext, out?: Uint8Array): Uint8Array {
+  // A short buffer would be written past its end silently — typed arrays drop
+  // out-of-range stores — and the caller would read stale buckets for the tail.
+  if (out !== undefined && out.length < COMBO_COUNT) {
+    throw new Error(
+      `classifyAll: out buffer holds ${out.length}, need ${COMBO_COUNT}`
+    );
+  }
   const buckets = out ?? new Uint8Array(COMBO_COUNT);
   if (ctx.len === 0) {
     buckets.set(PREFLOP_BUCKET);
@@ -298,25 +318,14 @@ export function classifyAll(ctx: BoardContext, out?: Uint8Array): Uint8Array {
   return buckets;
 }
 
-/** Must match `SUIT_INDEX` in core/card.ts. */
-const SUIT_INDEX: Record<string, number> = { s: 0, h: 1, d: 2, c: 3 };
-
 /** `tierOf`-shaped convenience for `Card`s. Builds a context, so not hot-path. */
 export function bucketOfCards(
   a: Card,
   b: Card,
   board: Card[] = []
 ): HandBucket {
-  const codes = new Uint8Array(board.length);
-  for (let i = 0; i < board.length; i++) {
-    codes[i] = ((board[i].rank - 2) << 2) | SUIT_INDEX[board[i].suit];
-  }
-  const ctx = makeBoardContext(codes);
-  return classifyHole(
-    ((a.rank - 2) << 2) | SUIT_INDEX[a.suit],
-    ((b.rank - 2) << 2) | SUIT_INDEX[b.suit],
-    ctx
-  );
+  const ctx = makeBoardContext(encodeCards(board));
+  return classifyHole(encodeCard(a), encodeCard(b), ctx);
 }
 
 /**
@@ -356,6 +365,16 @@ function classifyPostflop(
   // sheet is worth nothing at all, which is why it is checked before category.
   if (ctx.needed === 0 && score === ctx.boardScore) return HandBucket.Air;
 
+  // Quads on a board still to come is the same story, but the equality above
+  // cannot see it: `boardScore` is then a four-card partial hand and ours a
+  // six-card one, so they never compare equal. Every combo makes the board's
+  // quads and nothing better, so without this a 7-7-7-7 turn reads Monster for
+  // all 1326. On the river the equality does fire, and the one combo that beats
+  // the board there — a better kicker — must keep its Monster.
+  if (ctx.needed > 0 && ctx.boardCat === HandCategory.FourOfAKind) {
+    return HandBucket.Air;
+  }
+
   const made = madeBucket(score, hi, lo, ctx);
   if (ctx.needed === 0) return made;
 
@@ -392,7 +411,18 @@ function madeBucket(
     // Only two pair made with BOTH hole cards is really two pair. A pocket pair
     // beside a paired board, or one hole card pairing a paired board, is a
     // one-pair hand wearing the board's pair as a hat — rank it by its own pair.
-    if (hi !== lo && ctx.rankSlot[hi] !== 255 && ctx.rankSlot[lo] !== 255) {
+    //
+    // A paired board is the same story a rung up: the board's own pair already
+    // occupies one of the two pair slots, so the lower of our two paired ranks
+    // is a kicker rather than a pair. On As-Ah-Kd-7c-2s, K-7 and K-Q both play
+    // A-A-K-K plus a kicker, and K-Q's is the better one — so requiring `lo` to
+    // beat the board's pair is what keeps the ladder pointing the right way.
+    if (
+      hi !== lo &&
+      ctx.rankSlot[hi] !== 255 &&
+      ctx.rankSlot[lo] !== 255 &&
+      lo > ctx.boardPairRank
+    ) {
       return HandBucket.TwoPair;
     }
     return pairBucket(hi, lo, ctx);
@@ -408,6 +438,17 @@ function madeBucket(
  * abstract: which board card it paired, or where a pocket pair falls among the
  * board's ranks. Returns Air when the pair on the score sheet is entirely the
  * board's (A-K on 7-7-2 has a pair of sevens and nothing else).
+ *
+ * A five-card hand shows at most two pairs, so on a board that already shows
+ * two of its own — K-K-J-J-6 — our pair only reaches the hand if it outranks
+ * the lower of them. A pair of sixes there is not bottom pair, it is nothing:
+ * the hand is K-K-J-J plus a kicker either way. That is `boardPair2Rank`, and
+ * it is deliberately NOT `boardPairRank`: on a singly-paired board like
+ * A-A-K-7-2 our pair does still play (7-3 makes A-A-7-7, real two pair that
+ * beats anyone holding one pair), so testing against the board's top pair there
+ * would bury genuinely strong hands in Air. Measured over 200 exact-equity
+ * river boards, the `boardPairRank` form drops Somers' D against exact equity
+ * from 0.721 to 0.627 while this form raises it to 0.723.
  */
 function pairBucket(hi: number, lo: number, ctx: BoardContext): HandBucket {
   const b0 = ctx.ranks[0];
@@ -416,6 +457,7 @@ function pairBucket(hi: number, lo: number, ctx: BoardContext): HandBucket {
   if (hi === lo) {
     // A pocket pair matching a board rank is trips or better, so it never
     // reaches here: `hi` is strictly off the board and the comparisons decide.
+    if (hi < ctx.boardPair2Rank) return HandBucket.Air;
     if (hi > b0) return HandBucket.Overpair;
     if (hi > b1) return HandBucket.MidPair;
     return HandBucket.WeakPair;
@@ -427,6 +469,7 @@ function pairBucket(hi: number, lo: number, ctx: BoardContext): HandBucket {
   const slot = sHi < sLo ? sHi : sLo;
 
   if (slot === 255) return HandBucket.Air;
+  if (ctx.ranks[slot] < ctx.boardPair2Rank) return HandBucket.Air;
   if (slot === 0) return HandBucket.TopPair;
   if (slot === 1) return HandBucket.MidPair;
   return HandBucket.WeakPair;

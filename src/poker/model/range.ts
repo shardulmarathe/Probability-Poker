@@ -13,7 +13,8 @@
  *  - A range is a bare `Float64Array(1326)`. Weights are unnormalized until
  *    someone asks; nothing here allocates per combo.
  *  - The combo <-> card mapping is table-driven in both directions, so neither
- *    direction costs arithmetic at call time (~5 KB of tables, built once).
+ *    direction costs arithmetic at call time (~8 KB of tables, built once:
+ *    1326 bytes each way plus a 52x52 Uint16 reverse index).
  *  - Mutating helpers (`normalizeRange`, `removeCards`) work in place and return
  *    the same array so they chain. Copy with `cloneRange` first if the caller
  *    needs the original.
@@ -46,23 +47,16 @@ const INDEX_OF = new Uint16Array(52 * 52);
 /** Sentinel for "not a combo" — 1326 indices fit well below it. */
 const NO_COMBO = 0xffff;
 
-/** Frozen `[a, b]` per combo so `comboCards` allocates nothing at call time. */
-const COMBO_PAIRS: readonly (readonly [number, number])[] = (() => {
-  INDEX_OF.fill(NO_COMBO);
-  const pairs: (readonly [number, number])[] = [];
-  let i = 0;
-  for (let a = 0; a < 52; a++) {
-    for (let b = a + 1; b < 52; b++) {
-      COMBO_A[i] = a;
-      COMBO_B[i] = b;
-      INDEX_OF[a * 52 + b] = i;
-      INDEX_OF[b * 52 + a] = i;
-      pairs.push(Object.freeze([a, b] as [number, number]));
-      i++;
-    }
+INDEX_OF.fill(NO_COMBO);
+for (let a = 0, i = 0; a < 52; a++) {
+  for (let b = a + 1; b < 52; b++) {
+    COMBO_A[i] = a;
+    COMBO_B[i] = b;
+    INDEX_OF[a * 52 + b] = i;
+    INDEX_OF[b * 52 + a] = i;
+    i++;
   }
-  return Object.freeze(pairs);
-})();
+}
 
 /**
  * Index of the unordered combo {a, b}. Order-insensitive; throws on a === b or
@@ -78,10 +72,17 @@ export function comboIndex(a: number, b: number): number {
   return i;
 }
 
-/** The two card codes of combo i, ascending. Exact inverse of `comboIndex`. */
+/**
+ * The two card codes of combo i, ascending. Exact inverse of `comboIndex`.
+ *
+ * Allocates a tuple per call, which is why nothing on a hot path uses it — the
+ * per-combo loops read `comboCardA`/`comboCardB` instead. A table of 1326
+ * frozen pairs used to live here to make this allocation-free; it cost 255 KB
+ * resident to optimise a function with no caller outside the tests.
+ */
 export function comboCards(i: number): readonly [number, number] {
   if (i < 0 || i >= COMBO_COUNT) throw new Error(`comboCards: bad index ${i}`);
-  return COMBO_PAIRS[i];
+  return [COMBO_A[i], COMBO_B[i]];
 }
 
 /** Lower card code of combo i. Unchecked — this is the per-combo loop form. */
@@ -164,7 +165,14 @@ export function normalizeRange(range: Range): Range {
 export function removeCards(range: Range, cards: ArrayLike<number>): Range {
   for (let k = 0; k < cards.length; k++) {
     const c = cards[k];
-    if (c < 0 || c > 51) throw new Error(`removeCards: bad card code ${c}`);
+    // `c < 0 || c > 51` alone is false for NaN, undefined and null, all of which
+    // then index INDEX_OF as garbage: NaN is a silent no-op, null removes the
+    // ace of spades, and a fractional 3.5 zeroes 51 unrelated combos straddling
+    // two rows. Card removal that quietly removes the wrong cards is the worst
+    // failure this module has, so the check is on the integer, not the bounds.
+    if (!Number.isInteger(c) || c < 0 || c > 51) {
+      throw new Error(`removeCards: bad card code ${c}`);
+    }
     const row = c * 52;
     for (let o = 0; o < 52; o++) {
       if (o === c) continue;
@@ -358,6 +366,11 @@ export function gridCellOf(combo: number): number {
  * weight" stays testable either way.
  */
 export function toGrid(range: Range, out?: Float64Array): Float64Array {
+  // Float64Array drops out-of-range stores silently, so a short buffer would
+  // lose whole cells rather than fail — and the total would stop conserving.
+  if (out !== undefined && out.length < GRID_CELLS) {
+    throw new Error(`toGrid: out buffer holds ${out.length}, need ${GRID_CELLS}`);
+  }
   const grid = out ?? new Float64Array(GRID_CELLS);
   grid.fill(0);
   for (let i = 0; i < COMBO_COUNT; i++) grid[GRID_OF[i]] += range[i];

@@ -179,6 +179,37 @@ describe("removeCards (card removal, and blockers for free)", () => {
     removeCards(r, [code("Ah")]);
     expect([...r]).toEqual([...after]);
     expect(() => removeCards(uniformRange(), [52])).toThrow(/bad card code/);
+    expect(() => removeCards(uniformRange(), [-1])).toThrow(/bad card code/);
+  });
+
+  it("rejects a card code that is not an integer 0..51", () => {
+    // `c < 0 || c > 51` is false for every one of these, so each used to slip
+    // through and do something quietly wrong instead of throwing:
+    //   NaN       -> INDEX_OF[NaN] is undefined, a silent no-op
+    //   null      -> coerces to 0 and removes the ace of spades
+    //   3.5       -> row 182 zeroes 51 combos that are the tail of card 3 and
+    //                the head of card 4, i.e. the wrong ones
+    // A range that has quietly lost the wrong combos still looks like a range.
+    for (const bad of [NaN, undefined, null, 3.5, -0.5, Infinity, "7"]) {
+      expect(() =>
+        removeCards(uniformRange(), [bad as unknown as number])
+      ).toThrow(/bad card code/);
+    }
+
+    // Nothing is removed when the call throws — and in particular the ace of
+    // spades survives a `null`, which is the case that used to look like a
+    // working blocker.
+    const r = uniformRange();
+    expect(() => removeCards(r, [null as unknown as number])).toThrow();
+    expect(totalWeight(r)).toBe(COMBO_COUNT);
+    expect(r[comboIndex(code("As"), code("Kd"))]).toBe(1);
+
+    // A bad code partway through a list still throws, having stopped there.
+    const r2 = uniformRange();
+    expect(() =>
+      removeCards(r2, [code("Ah"), NaN as unknown as number, code("Ks")])
+    ).toThrow(/bad card code/);
+    expect(totalWeight(r2)).toBe(choose2(51));
   });
 });
 
@@ -259,6 +290,20 @@ describe("13x13 grid projection", () => {
     expect(grid).toBe(out);
     expect(out[0]).toBe(6);
   });
+
+  it("rejects an output buffer too small to hold the grid", () => {
+    // Float64Array drops out-of-range stores, so a short buffer silently loses
+    // whole cells — and `toGrid` would stop conserving weight without saying so.
+    expect(() => toGrid(uniformRange(), new Float64Array(10))).toThrow(
+      /out buffer/
+    );
+    expect(() => toGrid(uniformRange(), new Float64Array(GRID_CELLS - 1))).toThrow(
+      /out buffer/
+    );
+    expect(() =>
+      toGrid(uniformRange(), new Float64Array(GRID_CELLS))
+    ).not.toThrow();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -333,8 +378,103 @@ describe("sampleCombo", () => {
   });
 });
 
+/**
+ * The exact probability the alias table assigns each combo.
+ *
+ * A Vose draw picks a bucket uniformly and then keeps it with probability
+ * `prob[i]` or follows `alias[i]`, so the marginal is a closed form. Checking it
+ * needs no sampling, no chi-square and no tolerance for luck — every entry of
+ * both arrays is read, and an error of 1e-12 is a failure rather than noise.
+ */
+function aliasMarginals(sampler: {
+  prob: Float64Array;
+  alias: Uint16Array;
+}): Float64Array {
+  const m = new Float64Array(COMBO_COUNT);
+  for (let i = 0; i < COMBO_COUNT; i++) {
+    m[i] += sampler.prob[i] / COMBO_COUNT;
+    m[sampler.alias[i]] += (1 - sampler.prob[i]) / COMBO_COUNT;
+  }
+  return m;
+}
+
+/** Ranges chosen to exercise the alias build, not just to be valid. */
+function shapedRanges(): [string, Float64Array][] {
+  const rng = makeRng(90210);
+  const fill = (f: (i: number) => number): Float64Array => {
+    const r = emptyRange();
+    for (let i = 0; i < COMBO_COUNT; i++) r[i] = f(i);
+    return r;
+  };
+  const sparse = emptyRange();
+  sparse[5] = 1;
+  sparse[100] = 2;
+  sparse[700] = 7;
+  sparse[1325] = 10;
+  const single = emptyRange();
+  single[42] = 3;
+  const spikes = emptyRange();
+  spikes[3] = 1;
+  spikes[1000] = 0.0001;
+
+  return [
+    ["uniform", uniformRange()],
+    ["random", fill(() => rng.next())],
+    ["random again", fill(() => rng.next())],
+    ["heavy-tailed", fill(() => Math.pow(rng.next(), 8))],
+    ["linear mod 17", fill((i) => i % 17)],
+    ["one dominant combo", fill((i) => (i === 0 ? 1e6 : 1))],
+    ["1 : 1e-9", fill((i) => (i === 7 ? 1 : 1e-9))],
+    ["sparse", sparse],
+    ["single combo", single],
+    ["two spikes", spikes],
+  ];
+}
+
 describe("alias sampler", () => {
-  it("matches the range's weights (chi-square, uniform)", () => {
+  it("assigns every combo exactly its share of the weight", () => {
+    // The old test here drew 200k samples from a UNIFORM range and ran a
+    // chi-square. On a uniform range every scaled value is exactly 1, so every
+    // bucket goes to `large`, the small/large pairing loop never executes and
+    // `prob` is all ones — the test exercised none of the alias construction.
+    // (Mutating `prob[s] = scaled[s] * 0.97` left its error at exactly 0.)
+    // This checks the table's own arithmetic instead, on ranges that do drive
+    // the pairing loop.
+    for (const [name, range] of shapedRanges()) {
+      const sampler = makeComboSampler(range);
+      const total = totalWeight(range);
+      const m = aliasMarginals(sampler);
+      expect(sampler.total).toBeCloseTo(total, 9);
+
+      let worst = 0;
+      for (let i = 0; i < COMBO_COUNT; i++) {
+        worst = Math.max(worst, Math.abs(m[i] - range[i] / total));
+        expect(m[i]).toBeCloseTo(range[i] / total, 12);
+      }
+      // Carries the shape's name into the failure message, and records that the
+      // bound is float dust rather than slack: the worst shape here measures
+      // 1.2e-13 against the 5e-13 that 12 digits allows.
+      expect({ name, exact: worst < 5e-13 }).toEqual({ name, exact: true });
+    }
+  });
+
+  it("gives a zero-weight combo exactly zero probability", () => {
+    // The marginal is the whole story for blockers too: a removed card must not
+    // merely be unlikely, it must be unreachable.
+    const range = uniformRange();
+    const blocked = [code("Ah"), code("Ks"), code("2d"), code("9c")];
+    removeCards(range, blocked);
+    const m = aliasMarginals(makeComboSampler(range));
+    for (let i = 0; i < COMBO_COUNT; i++) {
+      if (range[i] === 0) expect(m[i]).toBe(0);
+      else expect(m[i]).toBeGreaterThan(0);
+    }
+  });
+
+  it("draws from a uniform range in proportion (chi-square)", () => {
+    // Kept as an end-to-end check that `drawCombo` reads the table the way
+    // `makeComboSampler` writes it; the marginal test above is what pins the
+    // construction itself.
     const range = uniformRange();
     const sampler = makeComboSampler(range);
     expect(sampler.total).toBe(COMBO_COUNT);
@@ -396,5 +536,51 @@ describe("alias sampler", () => {
 
   it("refuses a range with no weight", () => {
     expect(() => makeComboSampler(emptyRange())).toThrow(/no weight/);
+  });
+});
+
+describe("determinism", () => {
+  it("replays the same draws from the same seed", () => {
+    // The Monte Carlo is reproducible only if this is: a decision replayed from
+    // the same seed must sample the same opponent hands in the same order.
+    const range = uniformRange();
+    removeCards(range, [code("Ah"), code("Ks")]);
+    const sampler = makeComboSampler(range);
+
+    const draw = (seed: number): number[] => {
+      const rng = makeRng(seed);
+      const out: number[] = [];
+      for (let i = 0; i < 5_000; i++) out.push(drawCombo(sampler, rng));
+      return out;
+    };
+    const a = draw(777);
+    const b = draw(777);
+    expect(a).toEqual(b);
+    // ...and a different seed must not replay it, or the seed does nothing.
+    expect(draw(778)).not.toEqual(a);
+
+    // sampleCombo walks the range instead of a table, and must agree with
+    // itself the same way.
+    const walk = (seed: number): number[] => {
+      const rng = makeRng(seed);
+      const out: number[] = [];
+      for (let i = 0; i < 2_000; i++) out.push(sampleCombo(range, rng));
+      return out;
+    };
+    expect(walk(31)).toEqual(walk(31));
+    expect(walk(32)).not.toEqual(walk(31));
+  });
+
+  it("builds the same table from the same range", () => {
+    // Two samplers over equal ranges must be interchangeable, or a cached
+    // sampler and a freshly built one would drift apart mid-run.
+    const range = emptyRange();
+    const rng = makeRng(2024);
+    for (let i = 0; i < COMBO_COUNT; i++) range[i] = rng.next();
+    const a = makeComboSampler(range);
+    const b = makeComboSampler(cloneRange(range));
+    expect([...a.prob]).toEqual([...b.prob]);
+    expect([...a.alias]).toEqual([...b.alias]);
+    expect(a.total).toBe(b.total);
   });
 });

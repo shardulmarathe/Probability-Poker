@@ -37,6 +37,16 @@ function bucketOf(hole: string, board: string): HandBucket {
 }
 
 /**
+ * Score of the best five-card hand from these hole cards and this board — the
+ * showdown truth a bucket is supposed to be a summary of. Two holdings with the
+ * same score are the same hand and must not land in different buckets.
+ */
+function scoreOf(hole: string, board: string): number {
+  const cards = [...codes(hole), ...codes(board)];
+  return scoreInts(Uint8Array.from(cards), cards.length);
+}
+
+/**
  * Equity of a holding against a uniformly random opponent hand on this board,
  * by rollout. Chops count a half. Used to check that the ladder actually
  * measures what it claims to.
@@ -211,12 +221,42 @@ describe("the same combo on different boards", () => {
 
 describe("a hand the whole field also holds is not your hand", () => {
   it("gives no credit for a pair sitting on the board", () => {
+    const board = "7s 7h 2d 4c 9h";
     // A-K has "a pair of sevens" on the score sheet and nothing in reality.
-    expect(bucketOf("As Kd", "7s 7h 2d 4c 9h")).toBe(HandBucket.Air);
+    expect(bucketOf("As Kd", board)).toBe(HandBucket.Air);
     // The 2 does connect, but only as bottom pair beside the board's pair.
-    expect(bucketOf("As 2h", "7s 7h 2d 4c 9h")).toBe(HandBucket.WeakPair);
-    // Both hole cards pairing distinct board ranks is real two pair.
-    expect(bucketOf("9s 2h", "7s 7h 2d 4c 9h")).toBe(HandBucket.TwoPair);
+    expect(bucketOf("As 2h", board)).toBe(HandBucket.WeakPair);
+  });
+
+  it("gives no credit for a second pair the board's own pair crowds out", () => {
+    // A five-card hand shows at most two pairs. This board already shows one,
+    // so of the two ranks 9-2 pairs only the nine ever reaches the hand: the
+    // deuce is a third pair, and third pairs do not exist.
+    const board = "7s 7h 2d 4c 9h";
+    // Same five cards, to the point of the same score, so the same bucket.
+    expect(scoreOf("9s 2h", board)).toBe(scoreOf("9s 3h", board));
+    expect(bucketOf("9s 2h", board)).toBe(bucketOf("9s 3h", board));
+    expect(bucketOf("9s 2h", board)).toBe(HandBucket.TopPair);
+
+    // Same again at the bottom of the board, where the old rule was four rungs
+    // and a tier boundary out: it read 4-2 as TwoPair and 4-3 as WeakPair.
+    expect(scoreOf("4s 2h", board)).toBe(scoreOf("4s 3h", board));
+    expect(bucketOf("4s 2h", board)).toBe(bucketOf("4s 3h", board));
+    expect(bucketOf("4s 2h", board)).toBe(HandBucket.WeakPair);
+
+    // And the ordering the buckets claim is the ordering the cards have.
+    expect(scoreOf("9s 2h", board)).toBeGreaterThan(scoreOf("4s 2h", board));
+  });
+
+  it("still calls it two pair when both our pairs outrank the board's", () => {
+    // Board pairs deuces, so K-7 makes kings and sevens and the board's pair is
+    // the one that gets crowded out. Nothing is stripped here.
+    const board = "2s 2h Kd 7c 5h";
+    expect(bucketOf("Kh 7d", board)).toBe(HandBucket.TwoPair);
+    expect(bucketOf("7s 5c", board)).toBe(HandBucket.TwoPair);
+    // One hole card pairing the board is still just one pair.
+    expect(bucketOf("Kh 3d", board)).toBe(HandBucket.TopPair);
+    expect(scoreOf("Kh 7d", board)).toBeGreaterThan(scoreOf("Kh 3d", board));
   });
 
   it("gives no credit for trips the board already shows", () => {
@@ -226,6 +266,41 @@ describe("a hand the whole field also holds is not your hand", () => {
     expect(bucketOf("Kc 5h", board)).toBe(HandBucket.Monster); // quads
   });
 
+  it("gives no credit for board trips on the flop and turn either", () => {
+    // The strip is not a river rule. With `boardScore` computed only at five
+    // cards, a 7-7-7 flop reads Monster for all 1326 combos instead of 123 —
+    // a mutant the river-only case above cannot see.
+    for (const board of ["7s 7h 7d", "7s 7h 7d 2c", "7s 7h 7d 2c 4h"]) {
+      const buckets = classifyAll(makeBoardContext(codes(board)));
+      let monsters = 0;
+      for (let i = 0; i < COMBO_COUNT; i++) {
+        if (buckets[i] === HandBucket.Monster) monsters++;
+      }
+      // Only a pair (full house) or the case seven (quads) is a real monster.
+      expect(monsters).toBeLessThan(COMBO_COUNT / 3);
+      expect(monsters).toBeGreaterThan(0);
+      // A-K holds the board's trips and nothing of its own, on every street.
+      // (Two overcards are still a weak draw while cards are to come.)
+      expect(tierFromBucket(bucketOf("As Kd", board))).toBe("weak");
+      // A pocket pair fills it up, and the case seven makes quads.
+      expect(bucketOf("9s 9h", board)).toBe(HandBucket.Monster);
+      expect(bucketOf("7c 3h", board)).toBe(HandBucket.Monster);
+    }
+  });
+
+  it("does not hand the whole deck a monster on a quads board", () => {
+    // Four of a kind on the turn: every combo plays the board's quads and
+    // nothing better, but there is no five-card `boardScore` to compare with,
+    // so the river's playing-the-board test cannot fire. P is about 4.8e-5.
+    const buckets = classifyAll(makeBoardContext(codes("7s 7h 7d 7c")));
+    for (let i = 0; i < COMBO_COUNT; i++) {
+      expect(buckets[i]).toBe(HandBucket.Air);
+    }
+    // On the river the equality does fire, and a better kicker still counts.
+    expect(bucketOf("As Kd", "7s 7h 7d 7c 9h")).toBe(HandBucket.Monster);
+    expect(bucketOf("2s 3d", "7s 7h 7d 7c 9h")).toBe(HandBucket.Air);
+  });
+
   it("gives no credit for playing the board", () => {
     // Board is a straight; only a hand that beats it scores.
     expect(bucketOf("2s 3h", "5s 6h 7d 8c 9s")).toBe(HandBucket.Air);
@@ -233,6 +308,105 @@ describe("a hand the whole field also holds is not your hand", () => {
     // Board is a flush; a bigger heart beats it, a black ace does not.
     expect(bucketOf("As Kd", "2h 7h 9h Th Jh")).toBe(HandBucket.Air);
     expect(bucketOf("Ah Kd", "2h 7h 9h Th Jh")).toBe(HandBucket.Monster);
+  });
+});
+
+describe("a paired board spends one of the two pair slots itself", () => {
+  // The board's own pair is one of the two pairs that play, so a hole-card pair
+  // beneath it is a kicker wearing a pair's clothes. Every case here is checked
+  // against the five-card score rather than against intuition.
+
+  it("does not promote K-7 over K-Q on an ace-paired board", () => {
+    const board = "As Ah Kd 7c 2s";
+    // Both play A-A-K-K plus a kicker, and K-Q's kicker is the better one.
+    expect(scoreOf("Ks Qc", board)).toBeGreaterThan(scoreOf("Kh 7d", board));
+    // So K-7 must not outrank K-Q, and must not cross a tier boundary doing it.
+    expect(bucketOf("Kh 7d", board)).not.toBeGreaterThan(bucketOf("Ks Qc", board));
+    expect(tierFromBucket(bucketOf("Kh 7d", board))).toBe(
+      tierFromBucket(bucketOf("Ks Qc", board))
+    );
+    // The seven contributes exactly what a three would.
+    expect(scoreOf("Kh 7d", board)).toBe(scoreOf("Kh 3d", board));
+    expect(bucketOf("Kh 7d", board)).toBe(bucketOf("Kh 3d", board));
+  });
+
+  it("does not rank a pair the board's two pairs crowd out", () => {
+    // K-K-J-J-6: our sixes are a third pair and never play, so 6-7 is holding
+    // ace-high's poor cousin, not bottom pair.
+    const board = "Kh Jd Ks 6c Jc";
+    expect(scoreOf("Qs As", board)).toBeGreaterThan(scoreOf("6s 7s", board));
+    expect(bucketOf("6s 7s", board)).not.toBeGreaterThan(bucketOf("Qs As", board));
+    expect(bucketOf("6s 7s", board)).toBe(HandBucket.Air);
+    // A pair that DOES outrank the board's lower pair still counts.
+    expect(bucketOf("Qh Qd", "Kh Jd Ks 6c 3c")).not.toBe(HandBucket.Air);
+  });
+
+  it("crowds out a pocket pair only when the board shows two pairs", () => {
+    // Turn, two board pairs: threes are a third pair and never play, so the
+    // hand is K-K-5-5 plus a kicker exactly as it would be with 3-2 offsuit.
+    expect(bucketOf("3s 3d", "Kh Kd 5s 5c")).toBe(HandBucket.Air);
+    // Sevens beat the board's lower pair, so they do play.
+    expect(bucketOf("7s 7d", "Kh Kd 5s 5c")).toBe(HandBucket.MidPair);
+    expect(bucketOf("As Ad", "Kh Kd 5s 5c")).toBe(HandBucket.Overpair);
+
+    // One board pair is a different matter: the second slot is still free, so
+    // threes make real two pair (K-K-3-3) and keep their rung. Testing against
+    // the board's TOP pair instead of its second would wrongly bury this.
+    expect(bucketOf("3s 3d", "Kh Kd 5s 9c")).toBe(HandBucket.WeakPair);
+    expect(scoreOf("3s 3d", "Kh Kd 5s 9c")).toBeGreaterThan(
+      scoreOf("2s 4d", "Kh Kd 5s 9c")
+    );
+  });
+
+  it("never ranks a strictly worse five-card hand above a better one", () => {
+    // The property the two cases above are instances of, swept over paired
+    // boards: whenever two live combos make five-card hands of different
+    // strength, the buckets must not disagree with the scores.
+    const rng = makeRng(80808);
+    let compared = 0;
+    for (const board of randomBoards(5, 40, rng)) {
+      const ctx = makeBoardContext(board);
+      // Only paired boards — this is where the board eats a pair slot.
+      const seen = new Uint8Array(15);
+      let isPaired = false;
+      for (const c of board) {
+        const r = (c >> 2) + 2;
+        if (seen[r]++ > 0) isPaired = true;
+      }
+      if (!isPaired) continue;
+
+      const buckets = classifyAll(ctx);
+      const onBoard = new Uint8Array(52);
+      for (const c of board) onBoard[c] = 1;
+      const live: number[] = [];
+      const score = new Float64Array(COMBO_COUNT);
+      const hand = new Uint8Array(7);
+      for (let i = 0; i < 5; i++) hand[2 + i] = board[i];
+      for (let i = 0; i < COMBO_COUNT; i++) {
+        const a = comboCardA(i);
+        const b = comboCardB(i);
+        if (onBoard[a] === 1 || onBoard[b] === 1) continue;
+        hand[0] = a;
+        hand[1] = b;
+        score[i] = scoreInts(hand, 7);
+        live.push(i);
+      }
+
+      // Two hands with the SAME five-card score are the same hand, so they must
+      // share a bucket. This is the exact shape of the defect: 9-2 and 9-3 on
+      // 7-7-2-4-9 scored identically and sat two rungs and a tier apart.
+      const byScore = new Map<number, number>();
+      for (const i of live) {
+        const prev = byScore.get(score[i]);
+        if (prev === undefined) byScore.set(score[i], buckets[i]);
+        else {
+          expect(buckets[i]).toBe(prev);
+          compared++;
+        }
+      }
+    }
+    // The sweep has to actually have found ties, or it proves nothing.
+    expect(compared).toBeGreaterThan(1000);
   });
 });
 
@@ -313,20 +487,41 @@ describe("preflop", () => {
     expect(bucketOf("Ts 7h", "")).toBe(HandBucket.WeakDraw);
   });
 
-  it("is monotone in holeScore", () => {
-    const ctx = makeBoardContext([]);
-    const buckets = classifyAll(ctx);
-    // holeScore is what the bands are cut on, so a better Chen score must never
-    // land in a worse band.
-    const scoreOf = (i: number) =>
-      holeScore(decodeCard(comboCardA(i)), decodeCard(comboCardB(i)));
-    for (let i = 0; i < COMBO_COUNT; i++) {
-      for (let j = i + 1; j < COMBO_COUNT; j += 37) {
-        if (scoreOf(i) > scoreOf(j)) {
-          expect(buckets[i]).toBeGreaterThanOrEqual(buckets[j]);
-        }
-      }
+  it("cuts the bands where PREFLOP_BANDS says, to the point", () => {
+    // Monotonicity is not a test here: `PREFLOP_BUCKET` is a monotone step
+    // function of holeScore by construction, so asserting it cannot fail and
+    // cannot catch a moved cut point. The cut points themselves can, so pin
+    // each one with the hands on either side of it. holeScore takes 17 distinct
+    // values over the 1326 combos and every one maps to a single bucket, so
+    // these twelve hands fix all eight boundaries.
+    const atScore: [string, number, HandBucket][] = [
+      ["As Ah", 20, HandBucket.Monster],
+      ["Js Jh", 12, HandBucket.Monster], // bottom of the top band
+      ["Qs As", 11, HandBucket.TwoPair], // ...and the hand just below it
+      ["Ts Th", 10, HandBucket.TwoPair],
+      ["9s 9h", 9, HandBucket.Overpair],
+      ["8s 8h", 8, HandBucket.TopPair],
+      ["2s As", 7, HandBucket.MidPair],
+      ["4s 5s", 6, HandBucket.WeakPair],
+      ["2s 2h", 5, HandBucket.StrongDraw],
+      ["2s 4s", 4, HandBucket.WeakDraw],
+      ["2s 3h", 3, HandBucket.WeakDraw], // bottom of the WeakDraw band
+      ["2s 4h", 2, HandBucket.Air], // ...and the hand just below it
+    ];
+    for (const [hole, score, bucket] of atScore) {
+      const [a, b] = codes(hole);
+      expect(holeScore(decodeCard(a), decodeCard(b))).toBe(score);
+      expect(bucketOf(hole, "")).toBe(bucket);
     }
+  });
+
+  it("puts the documented share of the deck in each band", () => {
+    // The docstring claims roughly 2/2/2/4/7/8/18/24/33 percent top to bottom.
+    // Pinning the combo counts makes any moved cut point a failure here too.
+    const buckets = classifyAll(makeBoardContext([]));
+    const counts = new Array<number>(BUCKET_COUNT).fill(0);
+    for (let i = 0; i < COMBO_COUNT; i++) counts[buckets[i]]++;
+    expect(counts).toEqual([436, 316, 236, 102, 94, 54, 30, 30, 28]);
   });
 
   it("spreads the deck across every band", () => {
@@ -419,6 +614,36 @@ describe("classification is total and consistent", () => {
     expect(() => makeBoardContext([0, 1, 99])).toThrow(/bad card code/);
   });
 
+  it("rejects a board card that is not an integer 0..51", () => {
+    // `c < 0 || c > 51` is false for every one of these, so without an integer
+    // check they are all accepted and silently become the ace of spades or a
+    // half-card. A board of [10, 20, NaN] classified as [10, 20, 2s] would
+    // mis-bucket the entire range with nothing to show for it.
+    for (const bad of [NaN, undefined, null, 3.5, -0.5, Infinity, "7"]) {
+      expect(() =>
+        makeBoardContext([10, 20, bad as unknown as number])
+      ).toThrow(/bad card code/);
+    }
+    // The honest neighbours still pass.
+    expect(() => makeBoardContext([10, 20, 0])).not.toThrow();
+    expect(() => makeBoardContext([10, 20, 51])).not.toThrow();
+  });
+
+  it("rejects an output buffer too small to hold every combo", () => {
+    const ctx = makeBoardContext(codes("Ks 7h 2s"));
+    // Typed arrays drop out-of-range stores, so a short buffer would be filled
+    // to its length and the caller would read the tail of some older pass.
+    expect(() => classifyAll(ctx, new Uint8Array(10))).toThrow(/out buffer/);
+    expect(() => classifyAll(ctx, new Uint8Array(COMBO_COUNT - 1))).toThrow(
+      /out buffer/
+    );
+    expect(() => classifyAll(ctx, new Uint8Array(COMBO_COUNT))).not.toThrow();
+    // Preflop takes a different path through the same function.
+    expect(() => classifyAll(makeBoardContext([]), new Uint8Array(10))).toThrow(
+      /out buffer/
+    );
+  });
+
   it("maps the ladder onto the three legacy tiers in order", () => {
     const tiers = [...Array(BUCKET_COUNT).keys()].map((b) =>
       tierFromBucket(b as HandBucket)
@@ -491,11 +716,15 @@ describe("bucket order tracks equity", () => {
         const gain = (means[hi] as number) - (means[lo] as number);
         if (lo === HandBucket.TopPair && hi === HandBucket.Overpair) {
           // These two measure the same strength to within noise: 0.776 vs
-          // 0.796 on the flop, 0.773 vs 0.756 on the turn, 0.783 vs 0.791 on
+          // 0.796 on the flop, 0.773 vs 0.756 on the turn, 0.782 vs 0.791 on
           // the river — the sign flips with the boards drawn. Asserting an
-          // order between them would be asserting sampling noise, so assert
-          // what is actually true: they are the same rung.
-          expect(Math.abs(gain)).toBeLessThan(0.08);
+          // order between them would be asserting sampling noise.
+          //
+          // But `Math.abs(gain) < 0.08` is not that claim: it passes just as
+          // happily on a real inversion of up to eight points, which is larger
+          // than any gap between adjacent rungs elsewhere on the ladder. Bound
+          // the one direction that would be a defect instead.
+          expect(gain).toBeGreaterThan(-0.02);
         } else {
           expect(gain).toBeGreaterThan(0);
         }

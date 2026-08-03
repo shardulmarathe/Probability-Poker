@@ -29,10 +29,12 @@ import {
   Scroller,
   Section,
   Stat,
+  StatGrid,
   Tag,
   Why,
   cardText,
-} from "./ui";
+  type Tone,
+} from "../ui";
 
 interface Props {
   report: TableHandReport;
@@ -41,10 +43,16 @@ interface Props {
   isHero: boolean;
 }
 
-const ACTION_TONE: Record<string, "quiet" | "gold" | "good" | "bad"> = {
+/** Mirrors `netTone`, in the vocabulary `Stat` speaks. */
+function resultTone(net: number | undefined): Tone {
+  if (net === undefined || net === 0) return "neutral";
+  return net > 0 ? "good" : "bad";
+}
+
+const ACTION_TONE: Record<string, Tone> = {
   fold: "bad",
-  check: "quiet",
-  call: "quiet",
+  check: "neutral",
+  call: "neutral",
   bet: "gold",
   raise: "gold",
 };
@@ -60,7 +68,10 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
   const winners = report.seats.filter((s) => s.won > 0);
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+    // `items-start` so the short panel in a row keeps its own height. Stretched,
+    // "Pots" grew to match "Action" and left a third of a screen of empty felt
+    // inside a bordered box.
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:items-start">
       {/* ------------------------------------------------------------------ */}
       <Section title="The Board" subtitle={`Hand #${report.handNumber} · seed ${report.seed}`} wide>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -70,15 +81,19 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             size="md"
             empty="No flop was dealt"
           />
-          <div className="grid grid-cols-2 gap-2 sm:w-[22rem] sm:grid-cols-2 sm:gap-3">
-            <Stat
-              label={isHero ? "Your result" : `${seatName(focus)} result`}
-              value={you ? (you.net >= 0 ? `+${money(you.net)}` : `−${money(-you.net)}`) : "—"}
-              highlight
-            />
-            <Stat label="Total pot" value={money(totalPot)} />
-            <Stat label="Ended on" value={STREET_LABEL[report.endStreet]} />
-            <Stat label="Showdown" value={report.wentToShowdown ? "Yes" : "Folded out"} />
+          <div className="sm:w-[22rem]">
+            <StatGrid columns={2}>
+              {/* The old `highlight` made this gold whatever it said. A result
+                  has a sign, and the sign is the thing worth colouring. */}
+              <Stat
+                label={isHero ? "Your result" : `${seatName(focus)} result`}
+                value={you ? (you.net >= 0 ? `+${money(you.net)}` : `−${money(-you.net)}`) : "—"}
+                tone={resultTone(you?.net)}
+              />
+              <Stat label="Total pot" value={money(totalPot)} />
+              <Stat label="Ended on" value={STREET_LABEL[report.endStreet]} />
+              <Stat label="Showdown" value={report.wentToShowdown ? "Yes" : "Folded out"} />
+            </StatGrid>
           </div>
         </div>
 
@@ -290,7 +305,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                         >
                           {seatName(a.seat)}
                         </span>
-                        <Tag tone={ACTION_TONE[a.action] ?? "quiet"}>{a.action}</Tag>
+                        <Tag tone={ACTION_TONE[a.action] ?? "neutral"}>{a.action}</Tag>
                       </span>
                       <span className="shrink-0 font-mono text-[0.68rem] text-ivory/55">
                         {a.cost > 0 ? money(a.cost) : "—"}
@@ -312,9 +327,14 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
         wide
       >
         {equities.length === 0 ? (
+          // Two different absences, and saying the wrong one is a lie the page
+          // disproves three panels up: a hand read back from the archive has a
+          // full action list and no simulation records, because storage drops
+          // them. Only a hand with no actions at all was really uncontested.
           <p className="text-sm text-ivory/55">
-            No seat ran an equity estimate this hand — the pot was uncontested
-            before anyone had to price a decision.
+            {report.decisions.length === 0 && report.actions.length > 0
+              ? "These bars are built from the simulation records the table kept, and this hand was restored from the archive, which does not store them. The action list above is complete."
+              : "No seat ran an equity estimate this hand — the pot was uncontested before anyone had to price a decision."}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

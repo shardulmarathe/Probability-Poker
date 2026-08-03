@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useState } from "react";
-import type { ThinkStep } from "../../store/TableContext";
 
 // ---------------------------------------------------------------------------
 // Viewport
@@ -125,11 +124,9 @@ export function TableStyles() {
     <style>{`
 .pp-t-chip {
   position: absolute;
-  width: 28px; height: 28px; margin: -14px 0 0 -14px;
-  border-radius: 9999px;
-  border: 2px dashed #e2c563;
-  background: radial-gradient(circle at 50% 35%, #a30222 0%, #7a0019 70%);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45), inset 0 -1px 2px rgba(0,0,0,0.45),
+              inset 0 1px 1px rgba(255,255,255,0.2), 0 4px 8px rgba(0,0,0,0.5);
   animation: pp-t-fly 0.46s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 @keyframes pp-t-fly {
@@ -164,14 +161,8 @@ export function TableStyles() {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.pp-t-win { animation: pp-t-win 1.1s ease-in-out infinite; }
-@keyframes pp-t-win {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(226,197,99,0); }
-  50%      { box-shadow: 0 0 26px 3px rgba(226,197,99,0.55); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .pp-t-chip, .pp-t-sheet, .pp-t-win { animation: none; opacity: 1; }
+  .pp-t-chip, .pp-t-sheet { animation: none; opacity: 1; }
 }
 `}</style>
   );
@@ -183,10 +174,24 @@ export function TableStyles() {
 
 export type BadgeTone = "dealer" | "blind" | "quiet";
 
+/**
+ * A position marker.
+ *
+ * `dealer` is the one that exists as an object: at a real table the button is a
+ * pressed ivory puck with the word engraved into it, and it is the single most
+ * recognisable thing on the cloth after the cards. So it is drawn as one —
+ * moulded edge, lit top, a shadow under it — rather than as a gold pill that
+ * happens to say BTN. The other two are labels, and are drawn as labels.
+ */
 export function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
   const style =
     tone === "dealer"
-      ? { background: "#c9a227", color: "#0d0d0d" }
+      ? {
+          background: "linear-gradient(180deg, #fdf9ee 0%, #ddd2ba 100%)",
+          color: "#231a08",
+          boxShadow:
+            "inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(0,0,0,0.22), var(--pp-shadow-contact)",
+        }
       : tone === "blind"
         ? {
             background: "rgba(0,0,0,0.4)",
@@ -242,23 +247,41 @@ const ALIGN: Record<BubbleAlign, string> = {
   right: "right-0",
 };
 
+/**
+ * How far a bubble sits from the chair it belongs to.
+ *
+ * A seat on the top arc pushes its chips *downward*, toward the pot, and says
+ * what it did in the same direction — so the bet pill and the bubble were
+ * landing in the same place and printing through each other. `clearance` is
+ * "there is a bet pill in this slot": the bubble steps past it rather than over
+ * it.
+ */
+function offset(side: "top" | "bottom", clearance: boolean): string {
+  if (side === "top") return clearance ? "bottom-full mb-9" : "bottom-full mb-2";
+  return clearance ? "top-full mt-9" : "top-full mt-2";
+}
+
 export function SpeechBubble({
   text,
   side,
   align = "center",
+  clearance = false,
 }: {
   text: string;
   side: "top" | "bottom";
   align?: BubbleAlign;
+  clearance?: boolean;
 }) {
-  const pos = side === "top" ? "bottom-full mb-2" : "top-full mt-2";
+  const pos = offset(side, clearance);
   return (
     <div
       className={`pp-bubble pointer-events-none absolute z-30 max-w-[80vw] whitespace-nowrap ${ALIGN[align]} ${pos}`}
     >
+      {/* Fully round, per the radius grammar's `marker`: this is one short line
+          you read and never press. It was the only 12px corner on the felt. */}
       <div
-        className="rounded-xl border px-3 py-1.5 font-display text-xs font-semibold shadow-xl sm:text-sm"
-        style={BUBBLE_SKIN}
+        className="rounded-full border px-3.5 py-1.5 font-display text-xs font-semibold sm:text-sm"
+        style={{ ...BUBBLE_SKIN, boxShadow: "var(--pp-shadow-lift)" }}
       >
         {text}
       </div>
@@ -266,54 +289,169 @@ export function SpeechBubble({
   );
 }
 
-export function ThoughtBubble({
-  step,
+/**
+ * Where a bot's thinking hangs off its chair.
+ *
+ * Placement only — no skin, no border, no background. What used to live here
+ * was a cream speech bubble that paraphrased the decision in one line; the
+ * transcript that replaced it (`Thinking`) brings its own surface and its own
+ * account of the pipeline, and it is a panel rather than a bubble, so wrapping
+ * it in a second bordered box would be two frames around one thing.
+ *
+ * `pointer-events-none` because it hangs over the cloth and the seats beneath
+ * it: it is something you read, never something you press.
+ */
+export function ThoughtPocket({
   side,
   align = "center",
+  clearance = false,
+  children,
 }: {
-  step: ThinkStep;
   side: "top" | "bottom";
   align?: BubbleAlign;
+  clearance?: boolean;
+  children: React.ReactNode;
 }) {
-  const pos = side === "top" ? "bottom-full mb-2" : "top-full mt-2";
+  const pos = offset(side, clearance);
   return (
     <div
-      className={`pp-bubble pointer-events-none absolute z-30 w-[min(13rem,52vw)] ${ALIGN[align]} ${pos}`}
+      className={`pp-bubble pointer-events-none absolute z-30 w-[min(15rem,62vw)] ${ALIGN[align]} ${pos}`}
     >
-      <div className="rounded-xl border px-3 py-2 shadow-xl" style={BUBBLE_SKIN}>
-        {/* Re-keying on the step index re-runs the fade for each new message. */}
-        <div key={step.step} className="pp-thought">
-          <div className="flex items-center gap-1.5 font-display text-[0.7rem] font-semibold sm:text-xs">
-            {step.title}
-            <span className="flex gap-0.5">
-              <Dot delay="0s" />
-              <Dot delay="0.2s" />
-              <Dot delay="0.4s" />
-            </span>
-          </div>
-          {step.detail && (
-            <div className="mt-0.5 font-mono text-[0.6rem]" style={{ color: "#7a0019" }}>
-              {step.detail}
-            </div>
-          )}
-        </div>
-      </div>
+      {children}
     </div>
-  );
-}
-
-function Dot({ delay }: { delay: string }) {
-  return (
-    <span
-      className="pp-dot inline-block h-1 w-1 rounded-full"
-      style={{ background: "#7a0019", animationDelay: delay }}
-    />
   );
 }
 
 // ---------------------------------------------------------------------------
 // Chips
+//
+// A chip is a moulded clay disc, not a coloured circle: it has edge spots, a
+// recessed centre face, and enough thickness that a stack of them is visibly a
+// stack. All of that is `.pp-chip` in index.css; what lives here is only the
+// denomination ladder — which colours a table of this stake would actually be
+// racked with — and the arithmetic that turns an amount into chips.
 // ---------------------------------------------------------------------------
+
+interface Denomination {
+  /** Multiple of the big blind this chip is worth. */
+  bb: number;
+  body: string;
+  spot: string;
+}
+
+/**
+ * Four colours, deliberately. A rack with one chip per rung is a toy; a rack
+ * with eight is a Christmas tree on green cloth. These are the four a live game
+ * actually spreads, restated in blinds so a 5/10 table and a 50/100 table rack
+ * the same way.
+ */
+const DENOMINATIONS: Denomination[] = [
+  { bb: 10, body: "#161616", spot: "#e2c563" },
+  { bb: 5, body: "#c9a227", spot: "#2a1d05" },
+  { bb: 2, body: "#7a0019", spot: "#f4ede4" },
+  { bb: 1, body: "#e8e0d2", spot: "#7a0019" },
+];
+
+/**
+ * Break an amount into stacks, largest denomination first.
+ *
+ * Capped at three stacks of five, because past that the pile stops reading as
+ * chips and starts reading as a bar chart — and the number is printed right
+ * beside it anyway. The cap is honest about itself: the tallest stack is drawn
+ * tall, not accurate.
+ */
+export function chipStacks(
+  amount: number,
+  bigBlind: number,
+  maxStacks = 3,
+  maxHeight = 5
+): { denomination: Denomination; count: number }[] {
+  if (amount <= 0 || bigBlind <= 0) return [];
+  const out: { denomination: Denomination; count: number }[] = [];
+  let left = amount;
+  for (const denomination of DENOMINATIONS) {
+    if (out.length >= maxStacks) break;
+    const unit = denomination.bb * bigBlind;
+    const n = Math.floor(left / unit);
+    if (n <= 0) continue;
+    out.push({ denomination, count: Math.min(n, maxHeight) });
+    left -= n * unit;
+  }
+  // Anything under one big blind still bought something — show a single chip
+  // rather than nothing, or a min-raise looks like a check.
+  if (out.length === 0) out.push({ denomination: DENOMINATIONS[3], count: 1 });
+  return out;
+}
+
+/**
+ * One stack, drawn from the bottom up: `count - 1` edges, then a face on top.
+ * `size` is the chip's diameter in px.
+ */
+export function ChipStack({
+  count,
+  body,
+  spot,
+  size = 13,
+}: {
+  count: number;
+  body: string;
+  spot: string;
+  size?: number;
+}) {
+  // How much of each chip below the top one you can see. A chip is about a
+  // fifth as thick as it is wide, foreshortened by looking down at the table.
+  const step = Math.max(2, Math.round(size / 5));
+  const vars = {
+    "--pp-chip-body": body,
+    "--pp-chip-spot": spot,
+  } as React.CSSProperties;
+  return (
+    <span
+      className="pp-chip-stack"
+      style={{ width: size, height: size + step * (count - 1) }}
+    >
+      {Array.from({ length: count - 1 }, (_, i) => (
+        <span
+          key={i}
+          className="pp-chip-edge"
+          // +1 so consecutive edges overlap rather than leaving a hairline gap.
+          style={{ ...vars, width: size, height: step + 1, bottom: i * step }}
+        />
+      ))}
+      <span
+        className="pp-chip"
+        style={{ ...vars, width: size, height: size, bottom: (count - 1) * step }}
+      />
+    </span>
+  );
+}
+
+/** The chips actually sitting in the middle of the table. */
+export function PotChips({
+  pot,
+  bigBlind,
+  size = 13,
+}: {
+  pot: number;
+  bigBlind: number;
+  size?: number;
+}) {
+  const stacks = chipStacks(pot, bigBlind);
+  if (pot <= 0) return null;
+  return (
+    <span className="flex items-end gap-[3px]" aria-hidden>
+      {stacks.map((s, i) => (
+        <ChipStack
+          key={i}
+          count={s.count}
+          body={s.denomination.body}
+          spot={s.denomination.spot}
+          size={size}
+        />
+      ))}
+    </span>
+  );
+}
 
 export function ChipLayer({
   chips,
@@ -329,7 +467,7 @@ export function ChipLayer({
         return (
           <span
             key={chip.id}
-            className="pp-t-chip"
+            className="pp-chip pp-t-chip"
             style={
               {
                 "--sx": `${from.x}%`,
@@ -357,9 +495,12 @@ export function BeliefBar({
   belief: { weak: number; medium: number; strong: number };
   width?: string;
 }) {
+  // `weak` used to be `#94a3b8` — Tailwind's slate-400, the last surviving
+  // pixel of the blue theme this product dropped. It read as a fourth brand
+  // colour on green cloth. Weak is now simply unlit ivory.
   const parts: [string, number][] = [
-    ["#94a3b8", belief.weak],
-    ["#e2c563", belief.medium],
+    ["rgba(244,237,228,0.34)", belief.weak],
+    ["#c9a227", belief.medium],
     ["#a30222", belief.strong],
   ];
   return (

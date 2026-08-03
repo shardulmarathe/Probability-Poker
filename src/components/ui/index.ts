@@ -6,12 +6,11 @@
  * "../ui"` — never from the individual files, so a component can be split or
  * merged without touching its callers.
  *
- * `src/components/report/*` still carries its own copies of `FeltBackground`,
- * `Section`, `Stat`, `Rail`, `Tag`, `Meter`, `Scroller`, `EmptyPanel`,
- * `ChipRow`, `CardRow`, `cardText`, `Lead`, `Heading`, `Calc`, `Frac`, `Why`
- * and `HowCalculated`. Every one of them has an equivalent here under the same
- * name (`ChipRow` becomes `Tabs`), so that migration is an import swap plus a
- * rename of `Stat`'s `highlight`/`sub` props to `tone`/`note`.
+ * Every surface now imports from here; `report/ui.tsx`, which briefly carried a
+ * second copy of a dozen of these, is gone. If a primitive is needed in two
+ * places, it belongs in this directory rather than being copied — the copies
+ * drifted within days last time (`Rail` rendered visibly differently in two
+ * adjacent page headers, and three `Stat`s had incompatible props).
  */
 
 export { FeltBackground } from "./FeltBackground";

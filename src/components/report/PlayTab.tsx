@@ -46,9 +46,10 @@ import {
   Scroller,
   Section,
   Stat,
+  StatGrid,
   Tag,
   Why,
-} from "./ui";
+} from "../ui";
 
 interface Props {
   report: TableHandReport;
@@ -147,16 +148,17 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
         title={isHero ? "Your Hand" : `${seatName(focus)}'s Hand`}
         subtitle="The ledger"
       >
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid columns={4}>
           <Stat label="Moves made" value={moves.length} />
           <Stat label="Chips in" value={money(you?.invested ?? 0)} />
           <Stat label="Chips back" value={money(you?.won ?? 0)} />
+          {/* Signed, so the tone carries the sign rather than a flat gold. */}
           <Stat
             label="Net"
             value={you ? signed(you.net) : "—"}
-            highlight
+            tone={!you || you.net === 0 ? "neutral" : you.net > 0 ? "good" : "bad"}
           />
-        </div>
+        </StatGrid>
       </Section>
 
       {/* ------------------------------------------------------------------ */}
@@ -273,7 +275,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                             {STREET_LABEL[d.street]}
                           </td>
                           <td className="py-2 pr-3">
-                            <Tag tone={d.action === "fold" ? "bad" : "quiet"}>
+                            <Tag tone={d.action === "fold" ? "bad" : "neutral"}>
                               {d.action}
                             </Tag>
                           </td>
@@ -281,7 +283,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                             {pct(d.modelEquity)}
                           </td>
                           <td className="py-2 pr-3">
-                            <Tag tone={d.modelEvLoss < -0.01 ? "gold" : "quiet"}>
+                            <Tag tone={d.modelEvLoss < -0.01 ? "gold" : "neutral"}>
                               {d.modelBestAction}
                             </Tag>
                           </td>
@@ -414,6 +416,8 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                     </p>
                   )}
 
+                  <BluffPrice move={m} isHero={isHero} />
+
                   <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <p className="mb-1.5 font-mono text-[0.58rem] uppercase tracking-[0.18em] text-ivory/40">
@@ -478,6 +482,33 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
             arithmetic, not an estimate — the only open question is whether the
             hand clears it, and that is what the two EV panels answer from their
             two different vantage points.
+          </Lead>
+          <Heading>The same trick, from the other side of the bet</Heading>
+          <Lead>
+            Set the EV of a <em>bluff</em> to zero instead and the same algebra
+            gives the frequency it has to work. A bet of s into a pot of P risks s
+            to win P, so with no equity at all it breaks even at:
+          </Lead>
+          <Calc>
+            <div className="flex flex-wrap items-center gap-1">
+              α =
+              <Frac n={<>s</>} d={<>P + s</>} />
+              &nbsp;&nbsp; MDF = 1 − α =
+              <Frac n={<>P</>} d={<>P + s</>} />
+            </div>
+            <div className="mt-2 text-ivory/60">
+              half pot 33.3% / 66.7 · three-quarter pot 42.9 / 57.1 · pot 50 / 50
+              · twice pot 66.7 / 33.3. An opponent folding more often than α can
+              be beaten by betting any two cards; MDF is the share of range they
+              have to keep playing to stop that.
+            </div>
+          </Calc>
+          <Lead>
+            Both numbers are printed against every bet and raise above, worked at
+            that move's own pot. They need no simulation and no read — like pot
+            odds, they are the half of the decision that is pure arithmetic. What
+            the bet is actually <em>worth</em> needs one more thing, the equity
+            against the hands that do not fold, and that is on the Math tab.
           </Lead>
           <Why>
             Pot odds are the half of the decision that never needs a computer.
@@ -562,6 +593,57 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
 
 function signed(v: number): string {
   return v >= 0 ? `+${money(v)}` : `−${money(-v)}`;
+}
+
+/**
+ * What a bet had to buy, priced with no simulation at all.
+ *
+ * `s` is the increment risked beyond any call and `P` the pot as it stands once
+ * that call is in — the same frame `model/decider.ts` sizes bets in (`extra`
+ * against `pot + toCall`), so this number and the engine's sizing ladder are
+ * talking about the same fraction. `poker/ev.ts` derives both: a bluff with no
+ * equity breaks even at α = s/(P+s), and its complement is the minimum defence
+ * frequency.
+ *
+ * Where the seat was a bot, the engine's own recorded P(everyone folds) is
+ * printed beside it — the estimate against the threshold it has to clear.
+ */
+function BluffPrice({ move, isHero }: { move: Move; isHero: boolean }) {
+  const { record } = move;
+  if (record.action !== "bet" && record.action !== "raise") return null;
+  const size = record.cost - record.toCall;
+  const pot = record.potBefore + record.toCall;
+  if (!(size > 0) || !(pot > 0)) return null;
+
+  const alpha = size / (pot + size);
+  const breakdown = move.decision?.foldEquity?.[move.decision.action.label] ?? null;
+  const who = isHero ? "you" : "this seat";
+
+  return (
+    <p className="mt-1.5 text-xs leading-relaxed text-ivory/70">
+      Risking {money(size)} to win {money(pot)}: as a pure bluff it only had to
+      work{" "}
+      <span className="font-mono text-gold-soft">{pct(alpha)}</span> of the time
+      to break even, so the other seats had to defend{" "}
+      <span className="font-mono">{pct(1 - alpha)}</span> of their range to stop{" "}
+      {who} betting any two cards profitably.
+      {breakdown && (
+        <>
+          {" "}
+          The engine put the chance everyone folds at{" "}
+          <span
+            className="font-mono"
+            style={{ color: breakdown.pFold >= alpha ? "#7fd3a8" : "#e58a8a" }}
+          >
+            {pct(breakdown.pFold)}
+          </span>
+          , {breakdown.pFold >= alpha ? "above" : "below"} that line — and the
+          bet had {pct(breakdown.eContinue)} equity against the range that would
+          have called.
+        </>
+      )}
+    </p>
+  );
 }
 
 function LensCard({

@@ -28,6 +28,7 @@ import { SeatView } from "./Seat";
 import {
   ChipLayer,
   POT_CENTRE,
+  PotChips,
   TableStyles,
   boardTop,
   seatLayout,
@@ -122,100 +123,103 @@ export default function TableGame() {
           narrow={narrow}
         />
 
-        {/* ------------------------------ Felt ------------------------------ */}
-        <div
-          className={`relative mt-3 min-h-[25rem] flex-1 border shadow-2xl sm:mt-4 sm:min-h-[32rem] ${RADIUS.felt}`}
-          style={{
-            borderColor: "rgba(201,162,39,0.35)",
-            background:
-              "radial-gradient(115% 85% at 50% 20%, #1a4a32 0%, #123524 46%, #0b2218 100%)",
-            boxShadow:
-              "0 30px 70px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(11,34,24,0.6), inset 0 0 120px rgba(0,0,0,0.45)",
-          }}
-        >
-          {/* Table rim */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-[4%] inset-y-[6%] rounded-[50%] border"
-            style={{ borderColor: "rgba(201,162,39,0.13)" }}
-          />
+        {/* ------------------------------ Table ----------------------------- */}
+        {/*
+         * Two elements, because a real table is two things: a padded rail you
+         * rest your arms on, and a bed of cloth sunk below it. `.pp-table`
+         * carries the rail — its padding *is* the rail's width — and
+         * `.pp-table-bed` is the cloth, inset by exactly that much. Both
+         * materials live in index.css; nothing here paints — and the table's
+         * minimum height lives there too, because it is the *bed* that has to
+         * clear a seat, the board and the hero, and only the rail knows how
+         * much of the outer box it is taking.
+         */}
+        <div className="pp-table mt-3 flex-1 sm:mt-4">
+          <div className="pp-table-bed">
+            {/* The dealer's arc, printed on the cloth. */}
+            <div aria-hidden className="pp-table-arc" />
 
-          {/* Centre: the board, with the street and pot read out beneath it */}
-          <div
-            className="absolute z-[5] flex w-full flex-col items-center gap-2 px-2 sm:gap-2.5"
-            style={{
-              left: `${POT_CENTRE.x}%`,
-              top: `${boardTop(narrow)}%`,
-              transform: "translate(-50%, 0)",
-            }}
-          >
-            <div className="flex items-center justify-center gap-1 sm:gap-2.5">
-              {[0, 1, 2, 3, 4].map((i) => {
-                const card = table.board[i];
-                const dealt = i < fx.dealtCount && !!card;
-                return dealt ? (
-                  <div key={`c-${i}`} className="pp-deal">
-                    <PlayingCard card={card} size="lg" />
-                  </div>
-                ) : (
-                  <div
-                    key={`s-${i}`}
-                    className={`${LG_CARD_BOX} rounded-xl border border-dashed`}
-                    style={{ borderColor: "rgba(244,237,228,0.12)" }}
-                  />
-                );
-              })}
+            {/* Centre: the board, with the street and pot read out beneath it */}
+            <div
+              className="absolute z-[5] flex w-full flex-col items-center gap-2 px-2 sm:gap-2.5"
+              style={{
+                left: `${POT_CENTRE.x}%`,
+                top: `${boardTop(narrow)}%`,
+                transform: "translate(-50%, 0)",
+              }}
+            >
+              <div className="flex items-center justify-center gap-1 sm:gap-2.5">
+                {[0, 1, 2, 3, 4].map((i) => {
+                  const card = table.board[i];
+                  const dealt = i < fx.dealtCount && !!card;
+                  return dealt ? (
+                    <div key={`c-${i}`} className="pp-deal">
+                      <PlayingCard card={card} size="lg" />
+                    </div>
+                  ) : (
+                    <div
+                      key={`s-${i}`}
+                      className={`pp-slot ${LG_CARD_BOX} rounded-xl sm:rounded-2xl`}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className="rounded-full border px-3 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.25em] sm:px-4 sm:text-[0.68rem] sm:tracking-[0.3em]"
+                  style={{
+                    borderColor: "rgba(201,162,39,0.4)",
+                    color: "#e2c563",
+                    background: "rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {STREET_LABEL[table.street]}
+                </span>
+                <span
+                  data-testid="pot"
+                  className="pp-pot-glow flex items-center gap-2 rounded-full border py-1 pl-2 pr-3 sm:pl-2.5 sm:pr-4"
+                  style={{
+                    borderColor: "rgba(201,162,39,0.45)",
+                    background: "rgba(0,0,0,0.45)",
+                  }}
+                >
+                  {/* The pot is chips before it is a number. */}
+                  <PotChips pot={table.pot} bigBlind={options.bigBlind} />
+                  <span>
+                    <span className="font-mono text-[0.55rem] uppercase tracking-[0.25em] text-ivory/50">
+                      Pot{" "}
+                    </span>
+                    <span className="font-display text-base font-bold text-gold-soft sm:text-xl">
+                      {money(table.pot)}
+                    </span>
+                  </span>
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span
-                className="rounded-full border px-3 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.25em] sm:px-4 sm:text-[0.68rem] sm:tracking-[0.3em]"
-                style={{
-                  borderColor: "rgba(201,162,39,0.4)",
-                  color: "#e2c563",
-                  background: "rgba(0,0,0,0.4)",
-                }}
-              >
-                {STREET_LABEL[table.street]}
-              </span>
-              <span
-                data-testid="pot"
-                className="pp-pot-glow rounded-full border px-3 py-1 sm:px-4"
-                style={{
-                  borderColor: "rgba(201,162,39,0.45)",
-                  background: "rgba(0,0,0,0.45)",
-                }}
-              >
-                <span className="font-mono text-[0.55rem] uppercase tracking-[0.25em] text-ivory/50">
-                  Pot{" "}
-                </span>
-                <span className="font-display text-base font-bold text-gold-soft sm:text-xl">
-                  {money(table.pot)}
-                </span>
-              </span>
-            </div>
+            {/* Seats */}
+            {table.seats.map((seat) => (
+              <SeatView
+                key={seat.id}
+                seat={seat}
+                point={points[seat.id]}
+                position={positionOf(seat.id, table.button, table.seats.length)}
+                profile={findProfile(seat.profile ?? "") ?? null}
+                active={playing && table.toAct === seat.id}
+                reveal={revealed(seat.id)}
+                hero={seat.id === heroSeat}
+                compact={narrow && seat.id !== heroSeat}
+                fx={fx.seats[seat.id] ?? { bubble: null, thinking: null }}
+                read={mode === "study" ? (reads[seat.id] ?? null) : null}
+                won={wonBy.get(seat.id) ?? null}
+                showBlurb={mode === "study" && !narrow}
+                bigBlind={options.bigBlind}
+              />
+            ))}
+
+            <ChipLayer chips={fx.chips} points={points} />
           </div>
-
-          {/* Seats */}
-          {table.seats.map((seat) => (
-            <SeatView
-              key={seat.id}
-              seat={seat}
-              point={points[seat.id]}
-              position={positionOf(seat.id, table.button, table.seats.length)}
-              profile={findProfile(seat.profile ?? "") ?? null}
-              active={playing && table.toAct === seat.id}
-              reveal={revealed(seat.id)}
-              hero={seat.id === heroSeat}
-              compact={narrow && seat.id !== heroSeat}
-              fx={fx.seats[seat.id] ?? { bubble: null, thinking: null }}
-              read={mode === "study" ? (reads[seat.id] ?? null) : null}
-              won={wonBy.get(seat.id) ?? null}
-              showBlurb={mode === "study" && !narrow}
-            />
-          ))}
-
-          <ChipLayer chips={fx.chips} points={points} />
         </div>
 
         {/* ---------------------------- Controls ---------------------------- */}
@@ -285,6 +289,14 @@ function TopBar({
   observer: boolean;
   narrow: boolean;
 }) {
+  const change = (
+    <ButtonLink to="/" variant="quiet" size="sm">
+      {/* "Change table" and "Hand #1" and the heading do not share a 390px row,
+          and the heading is the one thing that cannot wrap. */}
+      {narrow ? "Change" : "Change table"}
+    </ButtonLink>
+  );
+
   return (
     <div className="flex flex-col gap-2">
       <PageHeader
@@ -295,6 +307,9 @@ function TopBar({
           <>
             {observer && <Rail>Watching</Rail>}
             <Rail>Hand #{handNumber}</Rail>
+            {/* On a phone this is the only place the control fits without
+                costing the felt a whole row of its own. */}
+            {narrow && change}
           </>
         }
       />
@@ -305,6 +320,12 @@ function TopBar({
        * full-width three-up sitting under the shell's own nav read as one.
        * Its blurb sits beside it, which is the whole reason the blurb is on
        * screen at all rather than in a `title=`.
+       *
+       * Beside it on a wide screen. *Under* it on a phone, via the control's
+       * own `showHint`: a 19rem switch and a sentence sharing a 390px row left
+       * the sentence a 90px column, which set "Your equity, pot odds, and outs
+       * shown while you decide." as seven lines and pushed the table 180px down
+       * the screen. Same words, one line, and the felt gets the space back.
        */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="w-full max-w-[19rem] shrink-0 sm:w-[19rem]">
@@ -314,6 +335,7 @@ function TopBar({
             layout="fill"
             size="sm"
             testIdPrefix="mode"
+            showHint={narrow}
             value={mode}
             onChange={onMode}
             options={TABLE_MODES.map((m) => ({
@@ -323,15 +345,17 @@ function TopBar({
             }))}
           />
         </div>
-        <p
-          className="min-w-0 flex-1 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
-          data-testid="mode-hint"
-        >
-          {TABLE_MODES.find((m) => m.id === mode)?.blurb}
-        </p>
-        <ButtonLink to="/" variant="quiet" size="sm">
-          Change table
-        </ButtonLink>
+        {!narrow && (
+          <>
+            <p
+              className="min-w-0 flex-1 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
+              data-testid="mode-hint"
+            >
+              {TABLE_MODES.find((m) => m.id === mode)?.blurb}
+            </p>
+            {change}
+          </>
+        )}
       </div>
     </div>
   );

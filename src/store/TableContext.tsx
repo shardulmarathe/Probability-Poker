@@ -14,7 +14,10 @@
  *      decision or a wedged worker must not leave the table locked forever.
  *   2. Modes gate rendering only. Nothing here consults `mode` before deciding
  *      anything — the bots' information set is identical in Fair, Coach and
- *      Study, so a hand studied is the same hand as a hand played.
+ *      Study, so a hand studied is the same hand as a hand played. `mode` is
+ *      read in exactly two places, and both are display: the human's coach
+ *      equity, and how much of a bot's narration is filled in (see "the
+ *      information boundary" in `performBot`). Neither reaches the engine.
  *
  * The provider outlives the felt: `/review`, `/profile` and `/replay` are
  * mounted inside it too, because the hand history lives here and a separately
@@ -40,11 +43,21 @@ import {
   type TableMode,
   type TableSetup as TableOptions,
 } from "../lib/tableOptions";
-import { asyncTableDecider, equityRequest, handActions, readsFromActions } from "../poker/model/decider";
+import {
+  asyncTableDecider,
+  closesAction,
+  equityRequest,
+  handActions,
+  readsFromActions,
+  sizedCandidates,
+  FOLD_EQUITY_SIMS,
+} from "../poker/model/decider";
 import { BOT_PROFILES } from "../poker/model/profiles";
-import { runMultiwayEquity } from "../poker/equity/pool";
+import { COMBO_COUNT, type Range } from "../poker/model/range";
+import { planShards, runMultiwayEquity } from "../poker/equity/pool";
 import type {
   BotDecision,
+  EquityRequest,
   MultiwayEquity,
   TableHandReport,
 } from "../poker/table/contract";
@@ -69,12 +82,32 @@ import type { BeliefDistribution } from "../types";
 // Presentation state
 // ---------------------------------------------------------------------------
 
-/** One frame of a bot's visible "computing" sequence. */
-export interface ThinkStep {
-  /** Monotonic index so the UI can re-trigger its fade on each new message. */
-  step: number;
+/** One row of a stage's breakdown: a size, a shard, a candidate line. */
+export interface ThinkFact {
+  label: string;
+  value: string;
+}
+
+/** One stage of the decision, as it is said. */
+export interface ThinkLine {
   title: string;
   detail: string | null;
+  /**
+   * Per-item detail the stage can table out — one row per bet size being
+   * priced. Optional, and the narrow thought bubble ignores it; `<Thinking />`
+   * is where it earns its place.
+   */
+  facts?: ThinkFact[];
+}
+
+/** One frame of a bot's visible "computing" sequence. */
+export interface ThinkStep extends ThinkLine {
+  /** Monotonic index so the UI can re-trigger its fade on each new message. */
+  step: number;
+  /** Stages already finished on this decision, oldest first. */
+  done: ThinkLine[];
+  /** Stages planned for this decision, this one included. */
+  total: number;
 }
 
 export interface ChipFx {
@@ -188,54 +221,230 @@ const T = {
   settle: 100, // pause after committing before the bubble clears
   dealStep: 175, // delay between each community card landing
   blindGap: 150, // gap between the small and big blind chips
-  /** Minimum visible thinking window — also covers the Monte Carlo in flight. */
-  thinkLead: 220,
-  thinkStepMin: 110,
-  thinkStepMax: 300,
 };
 
-/**
- * How long a bot lingers over a move, by what it decided.
- *
- * A fold is snap; a raise deserves a pause. Beyond looking right, this is what
- * keeps a six-handed table watchable — a preflop round where four seats fold
- * costs a second in total rather than five.
- */
-function beatFor(type: TableAction["type"]): number {
-  switch (type) {
-    case "fold":
-      return 300;
-    case "check":
-      return 360;
-    case "call":
-      return 520;
-    default:
-      return 760;
-  }
-}
-
-/**
- * The bot's visible reasoning, narrating the pipeline it actually runs. It
- * deliberately withholds the private numbers — equity, reads, EV — which would
- * leak information; only public facts (the field size, the sample count) show.
- */
-function thinkingSteps(opponents: number, sims: number): ThinkStep[] {
-  return [
-    {
-      step: 0,
-      title: "Reading the field",
-      detail: `${opponents} opponent${opponents === 1 ? "" : "s"} still live`,
-    },
-    {
-      step: 1,
-      title: "Running simulations",
-      detail: `${sims.toLocaleString()} multiway trials`,
-    },
-    { step: 2, title: "Pricing each action", detail: "Comparing expected value" },
-  ];
-}
-
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------------------
+// Narrating the decision
+// ---------------------------------------------------------------------------
+//
+// Every stage below names something `poker/model/decider.ts` genuinely does,
+// and every number in it is read off the very inputs the decider is handed —
+// the `EquityRequest` it will sample, the shard plan `equity/pool` will use,
+// the ladder `table/rules` will size from, and (in the revealing modes) the
+// `BotDecision` it returned. Nothing here is illustrative, and a stage whose
+// data is not available is not shown rather than being filled in.
+//
+// The one thing that is not real is the clock. The pipeline lands in single-
+// digit milliseconds on a fold and a few tens on a six-way priced decision,
+// which is far too fast to read, so each stage is held on screen for the dwell
+// below. That dwell is a *display minimum over work that has already happened*
+// — the previous version of this app hid a ~7ms decision behind a fabricated
+// 3.6-4.8s progress animation, and the difference between that and this is that
+// no number here is invented and no stage here describes work that did not run.
+
+/**
+ * How long one stage stays on screen before the next replaces it.
+ *
+ * Purely a reading speed: nothing is waiting on it. Long enough that a two-clause
+ * line with a count in it can be read once through.
+ */
+const STAGE_DWELL_MS = 480;
+
+/**
+ * Extra dwell per item a stage reports, past the first — a range, a bet size, a
+ * candidate line. A stage with five bet sizes in it has five times the reading
+ * to do, so the total length of a decision falls out of how much work that
+ * decision actually involved rather than out of a chosen duration.
+ */
+const STAGE_ITEM_MS = 110;
+
+/** Ceiling on one stage, so a full table stays watchable at six-handed. */
+const STAGE_DWELL_MAX_MS = 900;
+
+/** A stage of the pipeline, as planned before it is narrated. */
+interface Stage extends ThinkLine {
+  /** Real quantities this stage reports; the only thing that scales its dwell. */
+  items: number;
+}
+
+function dwellFor(stage: Stage): number {
+  return Math.min(
+    STAGE_DWELL_MAX_MS,
+    STAGE_DWELL_MS + STAGE_ITEM_MS * Math.max(0, stage.items - 1)
+  );
+}
+
+const asLine = ({ title, detail, facts }: Stage): ThinkLine => ({
+  title,
+  detail,
+  facts,
+});
+
+const nf = (n: number) => n.toLocaleString();
+const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+const signed = (n: number) => (n >= 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
+const s = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+
+/**
+ * Combos a range still allows. `opponentRanges` zeroes every combo containing a
+ * card the hero can see and no later factor can resurrect one, so this is the
+ * live count for the whole decision, not a snapshot of one moment in it.
+ */
+function liveCombos(range: Range | undefined): number {
+  if (!range) return 0;
+  let n = 0;
+  for (let i = 0; i < COMBO_COUNT; i++) if (range[i] > 0) n++;
+  return n;
+}
+
+/**
+ * The stages of one decision, in the order the decider runs them.
+ *
+ * `decision` is the completed `BotDecision` when the current mode is allowed to
+ * print the bot's own numbers, and null otherwise. It only ever *appends* to a
+ * stage's detail, so the stage list has the same length and the same order in
+ * every mode — what changes is how much of each line is filled in.
+ */
+function planStages(
+  state: Table,
+  seat: number,
+  request: EquityRequest,
+  decision: BotDecision | null
+): Stage[] {
+  const opponents = request.opponents;
+  const records = handActions(state).length;
+  const stages: Stage[] = [];
+
+  stages.push({
+    title: "Reading the table",
+    detail:
+      opponents.length === 0
+        ? "nobody left to beat"
+        : `${opponents.length} ${s(opponents.length, "opponent")} live · ${records} ${s(records, "action")} on record`,
+    items: 1,
+  });
+
+  // `asyncTableDecider` short-circuits an uncontested pot to `uncontestedEquity()`
+  // before any of the below runs. Narrating ranges or trials here would be
+  // describing work that provably did not happen.
+  if (opponents.length === 0) {
+    stages.push({
+      title: "Taking it down",
+      detail: "pot is already this seat's — nothing to simulate",
+      items: 1,
+    });
+    return stages;
+  }
+
+  // Card removal, applied once up front inside `opponentRanges`. Genuinely
+  // instant — 51 slots touched per dead card — so the line says what it found
+  // rather than pretending it took a while.
+  stages.push({
+    title: "Removing known cards",
+    detail: `${nf(liveCombos(request.ranges?.[opponents[0]]))} of ${nf(COMBO_COUNT)} combos survive · 2 hole + ${state.board.length} board`,
+    items: 1,
+  });
+
+  // Only records belonging to a seat still contesting the pot become factors:
+  // `opponentRanges` builds no range for a seat that folded, so its actions are
+  // skipped. "Nobody has acted" would therefore be wrong on a record that is not
+  // empty — the seats that acted are simply no longer in the hand.
+  const live = new Set(opponents);
+  const factors = handActions(state).filter((r) => live.has(r.seat)).length;
+  stages.push({
+    title: "Weighting their ranges",
+    detail:
+      factors === 0
+        ? `${opponents.length} flat ${s(opponents.length, "prior")} — none of them has acted yet`
+        : `${opponents.length} ${s(opponents.length, "range")} · ${factors} P(action | bucket) ${s(factors, "factor")}, renormalised each time`,
+    items: opponents.length,
+  });
+
+  // The shard plan the pool will actually use. `SHARDS` is a constant decoupled
+  // from the core count, so this split is the same on every machine — which is
+  // exactly why it can be quoted.
+  const shards = planShards(request.simulations, request.seed);
+  const even = shards.every((sh) => sh.sims === shards[0].sims);
+  let sampling = `${nf(request.simulations)} trials · ${shards.length} ${s(shards.length, "shard")} ${
+    even
+      ? `× ${nf(shards[0].sims)}`
+      : `(${shards.map((sh) => nf(sh.sims)).join(" + ")})`
+  }`;
+  if (decision) {
+    sampling += ` · ${pct(decision.equity.equity)} pot share ±${pct(decision.equity.se)}`;
+  }
+  stages.push({
+    title: "Rejection-sampling the field",
+    detail: sampling,
+    items: 1,
+  });
+
+  const actions = legalActions(state, seat, state.config);
+  const base = actions.find((a) => a.type === "bet" || a.type === "raise");
+  const sizings = sizingLadder(state, seat, state.config);
+  const candidates = base ? sizedCandidates(base, sizings) : [];
+  const toCall = toCallOf(state, seat);
+  const potAfterCall = state.pot + toCall;
+
+  if (candidates.length > 0) {
+    let detail = `${candidates.length} ${s(candidates.length, "size")}, each with its own continuing range · ${nf(FOLD_EQUITY_SIMS)} trials on common random numbers`;
+    if (decision?.equityVsRange !== undefined) {
+      detail += ` · ${pct(decision.equityVsRange)} vs their full ranges`;
+    }
+    stages.push({
+      title: "Pricing every size",
+      detail,
+      items: candidates.length,
+      // The pot fraction is the number `priceSizes` tilts each fold rate by, and
+      // it is derived from the pot, the call and the size — all public. The fold
+      // rate and continuing equity it produces are the bot's own read, so they
+      // arrive only with `decision`.
+      facts: candidates.map((a) => {
+        const extra = Math.max(0, a.cost - toCall);
+        const fraction = potAfterCall > 0 ? extra / potAfterCall : 0;
+        const priced = decision?.foldEquity?.[a.label];
+        return {
+          label: a.label,
+          value: priced
+            ? `${fraction.toFixed(2)}× pot · folds ${pct(priced.pFold)} · eq ${pct(priced.eContinue)}`
+            : `${fraction.toFixed(2)}× pot`,
+        };
+      }),
+    });
+  }
+
+  // `priceCall` returns null — leaving `actionEv`'s exact number standing —
+  // unless there is a call on the table that somebody behind can still raise
+  // the price of. Same predicate, so this stage appears exactly when it runs.
+  const call = actions.find((a) => a.type === "call");
+  if (call && call.cost > 0 && !closesAction(state, seat)) {
+    const behind = opponents.filter((id) => toCallOf(state, id) > 0).length;
+    let detail = `${behind} ${s(behind, "seat")} behind still ${s(behind, "owes", "owe")} chips — the pot it is called into is not the final one`;
+    const ev = decision?.evByAction[call.label];
+    if (ev !== undefined) detail += ` · ${call.label} at ${signed(ev)}`;
+    stages.push({
+      title: "Re-pricing the call",
+      detail,
+      items: Math.max(1, behind),
+    });
+  }
+
+  // `finish` swaps every aggressive action for the whole priced ladder before
+  // the argmax, so this is the size of the set actually compared.
+  const lines = base
+    ? actions.length - 1 + candidates.length
+    : actions.length;
+  let compare = `${lines} priced ${s(lines, "line")} · ranked, then bent by the seat's profile`;
+  if (decision) {
+    const ev = decision.evByAction[decision.action.label];
+    compare += ` · ${decision.action.label}${ev === undefined ? "" : ` at ${signed(ev)}`}`;
+  }
+  stages.push({ title: "Comparing the lines", detail: compare, items: lines });
+
+  return stages;
+}
 
 /** The live decider: Monte Carlo goes to the worker pool, off the main thread. */
 const decide = asyncTableDecider();
@@ -256,6 +465,12 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
   const tableRef = useRef(table);
   tableRef.current = table;
+  // Read the same way `tableRef` is, and for the same reason: the bot loop is a
+  // long-lived async sequence that must see the mode as it is *now*, and putting
+  // `options` in its dependency list would rebuild `drive` — and re-fire the
+  // resume effect that depends on it — every time a setting changed.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const busyRef = useRef(false);
   const chipId = useRef(0);
   const startedRef = useRef(false);
@@ -381,28 +596,67 @@ export function TableProvider({ children }: { children: ReactNode }) {
     async (seat: number): Promise<boolean> => {
       const live = tableRef.current;
       const request = equityRequest(live, seat);
-      // Kick the decision off first so the Monte Carlo overlaps the thinking
-      // beat rather than preceding it. It runs in the worker pool, so the main
-      // thread stays free to animate while it is in flight.
+      // Kick the decision off first so the whole pipeline runs *underneath* the
+      // narration rather than after it. It goes to the worker pool, so the main
+      // thread stays free to animate while it is in flight — and by the time the
+      // first stage has been read it has long since landed.
       const pending = decide(live, seat, live.config);
+      // A pause can abandon this turn with the decision still in flight, and
+      // then nothing awaits it. `runMultiwayEquity` falls back rather than
+      // rejecting, so this is belt and braces — but an unhandled rejection is a
+      // console error nobody can act on, which is worth one line to prevent.
+      void pending.catch(() => {});
 
-      const frames = thinkingSteps(request.opponents.length, request.simulations);
-      think(seat, frames[0]);
-      const [decision] = await Promise.all([pending, sleep(T.thinkLead)]);
+      // THE INFORMATION BOUNDARY.
+      //
+      // Counts are public facts about the computation: how many opponents, how
+      // many combos the deck still allows, how many trials across how many
+      // shards, which sizes the rules permit. Every mode gets those, because a
+      // player could work out all of them from the felt.
+      //
+      // The bot's own equity, its per-size fold and continuing-range numbers and
+      // its EVs are its hand talking, and handing those to the player mid-hand
+      // is handing them the bot's cards in a slower form. Those show only where
+      // the table already shows everything: Study, and the observer table, which
+      // has no human seat to keep anything from. Same predicate as
+      // `TableGame`'s `revealAll`, deliberately.
+      const { mode, observer } = optionsRef.current;
+      const reveal = mode === "study" || observer;
+
+      // Only the revealing modes join the worker before narrating, because only
+      // they have something to say that does not exist until it answers. Fair
+      // and Coach narrate from the request alone and never wait on it at all.
+      const early = reveal ? await pending : null;
+      const stages = planStages(live, seat, request, early);
+
+      const done: ThinkLine[] = [];
+      for (let i = 0; i < stages.length; i++) {
+        // Tested before each stage, never inside one: a paused table stops on a
+        // stage boundary with nothing owed but the turn itself, which `drive`
+        // re-runs whole. It cannot sit half-narrated.
+        if (pausedRef.current || !aliveRef.current) {
+          think(seat, null);
+          return false;
+        }
+        think(seat, {
+          ...asLine(stages[i]),
+          step: i,
+          done: [...done],
+          total: stages.length,
+        });
+        done.push(asLine(stages[i]));
+        await sleep(dwellFor(stages[i]));
+      }
 
       if (pausedRef.current || !aliveRef.current) {
         think(seat, null);
         return false;
       }
-
-      const per = Math.min(
-        T.thinkStepMax,
-        Math.max(T.thinkStepMin, beatFor(decision.action.type) / frames.length)
-      );
-      for (let i = 1; i < frames.length; i++) {
-        think(seat, frames[i]);
-        await sleep(per);
-      }
+      // For Fair and Coach this is the first and only join with the worker, and
+      // it has had the entire narration to finish. If it somehow has not, the
+      // last stage simply stays up until it does: the narration never runs out
+      // ahead of the decision, and the decision is never applied without one.
+      const decision = early ?? (await pending);
       think(seat, null);
       await perform(seat, decision.action, decision);
       return true;

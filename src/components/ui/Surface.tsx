@@ -11,8 +11,8 @@
  *             inside is a distinct object you could point at (the table setup,
  *             a verdict banner), not merely the next section down the page.
  *
- * `Section` is `Panel` under its old name, so `report/ui.tsx` can migrate by
- * changing one import line.
+ * `Section` is an alias of `Panel`, kept because the report and the legacy
+ * analysis page name it that way.
  */
 
 import type { ReactNode } from "react";
@@ -132,7 +132,7 @@ export function Panel({
   );
 }
 
-/** The old name, for `report/*` to migrate onto without a rewrite. */
+/** Alias: the report and the legacy analysis page call this a `Section`. */
 export const Section = Panel;
 
 // ---------------------------------------------------------------------------

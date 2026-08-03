@@ -5,6 +5,13 @@
  * (cards big enough to read at a glance), a full opponent card on a wide
  * screen, and a compact one on a phone — where six seats have to share 390
  * pixels and anything more than an avatar and a stack does not fit.
+ *
+ * A seat has four states and they are told apart by *elevation*, not by colour
+ * alone. Live seats sit slightly proud of the cloth. The seat on the clock is
+ * lifted further and lit gold. An all-in seat keeps its height but is ringed in
+ * oxblood, because its chips are already in the middle. A folded seat lies flat
+ * — no lift, no shadow, no colour in the face, no cards — which is what a
+ * player who is out of the hand looks like from across a table.
  */
 
 import type { CSSProperties } from "react";
@@ -18,11 +25,14 @@ import type { BotProfile } from "../../poker/table/contract";
 import {
   Badge,
   BeliefBar,
+  ChipStack,
   SpeechBubble,
-  ThoughtBubble,
+  ThoughtPocket,
   bubbleAlign,
+  chipStacks,
   type SeatPoint,
 } from "./chrome";
+import { Thinking } from "./Thinking";
 
 export interface SeatViewProps {
   seat: TableSeat;
@@ -40,11 +50,23 @@ export interface SeatViewProps {
   /** Set when the hand is over and this seat collected chips. */
   won: number | null;
   showBlurb: boolean;
+  /** The table's big blind, for pricing a bet into chips. */
+  bigBlind: number;
+}
+
+type SeatState = "idle" | "active" | "allin" | "folded";
+
+function seatState(seat: TableSeat, active: boolean): SeatState {
+  if (seat.status === "folded" || seat.status === "out") return "folded";
+  if (active) return "active";
+  if (seat.status === "allin") return "allin";
+  return "idle";
 }
 
 export function SeatView(props: SeatViewProps) {
-  const { seat, point, hero, compact } = props;
-  const folded = seat.status === "folded";
+  const { seat, point, hero, compact, active } = props;
+  const state = seatState(seat, active);
+  const folded = state === "folded";
 
   // Seat 0 owns the bottom chair — the human's, or in observer mode a bot's —
   // and is centred on its anchor so it cannot hang off the bottom rail. Every
@@ -56,7 +78,7 @@ export function SeatView(props: SeatViewProps) {
     left: `${point.x}%`,
     top: `${point.y}%`,
     transform: atBottom ? "translate(-50%, -50%)" : "translate(-50%, 0)",
-    opacity: folded ? 0.42 : 1,
+    opacity: folded ? 0.34 : 1,
   };
 
   // The bottom seat speaks upward; the top arc speaks down, toward the pot.
@@ -64,10 +86,15 @@ export function SeatView(props: SeatViewProps) {
   // …and a seat at either end of the arc opens its bubble inward, so a phone
   // never slices one off at the viewport edge.
   const align = bubbleAlign(point.x);
+  // The bet pill and the bubble both hang off the same edge of a chair. When
+  // both are on screen the bubble has to step past the chips.
+  const hasCommit = !hero && seat.streetCommit > 0;
 
   return (
     <div
-      className="absolute z-10 flex flex-col items-center transition-opacity duration-300"
+      className={`absolute z-10 flex flex-col items-center transition-opacity duration-300 ${
+        folded ? "pp-seat-folded" : ""
+      }`}
       style={style}
       data-testid="seat"
       data-seat-id={seat.id}
@@ -75,71 +102,176 @@ export function SeatView(props: SeatViewProps) {
       data-seat-status={seat.status}
       data-seat-reveal={props.reveal ? "1" : "0"}
     >
+      {/*
+       * While a bot is deciding, its chair carries the transcript of the
+       * decision rather than a one-line thought bubble. `Thinking` narrates the
+       * real pipeline — range construction, shard counts, the sizes actually
+       * priced — and it is mounted exactly where the bubble was, hanging off
+       * the seat that is thinking, so the narration stays attached to the
+       * player it belongs to. `ThoughtPocket` supplies only the placement.
+       */}
       {props.fx.thinking ? (
-        <ThoughtBubble step={props.fx.thinking} side={side} align={align} />
+        <ThoughtPocket side={side} align={align} clearance={hasCommit}>
+          <Thinking step={props.fx.thinking} />
+        </ThoughtPocket>
       ) : (
         props.fx.bubble && (
-          <SpeechBubble text={props.fx.bubble} side={side} align={align} />
+          <SpeechBubble
+            text={props.fx.bubble}
+            side={side}
+            align={align}
+            clearance={hasCommit}
+          />
         )
       )}
 
-      {hero ? <HeroSeat {...props} /> : compact ? <CompactSeat {...props} /> : <FullSeat {...props} />}
+      {hero ? (
+        <HeroSeat {...props} state={state} />
+      ) : compact ? (
+        <CompactSeat {...props} state={state} />
+      ) : (
+        <FullSeat {...props} state={state} />
+      )}
 
       {/* The chips this seat has pushed out, sitting between it and the pot —
           out of the flow, so a seat that grows cannot shove the board down.
           The hero's go inside its own card instead, since its info panel is
           already right there and the space above it is the pot readout's. */}
-      {!hero && <Commit amount={seat.streetCommit} above={atBottom} />}
+      {!hero && (
+        <Commit
+          amount={seat.streetCommit}
+          bigBlind={props.bigBlind}
+          above={atBottom}
+        />
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
 
-function avatarStyle(active: boolean, won: number | null): CSSProperties {
+type Skinned = SeatViewProps & { state: SeatState };
+
+/** The one thing every plate shares: its material, and which state it is in. */
+function plate(state: SeatState, won: number | null): {
+  className: string;
+  props: { "data-state": SeatState };
+} {
   return {
-    borderColor: active ? "#c9a227" : won ? "#e2c563" : "rgba(244,237,228,0.2)",
-    background: active ? "rgba(201,162,39,0.16)" : "rgba(0,0,0,0.4)",
-    boxShadow: active ? "0 0 20px rgba(201,162,39,0.4)" : "none",
+    className: `pp-seat-plate ${won ? "pp-seat-won" : ""}`,
+    props: { "data-state": state },
   };
 }
 
-function Commit({ amount, above }: { amount: number; above: boolean }) {
+function avatarStyle(state: SeatState, won: number | null): CSSProperties {
+  const lit = state === "active";
+  return {
+    borderColor: lit
+      ? "#c9a227"
+      : won
+        ? "#e2c563"
+        : state === "allin"
+          ? "rgba(163,2,34,0.7)"
+          : "rgba(244,237,228,0.18)",
+    background: lit ? "rgba(201,162,39,0.14)" : "rgba(0,0,0,0.4)",
+    boxShadow: lit
+      ? "inset 0 1px 0 rgba(255,240,200,0.25), var(--pp-shadow-contact)"
+      : "var(--pp-shadow-contact)",
+  };
+}
+
+/**
+ * Chips pushed out in front of a seat.
+ *
+ * A bet is chips before it is a number: at a real table you read the size of a
+ * commitment from the pile, and the total is something you work out afterwards.
+ * So the pile is drawn and the number sits beside it, rather than the number
+ * standing in for the pile.
+ */
+function Commit({
+  amount,
+  bigBlind,
+  above,
+}: {
+  amount: number;
+  bigBlind: number;
+  above: boolean;
+}) {
   if (amount <= 0) return null;
   const pos = above ? "bottom-full mb-1.5" : "top-full mt-1.5";
+  const stacks = chipStacks(amount, bigBlind, 2, 4);
   return (
     <span
-      className={`absolute left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-[0.62rem] leading-none text-gold-soft ${pos}`}
+      className={`absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full py-0.5 pl-1.5 pr-2 font-mono text-[0.62rem] leading-none text-gold-soft ${pos}`}
       style={{
-        background: "rgba(0,0,0,0.65)",
-        border: "1px solid rgba(201,162,39,0.45)",
+        background: "rgba(0,0,0,0.6)",
+        border: "1px solid rgba(201,162,39,0.4)",
       }}
     >
+      <span className="flex items-end gap-[2px]" aria-hidden>
+        {stacks.map((s, i) => (
+          <ChipStack
+            key={i}
+            count={s.count}
+            body={s.denomination.body}
+            spot={s.denomination.spot}
+            size={12}
+          />
+        ))}
+      </span>
       {money(amount)}
     </span>
   );
+}
+
+/**
+ * All-in is a state, not a stack size — $0 behind says nothing on its own.
+ *
+ * `tight` is the phone's six-handed case, where a chair is 3.5rem wide: at the
+ * desktop's tracking "ALL IN" is wider than the seat and two neighbouring
+ * all-ins print straight through each other.
+ */
+function Stack({ seat, tight }: { seat: TableSeat; tight?: boolean }) {
+  if (seat.status === "allin") {
+    return (
+      <span
+        className={tight ? "font-mono text-[0.55rem]" : "font-mono tracking-[0.14em]"}
+        style={{ color: "#e58a8a" }}
+        data-testid="allin"
+      >
+        ALL&nbsp;IN
+      </span>
+    );
+  }
+  return <>{money(seat.stack)}</>;
 }
 
 // ---------------------------------------------------------------------------
 // Hero — bottom centre, cards readable
 // ---------------------------------------------------------------------------
 
-function HeroSeat({ seat, position, active, reveal, won, fx: _fx, profile }: SeatViewProps) {
+function HeroSeat({ seat, position, reveal, won, profile, state, bigBlind }: Skinned) {
+  const skin = plate(state, won);
   return (
     <div className="flex items-end gap-3 sm:gap-4">
+      {/* Two cards pushed across cloth by one hand: the near one lands on top
+          of the far one, and neither lands square. */}
       <div className="flex gap-1.5 sm:gap-2">
-        <PlayingCard card={seat.hole[0]} faceDown={!reveal} size="lg" />
-        <PlayingCard card={seat.hole[1]} faceDown={!reveal} size="lg" />
+        <PlayingCard card={seat.hole[0]} faceDown={!reveal} size="lg" tilt={-1.4} />
+        <PlayingCard
+          card={seat.hole[1]}
+          faceDown={!reveal}
+          size="lg"
+          tilt={1.1}
+          overlaps
+        />
       </div>
       <div
-        className={`flex flex-col items-start rounded-2xl border px-3 py-2 ${won ? "pp-t-win" : ""}`}
-        style={{
-          borderColor: active ? "#c9a227" : "rgba(244,237,228,0.18)",
-          background: "rgba(0,0,0,0.45)",
-        }}
+        className={`${skin.className} flex flex-col items-start rounded-2xl px-3 py-2`}
+        {...skin.props}
       >
         <div className="flex items-center gap-2">
-          <span className="text-xl leading-none sm:text-2xl">
+          <span className="pp-avatar text-xl leading-none sm:text-2xl">
             {profile?.avatar ?? "\u{1F9D1}"}
           </span>
           <span className="font-display text-sm tracking-wide text-ivory">
@@ -147,19 +279,38 @@ function HeroSeat({ seat, position, active, reveal, won, fx: _fx, profile }: Sea
           </span>
           <Badge label={position} tone={position === "BTN" ? "dealer" : "blind"} />
         </div>
-        <div className="mt-0.5 font-mono text-sm text-ivory/80">
-          {money(seat.stack)}
+        {/* `nowrap`, deliberately: this row is an absolutely-positioned box
+            whose width comes from its own min-content, so letting it wrap made
+            "$901 · $99 in" two lines on a phone and grew the plate downward
+            into the rail. */}
+        <div className="mt-0.5 flex flex-nowrap items-center gap-2 whitespace-nowrap font-mono text-sm text-ivory/80">
+          <Stack seat={seat} />
           {seat.streetCommit > 0 && (
-            <span className="ml-2 text-gold-soft">
-              &middot; {money(seat.streetCommit)} in
+            <span className="flex items-center gap-1 text-gold-soft">
+              <HeroCommit amount={seat.streetCommit} bigBlind={bigBlind} />
+              {money(seat.streetCommit)} in
             </span>
           )}
-          {won ? (
-            <span className="ml-2 text-gold-soft">+{money(won)}</span>
-          ) : null}
+          {won ? <span className="text-gold-soft">+{money(won)}</span> : null}
         </div>
       </div>
     </div>
+  );
+}
+
+function HeroCommit({ amount, bigBlind }: { amount: number; bigBlind: number }) {
+  return (
+    <span className="flex items-end gap-[2px]" aria-hidden>
+      {chipStacks(amount, bigBlind, 2, 4).map((s, i) => (
+        <ChipStack
+          key={i}
+          count={s.count}
+          body={s.denomination.body}
+          spot={s.denomination.spot}
+          size={12}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -171,32 +322,42 @@ function FullSeat({
   seat,
   position,
   profile,
-  active,
   reveal,
   read,
   won,
   showBlurb,
-}: SeatViewProps) {
+  state,
+}: Skinned) {
+  const skin = plate(state, won);
+  const inHand = state !== "folded" && seat.hole.length > 0;
   return (
     <div className="flex w-[8.5rem] flex-col items-center">
-      <div className="mb-1.5 flex gap-1">
-        <PlayingCard card={seat.hole[0]} faceDown={!reveal} size="sm" />
-        <PlayingCard card={seat.hole[1]} faceDown={!reveal} size="sm" />
+      {/* A folded seat has mucked. Leaving two card backs sitting in front of
+          it is the single most confusing thing this table used to do. */}
+      <div className="mb-1.5 flex h-[clamp(2.75rem,9vw,3rem)] items-end gap-1">
+        {inHand && (
+          <>
+            <PlayingCard card={seat.hole[0]} faceDown={!reveal} size="sm" tilt={-1.2} />
+            <PlayingCard
+              card={seat.hole[1]}
+              faceDown={!reveal}
+              size="sm"
+              tilt={1}
+              overlaps
+            />
+          </>
+        )}
       </div>
 
       <div
-        className={`flex w-full flex-col items-center rounded-2xl border px-2 py-2 text-center ${won ? "pp-t-win" : ""}`}
-        style={{
-          borderColor: active ? "#c9a227" : "rgba(244,237,228,0.16)",
-          background: "rgba(0,0,0,0.5)",
-          backdropFilter: "blur(2px)",
-        }}
+        className={`${skin.className} flex w-full flex-col items-center rounded-2xl px-2 py-2 text-center`}
+        {...skin.props}
         title={profile?.blurb}
       >
         <div className="flex items-center gap-1.5">
           <span
-            className="flex h-8 w-8 items-center justify-center rounded-xl border text-lg"
-            style={avatarStyle(active, won)}
+            className="pp-avatar flex h-8 w-8 items-center justify-center rounded-full border text-lg"
+            style={avatarStyle(state, won)}
           >
             {profile?.avatar ?? "\u{1F464}"}
           </span>
@@ -206,7 +367,7 @@ function FullSeat({
           {seat.name}
         </div>
         <div className="font-mono text-xs text-ivory/75">
-          {money(seat.stack)}
+          <Stack seat={seat} />
           {won ? <span className="ml-1 text-gold-soft">+{money(won)}</span> : null}
         </div>
         {/* Study's addition is the *live* read, not the static one. The
@@ -237,16 +398,16 @@ function FullSeat({
 // a revealed pair stays inside the same footprint.
 // ---------------------------------------------------------------------------
 
-function CompactSeat({ seat, position, profile, active, reveal, read, won }: SeatViewProps) {
-  const inHand = seat.status !== "folded" && seat.hole.length > 0;
+function CompactSeat({ seat, position, profile, reveal, read, won, state }: Skinned) {
+  const inHand = state !== "folded" && seat.hole.length > 0;
 
   return (
     <div className="flex w-[3.5rem] flex-col items-center" title={profile?.blurb}>
       {reveal && inHand ? (
         <div className="mb-1 flex">
-          <PlayingCard card={seat.hole[0]} size="sm" />
+          <PlayingCard card={seat.hole[0]} size="sm" tilt={-1.5} />
           <span className="-ml-2.5">
-            <PlayingCard card={seat.hole[1]} size="sm" />
+            <PlayingCard card={seat.hole[1]} size="sm" tilt={1.5} overlaps />
           </span>
         </div>
       ) : (
@@ -261,16 +422,18 @@ function CompactSeat({ seat, position, profile, active, reveal, read, won }: Sea
       )}
 
       <span
-        className={`flex h-9 w-9 items-center justify-center rounded-xl border text-lg ${won ? "pp-t-win" : ""}`}
-        style={avatarStyle(active, won)}
+        className={`pp-avatar flex h-9 w-9 items-center justify-center rounded-full border text-lg ${
+          won ? "pp-seat-won" : ""
+        }`}
+        style={avatarStyle(state, won)}
       >
         {profile?.avatar ?? "\u{1F9D1}"}
       </span>
       <span className="mt-0.5 flex items-center gap-1">
         <Badge label={position} tone={position === "BTN" ? "dealer" : "quiet"} />
       </span>
-      <span className="font-mono text-[0.62rem] leading-tight text-ivory/80">
-        {money(seat.stack)}
+      <span className="max-w-full truncate font-mono text-[0.62rem] leading-tight text-ivory/80">
+        <Stack seat={seat} tight />
       </span>
       {read && (
         <span className="mt-0.5">
@@ -281,13 +444,19 @@ function CompactSeat({ seat, position, profile, active, reveal, read, won }: Sea
   );
 }
 
+/**
+ * A face-down card at 10×14px. Not `.pp-card-back`: that back's keyline rings
+ * are 5px in from the edge, which at this size meet in the middle and turn the
+ * card into a smudge. Same stock, one ring.
+ */
 function MiniBack() {
   return (
     <span
-      className="inline-block h-3.5 w-2.5 rounded-[2px] border"
+      className="inline-block h-3.5 w-2.5 rounded-[2px]"
       style={{
-        borderColor: "rgba(201,162,39,0.7)",
-        background: "linear-gradient(135deg, #7a0019 0%, #4d0010 100%)",
+        background: "linear-gradient(160deg, #8d011e 0%, #4a0010 100%)",
+        boxShadow:
+          "inset 0 0 0 1px rgba(226,197,99,0.6), var(--pp-shadow-contact)",
       }}
     />
   );

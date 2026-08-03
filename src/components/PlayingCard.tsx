@@ -23,40 +23,59 @@ interface PlayingCardProps {
   card?: Card;
   faceDown?: boolean;
   size?: Size;
+  /**
+   * This card overlaps the one beside it, so it is physically on top of it and
+   * carries the heavier shadow. Used by the hero's pair and by a phone's
+   * revealed hole cards, which are dealt into the same footprint.
+   */
+  overlaps?: boolean;
+  /**
+   * Degrees of tilt. Cards pushed across cloth by a hand never land square, and
+   * a pair that is exactly parallel is the quickest way to make a table look
+   * printed rather than played. Kept to about a degree — any more reads as a
+   * bug.
+   */
+  tilt?: number;
 }
 
-function PlayingCardImpl({ card, faceDown = false, size = "md" }: PlayingCardProps) {
+/**
+ * The ink of a playing card.
+ *
+ * Was `#b91c1c` — Tailwind's red-700, which is a UI danger colour and reads
+ * orange next to this product's oxblood. Real card stock is printed in a
+ * cooler, deeper red, and the black is not black either: it is a very dark
+ * warm grey, because a press cannot lay pure black on absorbent stock.
+ */
+const INK_RED = "#b3122a";
+const INK_BLACK = "#171412";
+
+function PlayingCardImpl({
+  card,
+  faceDown = false,
+  size = "md",
+  overlaps = false,
+  tilt = 0,
+}: PlayingCardProps) {
+  const shape = `${SIZES[size]} ${overlaps ? "pp-card-over" : ""}`;
+  const tilted = tilt ? { transform: `rotate(${tilt}deg)` } : undefined;
+
   if (faceDown || !card) {
-    return (
-      <div
-        className={`${SIZES[size]} flex items-center justify-center border shadow-md`}
-        style={{
-          borderColor: "#c9a227",
-          background: "linear-gradient(135deg, #7a0019 0%, #4d0010 100%)",
-        }}
-      >
-        <div
-          className="h-2/3 w-2/3 rounded-[3px] border"
-          style={{
-            borderColor: "rgba(201,162,39,0.55)",
-            background:
-              "repeating-linear-gradient(45deg, rgba(201,162,39,0.18) 0 3px, transparent 3px 7px), repeating-linear-gradient(-45deg, rgba(201,162,39,0.18) 0 3px, transparent 3px 7px)",
-          }}
-        />
-      </div>
-    );
+    // One element, not two. The back's border, its inner gold keyline and its
+    // lattice are all layers of the same box — a nested div for the keyline
+    // meant twelve extra nodes on a six-handed table for a 1px line.
+    return <div className={`pp-card-back ${shape}`} style={tilted} />;
   }
 
   const red = SUIT_IS_RED[card.suit];
-  const color = red ? "#b91c1c" : "#1a1a1a";
+  const color = red ? INK_RED : INK_BLACK;
   const rank = rankChar(card.rank);
   const suit = SUIT_SYMBOL[card.suit];
 
   if (size === "sm") {
     return (
       <div
-        className={`${SIZES[size]} relative flex flex-col items-center justify-center font-semibold shadow-md`}
-        style={{ color, background: "#f7f1e6" }}
+        className={`pp-card ${shape} relative flex flex-col items-center justify-center font-semibold`}
+        style={{ color, ...tilted }}
       >
         <span className="leading-none">{rank}</span>
         <span className="leading-none">{suit}</span>
@@ -66,13 +85,8 @@ function PlayingCardImpl({ card, faceDown = false, size = "md" }: PlayingCardPro
 
   return (
     <div
-      className={`${SIZES[size]} relative font-semibold shadow-lg`}
-      style={{
-        color,
-        background: "linear-gradient(155deg, #fbf7ef 0%, #f1e8d6 100%)",
-        boxShadow:
-          "0 6px 14px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.06)",
-      }}
+      className={`pp-card ${shape} relative font-semibold`}
+      style={{ color, ...tilted }}
     >
       <div className="absolute left-1.5 top-1 flex flex-col items-center leading-none">
         <span className="text-[0.55em]">{rank}</span>
@@ -98,6 +112,8 @@ export const PlayingCard = memo(PlayingCardImpl, (a, b) => {
   return (
     a.card?.id === b.card?.id &&
     a.faceDown === b.faceDown &&
-    a.size === b.size
+    a.size === b.size &&
+    a.overlaps === b.overlaps &&
+    a.tilt === b.tilt
   );
 });

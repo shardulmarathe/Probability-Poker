@@ -263,13 +263,23 @@ function Sheet({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal>
+      {/* A scrim, not a blur. `backdrop-filter` here covered the whole viewport
+          — including the felt, its weave and every card on it — and had to
+          re-filter all of it on each frame the sheet animated in. The sheet is
+          opaque; nothing behind it needed to be legible in the first place. */}
       <button
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/70"
       />
       <div
-        className="pp-t-sheet relative w-full rounded-t-3xl border-t px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
+        /* `rounded-t-2xl` is `RADIUS.surface` on the two corners that exist: a
+           sheet is a panel grouping controls, so it takes the surface radius
+           like every other panel. Spelled out rather than derived from the
+           token, because Tailwind scans source text and would not emit a class
+           assembled at runtime. `rounded-t-3xl` was the product's only 24px
+           corner. */
+        className="pp-t-sheet relative w-full rounded-t-2xl border-t px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
         style={{
           borderColor: "rgba(201,162,39,0.4)",
           background:

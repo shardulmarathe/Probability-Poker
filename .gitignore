@@ -8,10 +8,9 @@ dist-ssr
 .vercel
 .env*
 
-# Verification screenshots — regenerate locally, not worth 16MB in git
-docs/report-shots/
-docs/table-shots/
-docs/profile-shots/
+# Verification screenshots — regenerate locally. These reached 107MB across
+# five directories before this pattern caught all of them.
+docs/*-shots/
 
 # macOS/sync artefacts — duplicate copies tsc compiles but nothing imports
 * [0-9].ts

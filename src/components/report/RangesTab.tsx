@@ -37,16 +37,18 @@ import {
 import {
   CardRow,
   Calc,
-  ChipRow,
   Heading,
   HowCalculated,
+  LINE,
   Lead,
   Meter,
+  RADIUS,
   Section,
+  Tabs,
   Tag,
   Why,
   cardText,
-} from "./ui";
+} from "../ui";
 
 interface Props {
   report: TableHandReport;
@@ -103,8 +105,11 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
         title="Opponent Ranges"
         subtitle="13×13 chart · the weights the sampler drew from"
       >
-        <ChipRow
-          ariaLabel="Street"
+        <Tabs
+          label="Street"
+          as="options"
+          layout="scroll"
+          size="sm"
           testIdPrefix="range-street"
           options={streets.map((s) => ({ value: s.key, label: s.label }))}
           value={streetKey}
@@ -131,11 +136,8 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
               <div
                 key={v.seat}
                 data-testid={`range-card-${v.seat}`}
-                className="min-w-0 rounded-xl border p-3"
-                style={{
-                  borderColor: "rgba(201,162,39,0.22)",
-                  background: "rgba(0,0,0,0.28)",
-                }}
+                className={`min-w-0 border p-3 ${RADIUS.surface}`}
+                style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }}
               >
                 <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-display text-sm font-semibold tracking-wide text-gold-soft">

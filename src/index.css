@@ -58,13 +58,20 @@
   animation: pp-float 5s ease-in-out infinite;
 }
 
-/* A card sliding off the deck onto the felt. */
+/*
+ * A card sliding off the deck onto the felt.
+ *
+ * Opaque by a fifth of the way in, not three fifths: a card in the dealer's
+ * hand is a card, and for most of the old flight this one was a translucent
+ * green ghost with the weave showing through it. It fades in only far enough
+ * to cover its appearance out of nowhere.
+ */
 @keyframes pp-deal {
   from {
     opacity: 0;
     transform: translate(140px, -90px) rotate(14deg) scale(0.7);
   }
-  60% {
+  20% {
     opacity: 1;
   }
   to {
@@ -169,19 +176,38 @@
   animation: pp-dot 1.2s infinite ease-in-out;
 }
 
-/* Soft pulsing glow for the active pot. */
-@keyframes pp-pot-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(201, 162, 39, 0);
-  }
-  50% {
-    box-shadow: 0 0 22px 2px rgba(201, 162, 39, 0.25);
-  }
+/*
+ * Soft pulsing glow for the active pot.
+ *
+ * Animated as the `opacity` of a pseudo-element rather than as the `box-shadow`
+ * of the pill itself. A keyframed `box-shadow` repaints the element on every
+ * frame for as long as the table is open; an `opacity` keyframe is handled by
+ * the compositor and never touches the paint. Same picture, no repaint.
+ */
+.pp-pot-glow {
+  position: relative;
+}
+.pp-pot-glow::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Quiet. A pot that glows like a slot machine is the casino-skin failure this
+     table is trying not to be; this is a slow lift in the gold hairline, and it
+     is meant to be noticed only when you are looking for the pot. */
+  box-shadow: 0 0 9px 0 rgba(201, 162, 39, 0.3);
+  animation: pp-breathe 3.5s ease-in-out infinite;
 }
 
-.pp-pot-glow {
-  animation: pp-pot-glow 3.5s ease-in-out infinite;
+@keyframes pp-breathe {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -192,10 +218,13 @@
   .pp-chip-top,
   .pp-bubble,
   .pp-thought,
-  .pp-dot,
-  .pp-pot-glow {
+  .pp-dot {
     animation: none;
     opacity: 1;
+  }
+  .pp-pot-glow::after {
+    animation: none;
+    opacity: 0.55;
   }
 }
 
@@ -252,6 +281,449 @@ body {
  */
 .pp-screen {
   min-height: calc(100svh - var(--pp-header-h));
+}
+
+/* ------------------------------------------------------------------------ */
+/* The table, as a physical object                                           */
+/*                                                                           */
+/* Everything the felt, the rail, the chips and the cards are *made of* is    */
+/* defined here and nowhere else. It used to be a handful of inline           */
+/* `background: radial-gradient(...)` strings spread across four components,  */
+/* which is why the table read as a div that happened to be green: a single   */
+/* radial gradient is the one thing real cloth never looks like.              */
+/*                                                                           */
+/* Three rules hold the whole thing together:                                 */
+/*                                                                           */
+/*   1. One light. It hangs above the bed and slightly in front of the        */
+/*      viewer. So the pool of light sits above centre (--pp-light-y), and    */
+/*      every shadow on the table — rail, card, chip, seat — falls straight   */
+/*      down with no horizontal offset. A shadow that leans, or two shadows   */
+/*      that lean different ways, is the strongest tell that a scene is fake. */
+/*                                                                           */
+/*   2. Felt is cloth, not a gradient. Warp and weft as two repeating         */
+/*      gradients at different periods, low-frequency mottle for unevenness,  */
+/*      and a tiled grain to break the regularity of the weave — composited   */
+/*      with `background-blend-mode` on one element, so the browser paints    */
+/*      the whole material once and never again.                             */
+/*                                                                           */
+/*   3. None of it animates, and none of it is filtered at paint time. No     */
+/*      keyframed `box-shadow` on a large surface, no `backdrop-filter`, no   */
+/*      CSS `filter` on anything bigger than a 36px avatar. This runs behind  */
+/*      a live game: the materials are paint laid down once and left alone,   */
+/*      and every moving thing on top of them moves in `transform`/`opacity`. */
+/* ------------------------------------------------------------------------ */
+
+:root {
+  /* The light. */
+  --pp-light-x: 50%;
+  --pp-light-y: 34%;
+
+  /* The one shadow angle. Straight down, three depths. */
+  --pp-shadow-contact: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --pp-shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.4), 0 5px 12px -2px rgba(0, 0, 0, 0.38);
+  --pp-shadow-table: 0 1px 0 rgba(0, 0, 0, 0.55), 0 22px 44px -14px rgba(0, 0, 0, 0.72),
+    0 46px 90px -34px rgba(0, 0, 0, 0.65);
+
+  /* Felt greens, from the pool of light out to the rail shadow. Deliberately
+     within one hue: cloth in one dye lot does not change colour, it changes
+     how much light reaches it. */
+  --pp-felt-lit: #1d5236;
+  --pp-felt-mid: #143d28;
+  --pp-felt-low: #0c281a;
+  --pp-felt-edge: #06140d;
+
+  /* The padded rail: dark vinyl over a hardwood lip. Thick enough to read as
+     an armrest at 1280 and still visible as one at 390 — it is the edge, more
+     than anything else, that makes a table look like a table. */
+  --pp-rail-t: clamp(0.7rem, 2.1vw, 1.75rem);
+
+  /*
+   * The table's silhouette.
+   *
+   * The radius grammar in `ui/tokens.ts` gives the felt role 2rem, and that is
+   * the floor here: `clamp()` never returns less. Above it the corners open
+   * into ellipses, because the one physical object on the screen is an oval
+   * table and no 32px rounded rectangle has ever looked like one. The phone
+   * uses a shallower pair — a tall narrow box taken to a true ellipse pushes
+   * the outer seats off the cloth.
+   */
+  --pp-table-r: clamp(2rem, 16%, 13rem) / clamp(2rem, 34%, 13rem);
+
+  /*
+   * A grain tile: fractal noise, desaturated, rasterised once by the browser
+   * and then tiled like any other image. `filter` appears inside the SVG, so
+   * it is resolved at decode time — there is no CSS `filter` on any element.
+   */
+  --pp-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+@media (max-width: 767px) {
+  :root {
+    /*
+     * Rounder than a card, shallower than an ellipse. A phone's bed is taller
+     * than it is wide, and taking a box that shape to a true oval pushes the
+     * outer chairs of a six-handed table — and the corners of the hero's own
+     * plate — off the cloth. These two are the largest pair that keeps every
+     * seat inside the felt at every viewport height, checked at 6-handed,
+     * which is the tightest case.
+     */
+    --pp-table-r: clamp(2rem, 32%, 9rem) / clamp(2rem, 17%, 9rem);
+  }
+}
+
+/* --------------------------------------------------------------- the rail */
+
+/*
+ * The outer body of the table. Padding is the rail's width, so the bed inside
+ * is genuinely inset rather than drawn to look inset.
+ */
+.pp-table {
+  position: relative;
+  /* A flex box purely so the bed can stretch to the rail's inside. The rail is
+     a flex *item* with an auto height, so a `height: 100%` on the bed would
+     resolve to auto and the cloth would collapse to the height of whatever
+     happened to be sitting on it. */
+  display: flex;
+  padding: var(--pp-rail-t);
+  /*
+   * The floor, and why it is expressed here rather than as a utility on the
+   * element.
+   *
+   * `chrome.tsx` works out the smallest cloth that can hold a seat, the board,
+   * the pot and the hero without any two of them overlapping, and lands on
+   * 25rem on a phone and 32rem on a wide screen. Those numbers are measured
+   * against the *bed*. Adding a rail moved the bed inside it, so the same
+   * numbers on the outer box quietly took two rail-widths out of the budget —
+   * and at 900px tall in Study mode the pot readout printed straight across the
+   * hero's hole cards. The rail is added back on.
+   */
+  min-height: calc(25rem + 2 * var(--pp-rail-t));
+  border-radius: var(--pp-table-r);
+  background-image: var(--pp-grain),
+    /* the roll of the padding catching the light along its top */
+      radial-gradient(
+        150% 120% at var(--pp-light-x) -30%,
+        rgba(255, 236, 200, 0.16) 0%,
+        rgba(255, 236, 200, 0.05) 38%,
+        rgba(255, 236, 200, 0) 72%
+      ),
+    linear-gradient(180deg, #2b221c 0%, #1c1611 30%, #120d0a 66%, #080605 100%);
+  /* The grain is coarser on vinyl than on cloth, and half as strong: a rail is
+     a pebbled surface, not a speckled one. */
+  background-size:
+    260px 260px,
+    auto,
+    auto;
+  background-blend-mode: soft-light, screen, normal;
+  box-shadow:
+    /* the hardwood lip, a hairline of it */ inset 0 1px 0 rgba(255, 238, 205, 0.13),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    var(--pp-shadow-table);
+}
+
+@media (min-width: 640px) {
+  .pp-table {
+    min-height: calc(32rem + 2 * var(--pp-rail-t));
+  }
+}
+
+/* ---------------------------------------------------------------- the bed */
+
+.pp-table-bed {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--pp-table-r);
+  background-image: var(--pp-grain),
+    /* warp — the nap, running across the table */
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.022) 0 1px,
+        rgba(0, 0, 0, 0.03) 1px 2px
+      ),
+    /* weft — coarser, so the cloth is woven and not graph paper */
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.014) 0 1px,
+        rgba(0, 0, 0, 0.022) 1px 3px
+      ),
+    /* three slow swells, because no stretched cloth is perfectly even. Wide,
+       low-contrast and off-centre on purpose: unevenness you can point at is a
+       stain, unevenness you cannot is cloth. */
+      radial-gradient(
+        58% 44% at 22% 72%,
+        rgba(255, 255, 255, 0.075) 0%,
+        rgba(255, 255, 255, 0) 72%
+      ),
+    radial-gradient(46% 40% at 80% 30%, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0) 74%),
+    radial-gradient(40% 52% at 63% 84%, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0) 70%),
+    /* the pool of light, and the fall-off to the rail */
+      radial-gradient(
+        68% 74% at var(--pp-light-x) var(--pp-light-y),
+        var(--pp-felt-lit) 0%,
+        var(--pp-felt-mid) 34%,
+        var(--pp-felt-low) 68%,
+        var(--pp-felt-edge) 100%
+      );
+  background-size:
+    180px 180px,
+    auto,
+    auto,
+    auto,
+    auto,
+    auto,
+    auto;
+  background-blend-mode: soft-light, normal, normal, soft-light, soft-light,
+    soft-light, normal;
+  box-shadow:
+    /* the piping between cloth and rail */ 0 0 0 1px rgba(211, 178, 96, 0.16),
+    /* the crease the cloth is tucked into */ inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    /* the rail leans over the bed: hard shadow at the top, bounce at the foot */
+      inset 0 10px 16px -6px rgba(0, 0, 0, 0.85),
+    inset 0 -7px 14px -6px rgba(0, 0, 0, 0.6),
+    /* and the whole ring falls away from the light */
+      inset 0 0 60px 16px rgba(0, 0, 0, 0.38);
+}
+
+/*
+ * The dealer's arc, printed on the cloth. A hairline, concentric with the bed,
+ * and low enough in contrast that it reads as ink in the weave rather than as
+ * a stroked shape.
+ */
+.pp-table-arc {
+  position: absolute;
+  inset: 5% 4%;
+  border-radius: var(--pp-table-r);
+  border: 1px solid rgba(233, 221, 197, 0.055);
+  pointer-events: none;
+}
+
+/*
+ * Where a community card will land. Not a dashed box — a shallow depression in
+ * the cloth, which is what an empty spot on a table actually looks like.
+ */
+.pp-slot {
+  /* Tinted with the cloth rather than with black: a neutral scrim over green
+     desaturates it, and five grey rectangles in a row is a form, not a table. */
+  background: rgba(3, 18, 11, 0.17);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* --------------------------------------------------------------- the chips */
+
+/*
+ * The face of one clay chip, seen from above: a printed centre inlay, a ring of
+ * edge spots around it, and the light catching the top of the moulding.
+ * `--pp-chip-body` / `--pp-chip-spot` are the denomination.
+ *
+ * The spots are a `repeating-conic-gradient` showing through an annulus punched
+ * in the layer above it, so they sit on the rim where a chip's spots actually
+ * are rather than radiating across the whole face.
+ */
+.pp-chip {
+  --pp-chip-body: #7a0019;
+  --pp-chip-spot: #f4ede4;
+  border-radius: 9999px;
+  background-image: radial-gradient(
+      circle at 50% 26%,
+      rgba(255, 255, 255, 0.34) 0%,
+      rgba(255, 255, 255, 0.05) 40%,
+      rgba(255, 255, 255, 0) 64%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      var(--pp-chip-body) 0 40%,
+      rgba(0, 0, 0, 0) 40% 64%,
+      var(--pp-chip-body) 64%
+    ),
+    /* Six spots, not eight. At the size a chip is actually drawn here — 12 to
+       16 pixels — eight arcs on the rim fall below a pixel each and read as
+       noise rather than as moulding. */
+      repeating-conic-gradient(
+        from 12deg,
+        var(--pp-chip-spot) 0 17deg,
+        var(--pp-chip-body) 17deg 60deg
+      );
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.24);
+}
+
+/*
+ * The *edge* of a chip in a stack. This is the whole reason a stack of chips
+ * reads as a stack: from above you see one face and, below it, nothing but a
+ * few millimetres of milled edge each. Drawing full faces overlapping by three
+ * pixels produces a striped smudge, which is what this used to be.
+ */
+.pp-chip-edge {
+  border-radius: 9999px / 50%;
+  background-color: var(--pp-chip-body);
+  background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.26) 0%,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(0, 0, 0, 0.45) 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--pp-chip-spot) 0 1.5px,
+      rgba(0, 0, 0, 0) 1.5px 6.5px
+    );
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* One shadow for the stack, not one per chip — the pile touches the cloth once. */
+.pp-chip-stack {
+  position: relative;
+  display: inline-block;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+}
+.pp-chip-stack > * {
+  position: absolute;
+  left: 0;
+}
+
+/* --------------------------------------------------------------- the cards */
+
+.pp-card {
+  position: relative;
+  background-color: #f6f0e2;
+  background-image: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(255, 255, 255, 0) 46%
+    ),
+    var(--pp-grain);
+  background-size:
+    auto,
+    140px 140px;
+  background-blend-mode: normal, soft-light;
+  box-shadow:
+    /* card stock has an edge: a lit top, a dark foot, a crisp outline */
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.13),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.13),
+    var(--pp-shadow-lift);
+}
+
+.pp-card-back {
+  position: relative;
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(226, 197, 99, 0.2) 0 2px,
+      rgba(226, 197, 99, 0) 2px 6px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(226, 197, 99, 0.2) 0 2px,
+      rgba(226, 197, 99, 0) 2px 6px
+    ),
+    radial-gradient(120% 100% at var(--pp-light-x) 0%, #8d011e 0%, #6b0018 52%, #470010 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(226, 197, 99, 0.55),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 5px rgba(226, 197, 99, 0.3),
+    var(--pp-shadow-lift);
+}
+
+/* A card that overlaps the one beside it is physically on top of it, so it
+   carries the heavier shadow. */
+.pp-card-over {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.13),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.13),
+    -2px 2px 3px rgba(0, 0, 0, 0.35),
+    0 6px 14px -2px rgba(0, 0, 0, 0.45);
+}
+
+/* -------------------------------------------------------------- the seats */
+
+/*
+ * A player's plate: a dark plaque resting on the cloth. Three states, and they
+ * differ in *elevation* rather than in colour alone — an active seat is lifted
+ * and lit, a folded seat lies flat and unlit, which is what "out of the hand"
+ * looks like from across a table.
+ */
+.pp-seat-plate {
+  /* Translucent enough that the weave reads through it: a plate resting on the
+     cloth, not a card floating over a picture of cloth. */
+  background-image: linear-gradient(
+    180deg,
+    rgba(8, 22, 15, 0.6) 0%,
+    rgba(3, 11, 7, 0.78) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.42),
+    0 4px 10px -4px rgba(0, 0, 0, 0.4);
+  transition:
+    box-shadow 0.25s ease,
+    opacity 0.3s ease;
+}
+
+.pp-seat-plate[data-state="active"] {
+  background-image: linear-gradient(
+    180deg,
+    rgba(38, 34, 14, 0.82) 0%,
+    rgba(12, 22, 14, 0.9) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.16),
+    inset 0 0 0 1px rgba(201, 162, 39, 0.55),
+    0 2px 3px rgba(0, 0, 0, 0.45),
+    0 10px 22px -6px rgba(0, 0, 0, 0.55),
+    0 0 16px -2px rgba(201, 162, 39, 0.28);
+}
+
+.pp-seat-plate[data-state="allin"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px rgba(163, 2, 34, 0.75),
+    var(--pp-shadow-lift);
+}
+
+.pp-seat-plate[data-state="folded"] {
+  background-image: linear-gradient(
+    180deg,
+    rgba(4, 12, 8, 0.5) 0%,
+    rgba(3, 9, 6, 0.55) 100%
+  );
+  /* No lift at all: a folded seat is flat on the cloth. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+/* An avatar is 32-36px, so a `filter` on one is a rounding error — and it is
+   the only honest way to make a face read as "not in this hand". */
+.pp-seat-folded .pp-avatar {
+  filter: grayscale(1) brightness(0.75);
+}
+
+/*
+ * The winner's plate, announced the same way the pot is: an opacity keyframe
+ * on a pseudo-element, never a keyframed `box-shadow` on the plate itself.
+ */
+.pp-seat-won {
+  position: relative;
+}
+.pp-seat-won::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 20px 2px rgba(226, 197, 99, 0.55);
+  animation: pp-breathe 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-seat-won::after {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
 ::-webkit-scrollbar {

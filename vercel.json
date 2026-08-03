@@ -4,10 +4,11 @@
       "PUPPETEER_SKIP_DOWNLOAD": "1"
     }
   },
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "^/$", "dest": "/index.html" },
+    { "src": "^/(?:game|table|profile)/?$", "dest": "/index.html" },
+    { "src": "^/(?:review|replay|analysis)(?:/[^/]+)?/?$", "dest": "/index.html" },
+    { "src": "^/(?!api/).*$", "status": 404, "dest": "/index.html" }
   ]
 }

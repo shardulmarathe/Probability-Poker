@@ -6,32 +6,64 @@
  * source is deliberate — the same equity estimate shows up on three of these
  * pages, answering a different question every time.
  *
- * The whole thing reads `history` off `TableContext` and nothing else. There is
- * no store here, no fetch and no persistence: a review is a pure function of a
- * finished hand, and the moment it starts keeping its own copy of one, the copy
- * can disagree with the table.
+ * ## Where the hands come from
+ *
+ * The archive, not the table. This page used to read `history` off
+ * `TableContext`, which is component state: it dies with the tab. That was
+ * survivable while `/review` was reachable only by playing a hand and clicking
+ * through from the felt, and stopped being survivable the moment the shell put
+ * Review in the navigation — a player with fifty archived hands could land here
+ * directly, or simply reload, and be told they had never played one while
+ * `/profile` two tabs over listed all fifty.
+ *
+ * So the archive is the source of truth and the session is the part of it that
+ * has not been written yet. The merge is `mergeHands` — the profile's own — so
+ * the two pages cannot disagree about what was played, and it keeps the live
+ * copy of a hand played this session on purpose: storage strips each report's
+ * per-decision audit trail, and three of the four tabs read it. A hand restored
+ * from storage says so rather than quietly showing empty panels.
  */
 
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { money } from "../../lib/format";
 import { useTable } from "../../store/TableContext";
+import { loadArchive, mergeHands } from "../profile/store";
+import { BackLink, PageBody, PageHeader } from "../shell";
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  LINE,
+  Note,
+  RADIUS,
+  Rail,
+  StickyTabs,
+  Tabs,
+  netTone,
+} from "../ui";
 import { HandTab } from "./HandTab";
 import { MathTab } from "./MathTab";
 import { PlayTab } from "./PlayTab";
 import { RangeGridStyles } from "./RangeGrid";
 import { RangesTab } from "./RangesTab";
 import { STREET_LABEL, seatResult } from "./derive";
-import { FeltBackground, Rail } from "./ui";
 
 type TabId = "hand" | "ranges" | "play" | "math";
 
+/**
+ * The blurbs used to live in `title=` attributes, which no touch device has
+ * ever shown to anyone. `Tabs` prints the active one under the row.
+ */
 const TABS: { id: TabId; label: string; blurb: string }[] = [
-  { id: "hand", label: "Hand", blurb: "What happened" },
-  { id: "ranges", label: "Ranges", blurb: "What they had" },
-  { id: "play", label: "Your Play", blurb: "What it cost" },
-  { id: "math", label: "Math", blurb: "Where the numbers come from" },
+  { id: "hand", label: "Hand", blurb: "What happened, and what it cost each seat." },
+  { id: "ranges", label: "Ranges", blurb: "What the table thought everyone held." },
+  { id: "play", label: "Your play", blurb: "Every decision, re-priced two ways." },
+  { id: "math", label: "Math", blurb: "Where the numbers on the other tabs come from." },
 ];
+
+/** Cards in the strip at the foot of the page. The archive holds up to 400. */
+const STRIP = 24;
 
 export default function HandReview() {
   const { history, lastReport, table, heroSeat } = useTable();
@@ -39,22 +71,48 @@ export default function HandReview() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>("hand");
 
-  const hands = useMemo(() => {
-    const all = [...history];
-    if (lastReport && !all.some((r) => r.handNumber === lastReport.handNumber)) {
-      all.push(lastReport);
-    }
-    return all.sort((a, b) => a.handNumber - b.handNumber);
+  // `history` lags a render behind — the store appends to it in an effect — so
+  // the hand that just ended is still only in `lastReport`.
+  const live = useMemo(() => {
+    if (!lastReport) return history;
+    return history.some((r) => r.seed === lastReport.seed)
+      ? history
+      : [...history, lastReport];
   }, [history, lastReport]);
 
-  const requested = params.handNumber ? Number(params.handNumber) : undefined;
-  const report =
-    hands.find((r) => r.handNumber === requested) ?? hands[hands.length - 1] ?? null;
+  // Oldest first, deduplicated by deal seed, live copies winning. Deliberately
+  // not re-sorted by hand number: those restart at 1 with every new table, so
+  // sorting by them would shuffle three sessions into each other.
+  const hands = useMemo(() => mergeHands(loadArchive().hands, live), [live]);
+  const liveSeeds = useMemo(() => new Set(live.map((r) => r.seed)), [live]);
 
+  // Hand numbers restart with every table, so an archive spanning sessions can
+  // hold several hand #3s and this route's parameter cannot tell them apart.
+  // The most recent wins: it is the one a link written today meant.
+  const requested = params.handNumber ? Number(params.handNumber) : undefined;
+  const report = useMemo(() => {
+    if (requested !== undefined) {
+      for (let i = hands.length - 1; i >= 0; i--) {
+        if (hands[i].handNumber === requested) return hands[i];
+      }
+    }
+    return hands[hands.length - 1] ?? null;
+  }, [hands, requested]);
+
+  /** A hand that came back from storage has no decisions attached. See below. */
+  const restored = report !== null && !liveSeeds.has(report.seed);
+
+  // Seat names belong to the table, not to a hand, so they are only trustworthy
+  // for a table the same size as the one that dealt it. A six-max hand read
+  // while sitting three-handed gets "Seat 4", not whoever is in chair 4 now.
   const seatName = useMemo(() => {
-    const names = table.seats.map((s) => s.name);
-    return (seat: number) => names[seat] ?? `Seat ${seat + 1}`;
-  }, [table.seats]);
+    const named =
+      report !== null && table.seats.length === report.seatCount
+        ? table.seats.map((s) => s.name)
+        : [];
+    return (seat: number) =>
+      named[seat] ?? (seat === heroSeat ? "You" : `Seat ${seat + 1}`);
+  }, [table.seats, report, heroSeat]);
 
   // The seat the review is written from. The human when there is one; otherwise
   // the seat that put the most chips in, which is the hand worth reading.
@@ -66,197 +124,191 @@ export default function HandReview() {
       report.seats[0]?.seat ?? 0
     );
   }, [heroSeat, report]);
+  // The override is sticky across hands, and the archive mixes table sizes: seat
+  // 5 picked on a six-max hand does not exist in the heads-up hand before it.
+  // Fall back rather than render a seat the hand never had.
   const [focusOverride, setFocusOverride] = useState<number | null>(null);
-  const focus = focusOverride ?? defaultFocus;
+  const focus =
+    focusOverride !== null && report?.seats.some((s) => s.seat === focusOverride)
+      ? focusOverride
+      : defaultFocus;
   const isHero = heroSeat !== null && focus === heroSeat;
 
-  const index = report ? hands.findIndex((r) => r.handNumber === report.handNumber) : -1;
+  const index = report ? hands.findIndex((r) => r.seed === report.seed) : -1;
+  const strip = useMemo(() => hands.slice(-STRIP).reverse(), [hands]);
 
   return (
     <main
-      className="relative min-h-[100svh] overflow-x-hidden text-ivory"
+      className="relative overflow-x-hidden text-ivory"
       data-testid="review"
       data-tab={tab}
       data-hands={hands.length}
       data-hand={report?.handNumber ?? ""}
     >
-      <FeltBackground />
       <RangeGridStyles />
 
-      <div
-        className="relative z-10 mx-auto max-w-6xl px-3 pb-10 pt-4 sm:px-4 sm:pt-6"
-        style={{
-          paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
-          paddingRight: "max(0.75rem, env(safe-area-inset-right))",
-        }}
-      >
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Link
-              to="/table"
-              className="font-display text-xs tracking-wide text-ivory/70 transition hover:text-ivory sm:text-sm"
-            >
-              ← Back to table
-            </Link>
-            <h1 className="mt-1.5 font-display text-[clamp(1.5rem,6vw,2.1rem)] font-bold tracking-tight text-gold-soft">
-              Hand Review
-            </h1>
-            <p className="mt-1 max-w-xl text-[0.8rem] leading-relaxed text-ivory/55 sm:text-sm">
-              {report
-                ? `Hand #${report.handNumber} — ${report.seatCount}-handed, ended on the ${STREET_LABEL[report.endStreet].toLowerCase()}.`
-                : "Every finished hand, opened up."}
-            </p>
-          </div>
+      <PageBody width="full">
+        {/* The one back-link on this page, and it earns its place: `/review` is
+            entered from the felt. Nav handles everything else. */}
+        <BackLink to="/table">Table</BackLink>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {report && (
-              <Link
-                to={`/replay/${report.seed}`}
-                data-testid="review-to-replay"
-                className="min-h-[36px] rounded-lg border px-2.5 py-1.5 font-display text-xs transition hover:-translate-y-px"
-                style={{
-                  borderColor: "rgba(201,162,39,0.45)",
-                  background: "rgba(201,162,39,0.12)",
-                  color: "#e2c563",
-                }}
-              >
-                Replay ▸
-              </Link>
-            )}
-            {hands.length > 0 && (
-              <>
-                <button
-                  data-testid="review-prev"
-                  disabled={index <= 0}
-                  onClick={() => navigate(`/review/${hands[index - 1].handNumber}`)}
-                  className="min-h-[36px] rounded-lg border px-2.5 py-1 font-display text-xs transition disabled:opacity-30"
-                  style={{
-                    borderColor: "rgba(201,162,39,0.35)",
-                    background: "rgba(0,0,0,0.35)",
-                  }}
-                  aria-label="Previous hand"
-                >
-                  ‹
-                </button>
-                <select
-                  data-testid="review-select"
-                  value={report?.handNumber ?? ""}
-                  onChange={(e) => navigate(`/review/${e.target.value}`)}
-                  className="min-h-[36px] rounded-lg border px-3 py-1.5 font-display text-xs text-ivory outline-none sm:text-sm"
-                  style={{
-                    borderColor: "rgba(201,162,39,0.4)",
-                    background: "rgba(0,0,0,0.4)",
-                  }}
-                >
-                  {hands.map((r) => (
-                    <option key={r.handNumber} value={r.handNumber} className="bg-[#0b2218]">
-                      Hand #{r.handNumber}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  data-testid="review-next"
-                  disabled={index < 0 || index >= hands.length - 1}
-                  onClick={() => navigate(`/review/${hands[index + 1].handNumber}`)}
-                  className="min-h-[36px] rounded-lg border px-2.5 py-1 font-display text-xs transition disabled:opacity-30"
-                  style={{
-                    borderColor: "rgba(201,162,39,0.35)",
-                    background: "rgba(0,0,0,0.35)",
-                  }}
-                  aria-label="Next hand"
-                >
-                  ›
-                </button>
-              </>
-            )}
-            <Rail>{hands.length} hand{hands.length === 1 ? "" : "s"}</Rail>
-          </div>
-        </header>
+        <div className="mt-2">
+          <PageHeader
+            title="Hand review"
+            lede={
+              report
+                ? `Hand #${report.handNumber} — ${report.seatCount}-handed, ended on the ${STREET_LABEL[report.endStreet].toLowerCase()}.`
+                : "Every finished hand, opened up."
+            }
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                {report && (
+                  <ButtonLink
+                    to={`/replay/${report.seed}`}
+                    size="sm"
+                    testId="review-to-replay"
+                  >
+                    Replay
+                  </ButtonLink>
+                )}
+                {hands.length > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="quiet"
+                      data-testid="review-prev"
+                      disabled={index <= 0}
+                      onClick={() => navigate(`/review/${hands[index - 1].handNumber}`)}
+                      aria-label="Previous hand"
+                    >
+                      ‹
+                    </Button>
+                    <select
+                      data-testid="review-select"
+                      aria-label="Hand to review"
+                      value={report?.handNumber ?? ""}
+                      onChange={(e) => navigate(`/review/${e.target.value}`)}
+                      className={`min-h-[34px] border px-3 py-1.5 font-display text-xs text-ivory outline-none sm:text-sm ${RADIUS.action}`}
+                      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
+                    >
+                      {hands
+                        .slice()
+                        .reverse()
+                        .map((r) => (
+                          <option key={r.seed} value={r.handNumber} className="bg-[#0b2218]">
+                            Hand #{r.handNumber} · {r.seatCount}-handed
+                          </option>
+                        ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="quiet"
+                      data-testid="review-next"
+                      disabled={index < 0 || index >= hands.length - 1}
+                      onClick={() => navigate(`/review/${hands[index + 1].handNumber}`)}
+                      aria-label="Next hand"
+                    >
+                      ›
+                    </Button>
+                  </>
+                )}
+              </div>
+            }
+            meta={
+              <Rail>
+                {hands.length} hand{hands.length === 1 ? "" : "s"}
+              </Rail>
+            }
+          />
+        </div>
 
         {!report ? (
-          <EmptyReview />
+          <div className="mt-10">
+            <EmptyState
+              title="Play a hand and it will be waiting here"
+              testId="review-empty"
+              action={
+                <ButtonLink to="/table" variant="primary" size="lg">
+                  Go to the table
+                </ButtonLink>
+              }
+            >
+              Every hand you finish is opened up here — the cards, the chips, the
+              range the table had you on, and what each of your decisions was
+              worth against it. Nothing has finished yet, in this session or in
+              this browser's archive.
+            </EmptyState>
+          </div>
         ) : (
           <>
             {/* --------------------------- Tabs --------------------------- */}
-            <div
-              className="sticky top-0 z-30 -mx-3 mt-5 px-3 py-2 sm:-mx-4 sm:px-4"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(6,15,10,0.96) 0%, rgba(6,15,10,0.82) 70%, rgba(6,15,10,0) 100%)",
-                backdropFilter: "blur(6px)",
-              }}
-            >
-              <div
-                role="tablist"
-                aria-label="Hand review sections"
-                className="flex gap-1 rounded-xl border p-1"
-                style={{
-                  borderColor: "rgba(201,162,39,0.3)",
-                  background: "rgba(0,0,0,0.45)",
-                }}
-              >
-                {TABS.map((t) => {
-                  const active = t.id === tab;
-                  return (
-                    <button
-                      key={t.id}
-                      role="tab"
-                      aria-selected={active}
-                      title={t.blurb}
-                      data-testid={`tab-${t.id}`}
-                      onClick={() => setTab(t.id)}
-                      className="min-h-[38px] min-w-0 flex-1 truncate rounded-lg px-1.5 py-2 font-display text-[0.68rem] font-semibold tracking-wide transition sm:px-3 sm:text-sm"
-                      style={{
-                        background: active ? "rgba(201,162,39,0.22)" : "transparent",
-                        color: active ? "#e2c563" : "rgba(244,237,228,0.6)",
-                        boxShadow: active ? "inset 0 0 0 1px rgba(201,162,39,0.45)" : "none",
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="mt-5">
+              <StickyTabs>
+                <Tabs
+                  label="Hand review sections"
+                  layout="fill"
+                  showHint
+                  testIdPrefix="tab"
+                  value={tab}
+                  onChange={setTab}
+                  options={TABS.map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                    hint: t.blurb,
+                  }))}
+                />
+              </StickyTabs>
             </div>
 
             {/* ---------------------- Viewpoint seat ---------------------- */}
-            {table.seats.length > 1 && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-ivory/35">
+            {report.seats.length > 1 && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">
                   Reviewing from
                 </span>
-                <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
-                  {report.seats.map((s) => {
-                    const active = s.seat === focus;
-                    return (
-                      <button
-                        key={s.seat}
-                        data-testid={`focus-${s.seat}`}
-                        onClick={() => setFocusOverride(s.seat)}
-                        className="min-h-[30px] shrink-0 rounded-md border px-2 py-1 font-display text-[0.62rem] tracking-wide transition"
-                        style={{
-                          borderColor: active
-                            ? "rgba(201,162,39,0.6)"
-                            : "rgba(244,237,228,0.14)",
-                          background: active ? "rgba(201,162,39,0.18)" : "rgba(0,0,0,0.3)",
-                          color: active ? "#e2c563" : "rgba(244,237,228,0.55)",
-                        }}
-                      >
-                        {seatName(s.seat)}
-                        {heroSeat === s.seat ? " (you)" : ""}
-                      </button>
-                    );
+                <Tabs
+                  label="Seat to review from"
+                  as="options"
+                  layout="scroll"
+                  size="sm"
+                  testIdPrefix="focus"
+                  value={focus}
+                  onChange={setFocusOverride}
+                  options={report.seats.map((s) => {
+                    // The table already names the human's chair "You"; tagging
+                    // that one again reads "You (you)".
+                    const name = seatName(s.seat);
+                    const mine = heroSeat === s.seat && name !== "You";
+                    return { value: s.seat, label: mine ? `${name} (you)` : name };
                   })}
-                </div>
+                />
+              </div>
+            )}
+
+            {/*
+             * Storage keeps the hand and drops the audit trail — a Monte Carlo
+             * record per bot move is an order of magnitude larger than the hand
+             * itself. Everything derived from the action record still works; the
+             * panels that read the trail would otherwise report "nothing was
+             * simulated", which is a different and untrue statement.
+             */}
+            {restored && (
+              <div className="mt-4">
+                <Note label="Restored from this browser's archive" testId="review-restored">
+                  Storage keeps the hand, not the bots' simulation records — so
+                  the head-to-head equity, the engine's own pricing and the Math
+                  tab's worked examples are empty here. Everything rebuilt from
+                  the action record is unaffected.
+                </Note>
               </div>
             )}
 
             {/* -------------------------- Panels -------------------------- */}
             <div
-              className="mt-4"
+              className="mt-5"
               data-testid="review-panel"
               role="tabpanel"
-              key={`${report.handNumber}:${focus}`}
+              key={`${report.seed}:${focus}`}
             >
               {tab === "hand" && (
                 <HandTab
@@ -288,78 +340,68 @@ export default function HandReview() {
             </div>
 
             {/* ------------------------- Hand list ------------------------ */}
-            <div className="mt-8">
-              <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.22em] text-ivory/40">
-                This session
+            <div className="mt-10">
+              <p className="mb-3 font-display text-sm font-semibold tracking-wide text-ivory/70">
+                {hands.length > STRIP
+                  ? `Your last ${STRIP} hands`
+                  : hands.length === 1
+                    ? "Your one hand"
+                    : `All ${hands.length} of your hands`}
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                {hands
-                  .slice()
-                  .reverse()
-                  .map((r) => {
-                    const mine = seatResult(r, focus);
-                    const active = r.handNumber === report.handNumber;
-                    return (
-                      <Link
-                        key={r.handNumber}
-                        to={`/review/${r.handNumber}`}
-                        className="rounded-xl border p-2.5 transition hover:-translate-y-0.5"
-                        style={{
-                          borderColor: active
-                            ? "rgba(201,162,39,0.6)"
-                            : "rgba(244,237,228,0.14)",
-                          background: active ? "rgba(201,162,39,0.1)" : "rgba(0,0,0,0.25)",
-                        }}
+                {strip.map((r) => {
+                  const mine = seatResult(r, focus);
+                  const active = r.seed === report.seed;
+                  return (
+                    <Link
+                      key={r.seed}
+                      to={`/review/${r.handNumber}`}
+                      className={`border p-2.5 transition hover:-translate-y-0.5 ${RADIUS.control}`}
+                      style={{
+                        borderColor: active ? "rgba(201,162,39,0.6)" : LINE.quiet,
+                        background: active ? "rgba(201,162,39,0.1)" : "rgba(0,0,0,0.25)",
+                      }}
+                    >
+                      <p className="font-display text-xs font-semibold text-ivory">
+                        Hand #{r.handNumber}
+                      </p>
+                      <p className="text-[0.65rem] text-ivory/50">
+                        {STREET_LABEL[r.endStreet]}
+                        {r.wentToShowdown ? " · showdown" : ""}
+                      </p>
+                      <p
+                        className="mt-1 font-mono text-[0.7rem]"
+                        style={{ color: netTone(mine?.net ?? 0) }}
                       >
-                        <p className="font-display text-xs font-semibold text-ivory">
-                          Hand #{r.handNumber}
-                        </p>
-                        <p className="text-[0.65rem] text-ivory/50">
-                          {STREET_LABEL[r.endStreet]}
-                          {r.wentToShowdown ? " · showdown" : ""}
-                        </p>
-                        <p
-                          className="mt-1 font-mono text-[0.7rem]"
-                          style={{
-                            color:
-                              (mine?.net ?? 0) > 0
-                                ? "#7fd3a8"
-                                : (mine?.net ?? 0) < 0
-                                  ? "#e58a8a"
-                                  : "rgba(244,237,228,0.4)",
-                          }}
-                        >
-                          {mine
-                            ? mine.net >= 0
-                              ? `+${money(mine.net)}`
-                              : `−${money(-mine.net)}`
-                            : "—"}
-                        </p>
-                      </Link>
-                    );
-                  })}
+                        {mine
+                          ? mine.net >= 0
+                            ? `+${money(mine.net)}`
+                            : `−${money(-mine.net)}`
+                          : "—"}
+                      </p>
+                    </Link>
+                  );
+                })}
               </div>
+              {hands.length > STRIP && (
+                <p className="mt-3 text-[0.8rem] text-ivory/45">
+                  {hands.length - STRIP} older hand
+                  {hands.length - STRIP === 1 ? " is" : "s are"} still in the
+                  archive — step back through them with ‹, or read them all at
+                  once on{" "}
+                  <Link
+                    to="/profile"
+                    className="text-gold-soft underline-offset-4 hover:underline"
+                  >
+                    your profile
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
           </>
         )}
-      </div>
+      </PageBody>
     </main>
-  );
-}
-
-function EmptyReview() {
-  return (
-    <div className="mt-16 flex flex-col items-center gap-4 text-center">
-      <p className="max-w-md text-ivory/60">
-        No hand has finished yet. Play one out at the table and it will be waiting
-        here — cards, chips, ranges and all.
-      </p>
-      <Link
-        to="/table"
-        className="min-h-[46px] rounded-xl border border-pkred-light/70 bg-pkred/80 px-6 py-3 font-display font-semibold text-ivory transition hover:-translate-y-0.5 hover:bg-pkred-light"
-      >
-        Go to the table
-      </Link>
-    </div>
   );
 }

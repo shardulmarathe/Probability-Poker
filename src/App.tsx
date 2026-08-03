@@ -13,6 +13,7 @@ import HandReview from "./components/report/HandReview";
 import Profile from "./components/profile/Profile";
 import ProfileRecorder from "./components/profile/ProfileRecorder";
 import ReplayPage from "./components/profile/ReplayPage";
+import LearnPage from "./components/learn/LearnPage";
 import { AppShell, LegacyRoute, NotFound } from "./components/shell";
 
 const onRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
@@ -32,6 +33,9 @@ export default function App() {
            */}
           <Route element={<AppShell />}>
             <Route path="/" element={<Home />} />
+            {/* The concepts page needs no table — it works its examples with
+                live engine calls of its own, so it sits outside the provider. */}
+            <Route path="/learn" element={<LearnPage />} />
             {/* The original heads-up match. It renders no heading of its own
                 and is being retired separately, so the route supplies one. */}
             <Route

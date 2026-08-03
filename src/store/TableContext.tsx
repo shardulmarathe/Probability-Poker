@@ -15,6 +15,11 @@
  *   2. Modes gate rendering only. Nothing here consults `mode` before deciding
  *      anything — the bots' information set is identical in Fair, Coach and
  *      Study, so a hand studied is the same hand as a hand played.
+ *
+ * The provider outlives the felt: `/review`, `/profile` and `/replay` are
+ * mounted inside it too, because the hand history lives here and a separately
+ * mounted review would find an empty archive. That is deliberate, and it has
+ * one consequence this file has to own — see "Pausing" below.
  */
 
 import {
@@ -27,6 +32,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router-dom";
 import {
   loadSetup,
   saveSetup,
@@ -267,6 +273,43 @@ export function TableProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ---- Pausing -------------------------------------------------------------
+  //
+  // The table deals only while it is the thing being looked at.
+  //
+  // `/review` and its siblings share this provider with `/table`, so walking off
+  // the felt does not unmount the store and the bot loop keeps running behind
+  // the page you navigated to: hands finish, new ones are dealt, and the hand
+  // under review moves while it is being read. A hidden tab is the same
+  // situation arriving by a different door, so both drive one flag.
+  //
+  // The flag is held in a ref as well as in state because the bot loop is a
+  // long-lived async sequence that closes over neither — it re-reads the ref
+  // between turns, the way it already re-reads `aliveRef` and `tableRef`.
+  const { pathname } = useLocation();
+  const [hidden, setHidden] = useState(
+    () => typeof document !== "undefined" && document.visibilityState === "hidden"
+  );
+  useEffect(() => {
+    const onVisibility = () => setHidden(document.visibilityState === "hidden");
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  // Trailing slash stripped because the router matches `/table/` to the same
+  // route: a literal comparison would leave that URL permanently paused, which
+  // looks exactly like a dead table.
+  const paused = pathname.replace(/\/+$/, "") !== "/table" || hidden;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  /**
+   * Set when the loop stopped *because of* the pause, as opposed to because the
+   * hand ended or the human is on the clock. Only the first case has a turn
+   * still owed, so only the first case is resumed — which is what keeps the
+   * resume from re-entering a loop that already finished for a good reason.
+   */
+  const resumeRef = useRef(false);
+
   const heroSeat = options.observer ? null : 0;
 
   // ---- Low-level presentation primitives ----------------------------------
@@ -324,8 +367,18 @@ export function TableProvider({ children }: { children: ReactNode }) {
     [commit, dealUpTo, say, spawnChip]
   );
 
+  /**
+   * One bot's turn. False means it was abandoned before anything was applied.
+   *
+   * The abandon window is the wait on the worker, which is the longest part of
+   * a turn and so the part a pause is most likely to land in. Dropping the
+   * decision there costs nothing and duplicates nothing: it is a pure function
+   * of `(seed, hand number, action count, seat)` — none of which the abandon
+   * changes — so re-entering recomputes this exact move rather than a different
+   * one, and the table has not moved in the meantime.
+   */
   const performBot = useCallback(
-    async (seat: number) => {
+    async (seat: number): Promise<boolean> => {
       const live = tableRef.current;
       const request = equityRequest(live, seat);
       // Kick the decision off first so the Monte Carlo overlaps the thinking
@@ -337,6 +390,11 @@ export function TableProvider({ children }: { children: ReactNode }) {
       think(seat, frames[0]);
       const [decision] = await Promise.all([pending, sleep(T.thinkLead)]);
 
+      if (pausedRef.current || !aliveRef.current) {
+        think(seat, null);
+        return false;
+      }
+
       const per = Math.min(
         T.thinkStepMax,
         Math.max(T.thinkStepMin, beatFor(decision.action.type) / frames.length)
@@ -347,24 +405,37 @@ export function TableProvider({ children }: { children: ReactNode }) {
       }
       think(seat, null);
       await perform(seat, decision.action, decision);
+      return true;
     },
     [perform, think]
   );
 
   /**
-   * Run bot moves until the human is on the clock or the hand ends. The step
-   * cap is a backstop: a cycling turn order would otherwise spin here forever
-   * with the lock held, which is the one failure the user cannot recover from.
+   * Run bot moves until the human is on the clock, the hand ends, or the table
+   * is paused. The step cap is a backstop: a cycling turn order would otherwise
+   * spin here forever with the lock held, which is the one failure the user
+   * cannot recover from.
+   *
+   * The pause is tested between turns, never inside one, so a turn either
+   * happens whole or has not started — the seat still owes exactly the move it
+   * owed before, and `resumeRef` is what remembers that it does.
    */
   const drive = useCallback(async () => {
     for (let steps = 0; steps < 400; steps++) {
       if (!aliveRef.current) return;
+      if (pausedRef.current) {
+        resumeRef.current = true;
+        return;
+      }
       const t = tableRef.current;
       if (t.status !== "playing") return;
       const seat = t.toAct;
       if (seat === null) return;
       if (t.seats[seat].kind === "human") return;
-      await performBot(seat);
+      if (!(await performBot(seat))) {
+        resumeRef.current = true;
+        return;
+      }
     }
     throw new Error("table: bot loop exceeded its step budget");
   }, [performBot]);
@@ -478,6 +549,20 @@ export function TableProvider({ children }: { children: ReactNode }) {
     });
   }, [beginHand, runExclusive]);
 
+  // ---- Resume where the pause stopped --------------------------------------
+  //
+  // Keyed on `busy` as well as `paused`, which is not belt-and-braces: a
+  // sequence still unwinding when the user walks back onto the felt is holding
+  // the lock, and `runExclusive` drops a call that arrives while it is held. Any
+  // one-shot resume would be swallowed there and the table would sit dead with a
+  // bot on the clock. Depending on `busy` re-fires this the moment the `finally`
+  // releases it, so the handoff has neither a stall nor a double turn in it.
+  useEffect(() => {
+    if (paused || busy || !resumeRef.current) return;
+    resumeRef.current = false;
+    runExclusive(drive);
+  }, [paused, busy, drive, runExclusive]);
+
   // ---- Archive finished hands ---------------------------------------------
   useEffect(() => {
     const report = table.lastReport;
@@ -490,11 +575,15 @@ export function TableProvider({ children }: { children: ReactNode }) {
   }, [table.lastReport]);
 
   // ---- Observer mode deals itself on ---------------------------------------
+  //
+  // Gated on the pause too: dealing the *next* hand behind the review screen is
+  // the same defect as playing the current one, and the louder half of it —
+  // it is what moves the hand number.
   useEffect(() => {
-    if (!options.observer || busy || table.status === "playing") return;
+    if (paused || !options.observer || busy || table.status === "playing") return;
     const id = window.setTimeout(nextHand, 2200);
     return () => window.clearTimeout(id);
-  }, [options.observer, busy, table.status, table.handNumber, nextHand]);
+  }, [paused, options.observer, busy, table.status, table.handNumber, nextHand]);
 
   // ---- Coach / Study equity for the human ----------------------------------
   //
@@ -507,7 +596,9 @@ export function TableProvider({ children }: { children: ReactNode }) {
     : "";
 
   useEffect(() => {
-    if (!heroTurn || heroSeat === null || options.mode === "fair") {
+    // Paused counts as "not on the clock": a Monte Carlo run for a decision
+    // nobody is looking at is the same wasted work the bot loop was doing.
+    if (paused || !heroTurn || heroSeat === null || options.mode === "fair") {
       setHeroRead(null);
       return;
     }
@@ -538,7 +629,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
     // `heroKey` identifies the decision point; the table object itself changes
     // identity on every commit and would re-run this for no reason.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [heroKey, heroTurn, heroSeat, options.mode]);
+  }, [heroKey, heroTurn, heroSeat, options.mode, paused]);
 
   // ---- Derived -------------------------------------------------------------
   const canAct =

@@ -12,7 +12,8 @@
 import type { Counter, PlayerStats, StatCounters } from "../../poker/coach/stats";
 import { POSITIONS, percent, rate } from "../../poker/coach/stats";
 import type { PositionName } from "../../poker/table/position";
-import { Scroller, Stat } from "../report/ui";
+import { netTone } from "../ui";
+import { Scroller, Stat, StatGrid } from "../ui";
 
 interface StatSpec {
   key: string;
@@ -101,50 +102,22 @@ const STAT_SPECS: StatSpec[] = [
 /** Small, so the meter is honest about it: below this the bar is dimmed. */
 const THIN_SAMPLE = 12;
 
-function Bar({ value, thin }: { value: number | null; thin: boolean }) {
-  return (
-    <div
-      className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
-      style={{ background: "rgba(0,0,0,0.45)" }}
-    >
-      {value !== null && (
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${Math.max(2, Math.min(1, value) * 100)}%`,
-            backgroundColor: thin ? "rgba(201,162,39,0.35)" : "#e2c563",
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
 export function TrackerOverall({ stats }: { stats: PlayerStats }) {
   const thin = stats.total.hands < THIN_SAMPLE;
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <StatGrid columns={3}>
       {STAT_SPECS.map((spec) => (
-        <div
+        <Stat
           key={spec.key}
-          className="min-w-0 rounded-xl border p-2.5 sm:p-3"
-          style={{
-            borderColor: "rgba(244,237,228,0.14)",
-            background: "rgba(0,0,0,0.25)",
-          }}
-          data-testid={`stat-${spec.key}`}
-        >
-          <p className="truncate text-[0.6rem] uppercase tracking-wider text-ivory/45 sm:text-xs">
-            {spec.label}
-          </p>
-          <p className="mt-0.5 font-display text-lg font-semibold text-ivory sm:text-xl">
-            {spec.format(stats.total)}
-          </p>
-          <Bar value={spec.fraction(stats.total)} thin={thin} />
-          <p className="mt-1.5 text-[0.6rem] leading-snug text-ivory/40">{spec.blurb}</p>
-        </div>
+          testId={`stat-${spec.key}`}
+          label={spec.label}
+          value={spec.format(stats.total)}
+          meter={spec.fraction(stats.total)}
+          meterThin={thin}
+          note={spec.blurb}
+        />
       ))}
-    </div>
+    </StatGrid>
   );
 }
 
@@ -228,14 +201,7 @@ function PositionRow({
       ))}
       <td
         className="py-2 text-right font-mono text-xs"
-        style={{
-          color:
-            counters.net > 0
-              ? "#7fd3a8"
-              : counters.net < 0
-                ? "#e58a8a"
-                : "rgba(244,237,228,0.4)",
-        }}
+        style={{ color: netTone(counters.net) }}
       >
         {counters.net >= 0 ? `+$${counters.net}` : `−$${-counters.net}`}
       </td>
@@ -243,27 +209,27 @@ function PositionRow({
   );
 }
 
-/** Headline numbers that are not tracker stats: hands, net, biggest pot. */
+/** Headline numbers that are not tracker stats: hands, net, showdowns. */
 export function SessionHeadline({ stats }: { stats: PlayerStats }) {
   const t = stats.total;
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <Stat label="Hands" value={t.hands} />
+    <StatGrid columns={4}>
+      <Stat label="Hands played" value={t.hands} />
       <Stat
         label="Net"
         value={t.net >= 0 ? `+$${t.net}` : `−$${-t.net}`}
-        highlight={t.net >= 0}
+        tone={t.net > 0 ? "good" : t.net < 0 ? "bad" : "neutral"}
       />
       <Stat
         label="Showdowns"
         value={t.wtsd.n}
-        sub={`of ${t.wtsd.d} flops seen`}
+        note={`of ${t.wtsd.d} flop${t.wtsd.d === 1 ? "" : "s"} seen`}
       />
       <Stat
         label="Won at showdown"
         value={t.wsd.d > 0 ? `${t.wsd.n}/${t.wsd.d}` : "—"}
-        sub={t.wsd.d > 0 ? pctText(t.wsd) : "no showdowns yet"}
+        note={t.wsd.d > 0 ? pctText(t.wsd) : "no showdowns yet"}
       />
-    </div>
+    </StatGrid>
   );
 }

@@ -18,14 +18,14 @@ import {
   STYLE_BLURBS,
   type StyleVerdict,
 } from "../../poker/coach/archetype";
-import { Tag } from "../report/ui";
+import { Note, Tag } from "../ui";
 
 /** Where a read stops being a coin flip. Presentation only. */
 const USABLE_CONFIDENCE = 0.4;
 
-function tone(verdict: StyleVerdict): "quiet" | "gold" | "bad" {
-  if (verdict.provisional) return "quiet";
-  return verdict.confidence >= USABLE_CONFIDENCE ? "gold" : "quiet";
+function tone(verdict: StyleVerdict): "neutral" | "gold" {
+  if (verdict.provisional) return "neutral";
+  return verdict.confidence >= USABLE_CONFIDENCE ? "gold" : "neutral";
 }
 
 export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
@@ -53,7 +53,7 @@ export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
       {/* ---------------------- Confidence ---------------------- */}
       <div className="mt-4">
         <div className="mb-1 flex items-baseline justify-between gap-2">
-          <span className="font-display text-[0.62rem] uppercase tracking-[0.18em] text-ivory/45">
+          <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">
             Confidence
           </span>
           <span
@@ -80,42 +80,31 @@ export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
       </div>
 
       {/* --------------------- The honest bit -------------------- */}
-      <div
-        className="mt-4 rounded-lg border-l-2 px-3 py-2.5"
-        style={{
-          borderColor: verdict.provisional ? "#d24a4a" : "#c9a227",
-          background: verdict.provisional
-            ? "rgba(210,74,74,0.10)"
-            : "rgba(201,162,39,0.08)",
-        }}
-        data-testid="confidence-note"
-      >
-        <p className="text-[0.8rem] leading-relaxed text-ivory/75">
-          {verdict.provisional ? (
-            <>
-              This is a guess. {verdict.hands} hand{verdict.hands === 1 ? "" : "s"} is
-              well under the {MIN_CLASSIFY_HANDS} a label needs to mean anything
-              {shortOf > 0 ? ` — ${shortOf} to go` : ""}. Expect it to change.
-            </>
-          ) : verdict.confidence < USABLE_CONFIDENCE ? (
-            <>
-              A working read, not a settled one. Confidence reaches 50% at{" "}
-              {CONFIDENCE_HALF_HANDS} hands, and sitting near a threshold holds it
-              down further.
-            </>
-          ) : (
-            <>
-              Measured over {verdict.hands} hands. Confidence still rises with the
-              sample — it passes 50% at {CONFIDENCE_HALF_HANDS} hands — and drops
-              when VPIP sits on a cut point.
-            </>
-          )}
-        </p>
-      </div>
+      <Note tone={verdict.provisional ? "bad" : "gold"} testId="confidence-note">
+        {verdict.provisional ? (
+          <>
+            This is a guess. {verdict.hands} hand{verdict.hands === 1 ? "" : "s"} is
+            well under the {MIN_CLASSIFY_HANDS} a label needs to mean anything
+            {shortOf > 0 ? ` — ${shortOf} to go` : ""}. Expect it to change.
+          </>
+        ) : verdict.confidence < USABLE_CONFIDENCE ? (
+          <>
+            A working read, not a settled one. Confidence reaches 50% at{" "}
+            {CONFIDENCE_HALF_HANDS} hands, and sitting near a threshold holds it
+            down further.
+          </>
+        ) : (
+          <>
+            Measured over {verdict.hands} hands. Confidence still rises with the
+            sample — it passes 50% at {CONFIDENCE_HALF_HANDS} hands — and drops
+            when VPIP sits on a cut point.
+          </>
+        )}
+      </Note>
 
       {/* ------------------------ Reasons ----------------------- */}
       <div className="mt-4">
-        <p className="mb-1.5 font-display text-[0.62rem] uppercase tracking-[0.18em] text-ivory/40">
+        <p className="mb-1.5 font-display text-sm font-semibold tracking-wide text-ivory/70">
           What decided it
         </p>
         <ul className="space-y-1">

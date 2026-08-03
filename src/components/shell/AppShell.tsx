@@ -1,0 +1,125 @@
+/**
+ * The application shell: the felt, the wordmark, and the navigation.
+ *
+ * Before this existed there was no persistent navigation at all. The profile —
+ * the tracker, the style read, the priced leaks, the most valuable thing the
+ * product computes — was reachable only by going home, choosing a table,
+ * playing a hand to completion, opening the review, opening the replay, and
+ * then following a link labelled "← Back to profile" from a page you had never
+ * been to. Five hops, the last one signposted backwards.
+ *
+ * The shell mounts on every route, so:
+ *
+ *   - every page has a home affordance (the wordmark) and a way to reach the
+ *     other two surfaces in one click;
+ *   - the felt is painted once, by one component, rather than five times by
+ *     five copies that had already drifted apart;
+ *   - back-links stop being navigation. A page adds one only when it returns
+ *     you to a specific thing you came from, and it is spelled with the
+ *     destination's nav name — `← Table`, never "← Back to table" on one page
+ *     and "← New table" on the next.
+ *
+ * The `pp-shell` class is what lets `index.css` shorten every page's
+ * `min-h-[100svh]` by the header's height, including on the routes this agent
+ * does not own. Without it, every route would carry a permanent scrollbar
+ * exactly one header tall.
+ */
+
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { FeltBackground } from "../ui";
+import { AccountMenu } from "./AccountMenu";
+
+const NAV = [
+  { to: "/table", label: "Table" },
+  { to: "/review", label: "Review" },
+  { to: "/profile", label: "Profile" },
+];
+
+export default function AppShell() {
+  const { pathname } = useLocation();
+  // The landing page keeps the fuller felt — brighter centre, vignette, the
+  // four suit watermarks — because it is the only page that is a poster.
+  const flourish = pathname === "/";
+
+  return (
+    <div className="pp-shell min-h-[100svh] text-ivory">
+      <FeltBackground flourish={flourish} />
+
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:border focus:border-gold/60 focus:bg-felt-deep focus:px-3 focus:py-2 focus:font-display focus:text-sm focus:text-gold-soft"
+      >
+        Skip to content
+      </a>
+
+      <header
+        className="sticky top-0 z-50 h-[var(--pp-header-h)] border-b backdrop-blur-md"
+        style={{
+          borderColor: "rgba(201,162,39,0.22)",
+          background:
+            "linear-gradient(180deg, rgba(6,20,13,0.92) 0%, rgba(6,20,13,0.78) 100%)",
+        }}
+      >
+        <div
+          className="mx-auto flex h-full max-w-6xl items-center gap-3 px-3 sm:gap-6 sm:px-4"
+          style={{
+            paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
+            paddingRight: "max(0.75rem, env(safe-area-inset-right))",
+          }}
+        >
+          {/*
+           * Icon mark on a phone, full lockup from 640px up. Three nav labels
+           * and the account control do not fit beside the wordmark at 390px —
+           * they used to overlap it, which made "Profile" unclickable on
+           * exactly the device where the nav matters most. The `aria-label`
+           * keeps the accessible name identical at every width.
+           */}
+          <NavLink
+            to="/"
+            data-testid="brand"
+            aria-label="Probability Poker — home"
+            className="flex shrink-0 items-center gap-1.5 font-display text-base font-semibold tracking-tight text-ivory transition hover:text-gold-soft sm:text-[0.95rem] sm:tracking-wide"
+          >
+            <span aria-hidden className="text-gold">
+              ♠
+            </span>
+            <span aria-hidden className="hidden sm:inline">
+              Probability&nbsp;Poker
+            </span>
+          </NavLink>
+
+          <nav aria-label="Main" className="min-w-0 flex-1">
+            <ul
+              className="flex min-w-0 items-center gap-1 overflow-x-auto sm:gap-2"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {NAV.map((item) => (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    data-testid={`nav-${item.label.toLowerCase()}`}
+                    className={({ isActive }) =>
+                      `inline-flex min-h-[34px] items-center whitespace-nowrap rounded-lg border px-2 py-1 font-display text-[0.78rem] tracking-wide transition sm:px-3 sm:text-sm ${
+                        isActive
+                          ? "border-gold/50 bg-gold/15 text-gold-soft"
+                          : "border-transparent text-ivory/60 hover:bg-white/[0.04] hover:text-ivory"
+                      }`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <AccountMenu className="shrink-0" />
+        </div>
+      </header>
+
+      <div id="main">
+        <Outlet />
+      </div>
+    </div>
+  );
+}

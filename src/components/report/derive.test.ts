@@ -14,9 +14,20 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { INITIAL_BELIEF } from "../../data/constants";
-import { GRID_SIZE, gridCellOf, comboIndex } from "../../poker/model/range";
+import { tierOf } from "../../poker/bayesian";
+import { decodeCard } from "../../poker/core/card";
+import { opponentRanges } from "../../poker/model/decider";
+import {
+  COMBO_COUNT,
+  GRID_CELLS,
+  comboCardA,
+  comboCardB,
+  comboIndex,
+  gridCellOf,
+} from "../../poker/model/range";
+import type { TableState } from "../../poker/table/state";
 import type {
+  ActionRecord,
   BotDecision,
   MultiwayEquity,
   PotRecord,
@@ -28,7 +39,9 @@ import {
   CELL_TOTAL,
   headsUpEquity,
   rangeView,
+  readsAfter,
   requiredEquity,
+  reviewStreets,
   streetEquities,
 } from "./derive";
 
@@ -95,6 +108,7 @@ interface ReportSpec {
   holes: Record<number, number[]>;
   board?: number[];
   decisions?: BotDecision[];
+  actions?: ActionRecord[];
   pots?: PotRecord[];
   seed?: number;
 }
@@ -119,10 +133,55 @@ function report(spec: ReportSpec): TableHandReport {
     seats,
     pots: spec.pots ?? [{ amount: 200, eligible: ids, winners: [ids[0]] }],
     decisions: spec.decisions ?? [],
-    actions: [],
+    actions: spec.actions ?? [],
     endStreet: (spec.board?.length ?? 0) >= 5 ? "river" : "preflop",
     wentToShowdown: true,
   };
+}
+
+/**
+ * The same hand as a live `TableState`, so `decider.opponentRanges` — the thing
+ * that actually feeds the sampler — can be run against the review's rebuild of
+ * it. Only the fields `opponentRanges` reads are meaningful; the rest is
+ * scaffolding the type demands.
+ */
+function tableState(spec: {
+  holes: Record<number, number[]>;
+  board: number[];
+  actions: ActionRecord[];
+  button?: number;
+}): TableState {
+  const ids = Object.keys(spec.holes).map(Number).sort((a, b) => a - b);
+  return {
+    seed: 1,
+    handNumber: 1,
+    seats: ids.map((id) => ({
+      id,
+      name: `seat ${id}`,
+      kind: "bot" as const,
+      stack: 1000,
+      hole: spec.holes[id].map(decodeCard),
+      status: "active" as const,
+      streetCommit: 0,
+      invested: 0,
+      hasActed: true,
+      mayRaise: true,
+    })),
+    button: spec.button ?? 0,
+    street: "river",
+    deck: [],
+    board: spec.board.map(decodeCard),
+    currentBet: 0,
+    lastRaiseSize: 0,
+    lastAggressor: null,
+    toAct: null,
+    pot: 0,
+    log: [],
+    status: "playing",
+    // `handActions` reads this off the state defensively; the engine's `Table`
+    // carries it and a bare `TableState` does not.
+    actions: spec.actions,
+  } as unknown as TableState;
 }
 
 /**
@@ -342,68 +401,136 @@ describe("requiredEquity", () => {
 // Ranges
 // ---------------------------------------------------------------------------
 
-const STRONG_READ: BeliefDistribution = { weak: 0.1, medium: 0.2, strong: 0.7 };
+/**
+ * K-7-2-9-4 — the board `equity/multiway.ts` names in its own header as the
+ * case the preflop classifier gets wrong. 7-2 has flopped two pair here and
+ * `bayesian.tierOf` still calls it the worst hand in poker.
+ */
+const K72_BOARD = [card(13, S), card(7, D), card(2, C), card(9, H), card(4, S)];
 
-/** Total grid mass sitting on cells of a given tier, read off `rangeView`. */
-function massOnTier(
-  view: ReturnType<typeof rangeView>,
-  tier: 0 | 1 | 2,
-  tierOfCell: (cell: number) => number
-): number {
-  let sum = 0;
-  for (let cell = 0; cell < GRID_SIZE * GRID_SIZE; cell++) {
-    if (view.cellCombos[cell] > 0 && tierOfCell(cell) === tier) sum += view.grid[cell];
-  }
-  return sum;
+/** A seat that called pre-flop and then bet every street. */
+const BETTOR_ACTIONS: ActionRecord[] = [
+  { seat: 1, street: "preflop", action: "call", cost: 20, potBefore: 30, toCall: 20 },
+  { seat: 0, street: "preflop", action: "check", cost: 0, potBefore: 50, toCall: 0 },
+  { seat: 1, street: "flop", action: "bet", cost: 40, potBefore: 50, toCall: 0 },
+  { seat: 0, street: "flop", action: "call", cost: 40, potBefore: 90, toCall: 40 },
+  { seat: 1, street: "turn", action: "bet", cost: 90, potBefore: 130, toCall: 0 },
+  { seat: 0, street: "turn", action: "call", cost: 90, potBefore: 220, toCall: 90 },
+  { seat: 1, street: "river", action: "bet", cost: 200, potBefore: 310, toCall: 0 },
+];
+
+/** The `ReviewStreet` for the end of the hand — the whole record folded in. */
+function finalStreet(hand: TableHandReport) {
+  const streets = reviewStreets(hand);
+  return streets[streets.length - 1];
 }
 
 /**
- * Which tier a cell is in, recovered from a view built on a read that is pinned
- * to one tier: only that tier's cells carry any weight. Avoids re-exporting
- * `CELL_TIER` purely for the test.
+ * The distribution the chart used to draw, reconstructed here rather than kept
+ * in the source: bucket every live combo by `bayesian.tierOf`, split each
+ * tier's belief mass evenly inside it. This is what `rangeView` did before it
+ * was rebuilt on `model/buckets.ts`, and it is the yardstick the assertions
+ * below measure the fix against.
  */
-function tierMap(dead: number[], board: number[]): (cell: number) => number {
-  const pinned = [0, 1, 2].map((t) =>
-    rangeView(
-      0,
-      {
-        weak: t === 0 ? 1 : 0,
-        medium: t === 1 ? 1 : 0,
-        strong: t === 2 ? 1 : 0,
-      },
-      dead,
-      board
-    )
-  );
-  return (cell) => pinned.findIndex((v) => v.grid[cell] > 0);
+function tierOfGrid(dead: number[], belief: BeliefDistribution): Float64Array {
+  const used = new Uint8Array(52);
+  for (const c of dead) used[c] = 1;
+  const tierIndex = (combo: number): number => {
+    const t = tierOf(decodeCard(comboCardA(combo)), decodeCard(comboCardB(combo)));
+    return t === "weak" ? 0 : t === "medium" ? 1 : 2;
+  };
+  const live: number[] = [];
+  const count = [0, 0, 0];
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    if (used[comboCardA(c)] || used[comboCardB(c)]) continue;
+    live.push(c);
+    count[tierIndex(c)]++;
+  }
+  const mass = [belief.weak, belief.medium, belief.strong];
+  const grid = new Float64Array(GRID_CELLS);
+  for (const c of live) {
+    const t = tierIndex(c);
+    grid[gridCellOf(c)] += count[t] > 0 ? mass[t] / count[t] : 0;
+  }
+  return grid;
 }
 
 describe("rangeView", () => {
-  const dead = [ACE_S, ACE_D];
-  const board: number[] = [];
+  it("draws the distribution the sampler draws, combo for combo", () => {
+    // The assertion the whole tab rests on. `opponentRanges` is what the engine
+    // hands the multiway estimator; if the chart is "the model" rather than an
+    // illustration of it, these two arrays are the same array.
+    const holes = { 0: ACES, 1: [card(7, S), card(2, H)] };
+    const hand = report({ holes, board: K72_BOARD, actions: BETTOR_ACTIONS });
+    const engine = opponentRanges(
+      tableState({ holes, board: K72_BOARD, actions: BETTOR_ACTIONS }),
+      0
+    )[1];
+    const view = rangeView(hand, finalStreet(hand), 1, ACES);
 
-  it("puts each tier's belief mass on that tier, not one weight per combo", () => {
-    // The mutation this kills: dropping the tier weighting and spreading the
-    // range uniformly. The weak tier holds several times the combos the strong
-    // one does, so a uniform range turns a 0.1 / 0.2 / 0.7 read into something
-    // close to its opposite.
-    const view = rangeView(1, STRONG_READ, dead, board);
-    const tierOfCell = tierMap(dead, board);
+    let worst = 0;
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      worst = Math.max(worst, Math.abs(view.range[c] - engine[c]));
+    }
+    expect(worst).toBeLessThan(1e-15);
+    // …and not vacuously: the range is a real distribution with structure in it.
+    expect(view.range.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 12);
+    expect(Math.max(...view.range)).toBeGreaterThan(2 / view.liveCombos);
+  });
 
-    expect(massOnTier(view, 2, tierOfCell)).toBeCloseTo(0.7, 9);
-    expect(massOnTier(view, 1, tierOfCell)).toBeCloseTo(0.2, 9);
-    expect(massOnTier(view, 0, tierOfCell)).toBeCloseTo(0.1, 9);
-    expect(view.tierWeight).toEqual([0.1, 0.2, 0.7]);
+  it("does not call 7-2 trash on a board where it is two pair", () => {
+    // The defect this rebuild exists to remove. `tierOf` scores hole cards with
+    // a preflop Chen formula on every street, so on K-7-2-9-4 it files 7-2
+    // under "weak" — the bin a seat that has bet three streets is least likely
+    // to be in — while the board says two pair.
+    const holes = { 0: ACES, 1: [card(7, S), card(2, H)] };
+    const hand = report({ holes, board: K72_BOARD, actions: BETTOR_ACTIONS });
+    const dead = [...ACES, ...K72_BOARD];
+    const view = rangeView(hand, finalStreet(hand), 1, ACES);
 
-    // …and the strong tier is the *small* one, so per-combo it is far denser.
-    const uniform = rangeView(1, INITIAL_BELIEF, dead, board);
-    expect(massOnTier(uniform, 2, tierOfCell)).toBeLessThan(
-      massOnTier(view, 2, tierOfCell)
-    );
+    const cell = gridCellOf(comboIndex(card(7, S), card(2, H))); // 72o
+    expect(tierOf(decodeCard(card(7, S)), decodeCard(card(2, H)))).toBe("weak");
+
+    const belief = readsAfter(hand.actions, hand.actions.length, hand.seatCount)[1];
+    const before = tierOfGrid(dead, belief)[cell];
+    const after = view.grid[cell];
+
+    // Materially more, not marginally: the old chart put this cell in the bin
+    // its own bets argue against.
+    expect(after).toBeGreaterThan(before * 3);
+    // And it is not just "some weight" — per combo it beats the flat share the
+    // deck would give it, which is what "this seat can credibly hold it" means.
+    expect(after / view.cellCombos[cell]).toBeGreaterThan(1 / view.liveCombos);
+  });
+
+  it("reads the same range through nine buckets and three tiers", () => {
+    const holes = { 0: ACES, 1: [card(7, S), card(2, H)] };
+    const hand = report({ holes, board: K72_BOARD, actions: BETTOR_ACTIONS });
+    const view = rangeView(hand, finalStreet(hand), 1, ACES);
+
+    const tiers = view.tierWeight[0] + view.tierWeight[1] + view.tierWeight[2];
+    expect(tiers).toBeCloseTo(1, 12);
+    let buckets = 0;
+    for (let b = 0; b < view.buckets.length; b++) buckets += view.buckets[b];
+    expect(buckets).toBeCloseTo(1, 12);
+
+    // The collapse is `tierFromBucket`: Overpair and up is strong, WeakPair
+    // through TopPair medium, everything below weak. Same numbers, two
+    // resolutions — so the meters can never contradict the bars beside them.
+    const strong = view.buckets[6] + view.buckets[7] + view.buckets[8];
+    const medium = view.buckets[3] + view.buckets[4] + view.buckets[5];
+    expect(view.tierWeight[2]).toBeCloseTo(strong, 12);
+    expect(view.tierWeight[1]).toBeCloseTo(medium, 12);
   });
 
   it("is a probability distribution over the live combos", () => {
-    const view = rangeView(1, STRONG_READ, dead, board);
+    const hand = report({
+      holes: { 0: ACES, 1: KINGS },
+      actions: [
+        { seat: 1, street: "preflop", action: "raise", cost: 60, potBefore: 30, toCall: 20 },
+      ],
+    });
+    const view = rangeView(hand, finalStreet(hand), 1, ACES);
     let total = 0;
     for (let i = 0; i < view.grid.length; i++) total += view.grid[i];
     expect(total).toBeCloseTo(1, 9);
@@ -414,30 +541,41 @@ describe("rangeView", () => {
   it("removes the dead cards from the combos it counts", () => {
     // Two aces gone: C(52,2) - C(50,2) = 1326 - 1225 = 101 combos die, and the
     // AA cell keeps exactly the one pair the other two aces still make.
-    const view = rangeView(1, INITIAL_BELIEF, dead, board);
+    const hand = report({ holes: { 0: ACES, 1: KINGS } });
+    const view = rangeView(hand, finalStreet(hand), 1, ACES);
     expect(view.liveCombos).toBe(1225);
     const aces = gridCellOf(comboIndex(card(14, H), card(14, C)));
     expect(view.cellCombos[aces]).toBe(1);
     expect(CELL_TOTAL[aces]).toBe(6);
-  });
 
-  it("redistributes a tier the board has left empty rather than losing it", () => {
-    // A read that is all weak, on a board where a tier can still be held: the
-    // weights must still sum to one whatever the read says.
-    const view = rangeView(1, { weak: 1, medium: 0, strong: 0 }, dead, board);
-    const sum = view.tierWeight[0] + view.tierWeight[1] + view.tierWeight[2];
-    expect(sum).toBeCloseTo(1, 9);
+    // A dead combo carries no weight, however the seat bet: `removeCards` runs
+    // before the likelihood factors and nothing downstream can scale a zero.
+    for (let c = 0; c < COMBO_COUNT; c++) {
+      if (comboCardA(c) === ACE_S || comboCardB(c) === ACE_S) {
+        expect(view.range[c]).toBe(0);
+      }
+    }
   });
 
   it("measures narrowness as the combos holding half the weight", () => {
-    const flat = rangeView(1, INITIAL_BELIEF, dead, board);
-    const pinned = rangeView(1, { weak: 0, medium: 0, strong: 1 }, dead, board);
-    // A read pinned on one tier needs a fraction of the deck to cover half its
-    // weight; a flat read has to walk much further down the density ranking.
-    expect(pinned.half.fraction).toBeLessThan(flat.half.fraction / 2);
-    expect(pinned.half.combos).toBeGreaterThan(0);
-    // Never more than the whole live range, and half the weight is by
-    // construction reachable before it.
+    const flat = rangeView(
+      report({ holes: { 0: ACES, 1: KINGS } }),
+      finalStreet(report({ holes: { 0: ACES, 1: KINGS } })),
+      1,
+      ACES
+    );
+    const bet = report({
+      holes: { 0: ACES, 1: KINGS },
+      board: K72_BOARD,
+      actions: BETTOR_ACTIONS,
+    });
+    const narrowed = rangeView(bet, finalStreet(bet), 1, ACES);
+
+    // No actions is no information: half a flat range's weight takes half the
+    // deck. Three streets of betting has to buy something.
+    expect(flat.half.fraction).toBeCloseTo(0.5, 2);
+    expect(narrowed.half.fraction).toBeLessThan(flat.half.fraction);
+    expect(narrowed.half.combos).toBeGreaterThan(0);
     expect(flat.half.fraction).toBeLessThanOrEqual(1);
   });
 });

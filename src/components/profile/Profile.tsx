@@ -11,14 +11,30 @@
  * decision), so it happens off the first paint and over a bounded window of
  * recent hands. The page renders its cheap half immediately and fills the rest
  * in, rather than blocking on a second of arithmetic.
+ *
+ * Presentation note: this page used to put every one of those numbers in its
+ * own rounded box inside another rounded box — six panels, each a grid of six
+ * bordered tiles. The boxes were doing no work, so they are gone. Sections are
+ * a heading, a hairline and content; metrics are grouped by whitespace. The
+ * only remaining surfaces are the ones where the container is genuinely the
+ * object: the style verdict, and the empty state.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { classifyStats } from "../../poker/coach/archetype";
 import { analyzeHands, type SessionEvLoss } from "../../poker/coach/evLoss";
 import { computeStats } from "../../poker/coach/stats";
-import { EmptyPanel, FeltBackground, Rail, Section } from "../report/ui";
+import { storageNotice, useSync } from "../account";
+import { PageBody, PageHeader } from "../shell";
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  Group,
+  Rail,
+  Tabs,
+} from "../ui";
 import { ArchetypeCard } from "./Archetype";
 import { LeakByStreet, LeakList, LeakTotals, LossCurve } from "./Leaks";
 import { SessionHeadline, TrackerByPosition, TrackerOverall } from "./Tracker";
@@ -36,6 +52,10 @@ const EV_WINDOW = 120;
 
 export default function Profile() {
   const navigate = useNavigate();
+  // Where the hands actually are. The line under the archive used to be a
+  // fixed promise ("Nothing leaves the device") that a single sync would have
+  // made false; `storageNotice` returns the sentence that is true right now.
+  const sync = useSync();
   const {
     hands,
     seat,
@@ -99,189 +119,190 @@ export default function Profile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
+  const empty = hands.length === 0;
+
   return (
     <main
-      className="relative min-h-[100svh] overflow-x-hidden text-ivory"
+      className="relative overflow-x-hidden text-ivory"
       data-testid="profile"
       data-hands={hands.length}
       data-seat={seat}
     >
-      <FeltBackground />
-
-      <div
-        className="relative z-10 mx-auto max-w-5xl px-3 pb-12 pt-4 sm:px-4 sm:pt-6"
-        style={{
-          paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
-          paddingRight: "max(0.75rem, env(safe-area-inset-right))",
-        }}
-      >
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Link
-              to="/table"
-              className="font-display text-xs tracking-wide text-ivory/70 transition hover:text-ivory sm:text-sm"
-            >
-              ← Back to table
-            </Link>
-            <h1 className="mt-1.5 font-display text-[clamp(1.5rem,6vw,2.1rem)] font-bold tracking-tight text-gold-soft">
-              Player Profile
-            </h1>
-            <p className="mt-1 max-w-xl text-[0.8rem] leading-relaxed text-ivory/55 sm:text-sm">
-              {hands.length === 0
-                ? "Nothing recorded yet. Every finished hand is archived here."
-                : `${hands.length} hand${hands.length === 1 ? "" : "s"} recorded${
-                    storedCount > 0 ? `, ${storedCount} restored from your archive` : ""
-                  }.`}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/replay"
-              className="min-h-[36px] rounded-lg border px-3 py-1.5 font-display text-xs transition hover:-translate-y-px sm:text-sm"
-              style={{ borderColor: "rgba(201,162,39,0.45)", background: "rgba(201,162,39,0.12)", color: "#e2c563" }}
-              data-testid="to-replay"
-            >
-              Replay a hand
-            </Link>
+      <PageBody>
+        <PageHeader
+          title="Your profile"
+          lede={
+            empty
+              ? "Everything here is computed from hands you have finished — tracker stats, a style read with the confidence it deserves, and what each mistake cost."
+              : `Computed from ${hands.length} finished hand${hands.length === 1 ? "" : "s"}${
+                  storedCount > 0
+                    ? `, ${storedCount} of them restored from this browser's archive`
+                    : ""
+                }.`
+          }
+          actions={
+            !empty && (
+              <ButtonLink to="/replay" size="sm" testId="to-replay">
+                Replay a hand
+              </ButtonLink>
+            )
+          }
+          meta={
             <Rail>
               ${smallBlind} / ${bigBlind}
             </Rail>
-          </div>
-        </header>
+          }
+        />
 
-        {/* ------------------------ Seat picker ------------------------ */}
-        {seatCount > 1 && hands.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[0.58rem] uppercase tracking-[0.2em] text-ivory/35">
-              Profiling
+        {/* ------------------------ Whose profile ------------------------ */}
+        {seatCount > 1 && !empty && (
+          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">
+              Reading
             </span>
-            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
-              {Array.from({ length: seatCount }, (_, id) => {
-                const active = id === seat;
-                return (
-                  <button
-                    key={id}
-                    data-testid={`profile-seat-${id}`}
-                    onClick={() => setSeat(id)}
-                    className="min-h-[32px] shrink-0 rounded-md border px-2.5 py-1 font-display text-[0.64rem] tracking-wide transition"
-                    style={{
-                      borderColor: active ? "rgba(201,162,39,0.6)" : "rgba(244,237,228,0.14)",
-                      background: active ? "rgba(201,162,39,0.18)" : "rgba(0,0,0,0.3)",
-                      color: active ? "#e2c563" : "rgba(244,237,228,0.55)",
-                    }}
-                  >
-                    {seatName(id)}
-                  </button>
-                );
-              })}
-            </div>
+            <Tabs
+              label="Seat to profile"
+              as="options"
+              layout="scroll"
+              size="sm"
+              testIdPrefix="profile-seat"
+              value={seat}
+              onChange={setSeat}
+              options={Array.from({ length: seatCount }, (_, id) => ({
+                value: id,
+                label: seatName(id),
+              }))}
+            />
           </div>
         )}
 
-        {hands.length === 0 ? (
-          <div className="mt-8">
-            <EmptyPanel title="No hands yet">
-              Play a few at the table and they will collect here — tracker stats,
-              a style read with the confidence it deserves, and what each mistake
-              cost. The archive survives a reload.
-              <div className="mt-4">
-                <Link
-                  to="/table"
-                  className="inline-block min-h-[44px] rounded-xl border border-pkred-light/70 bg-pkred/80 px-6 py-3 font-display font-semibold text-ivory transition hover:-translate-y-0.5 hover:bg-pkred-light"
-                >
+        {empty ? (
+          <div className="mt-10">
+            <EmptyState
+              title="Play a hand and this fills itself in"
+              action={
+                <ButtonLink to="/table" variant="primary" size="lg">
                   Go to the table
-                </Link>
-              </div>
-            </EmptyPanel>
+                </ButtonLink>
+              }
+            >
+              Every hand you finish is archived in this browser and priced here:
+              how often you enter a pot, how you play each position, what your
+              style looks like from the outside, and which decisions cost the
+              most. A dozen hands is enough for the first read.
+            </EmptyState>
           </div>
         ) : (
-          <div className="mt-5 grid gap-3 sm:gap-4 lg:grid-cols-2">
-            <Section title="Totals" subtitle="Across every recorded hand" wide>
+          <div className="mt-10 space-y-12">
+            {/*
+             * No lede here, and none on "How you play" either. Six sections
+             * each opening heading-then-explanatory-sentence is the templated
+             * rhythm the failure catalog calls out; a lede earns its place only
+             * where the heading genuinely cannot say the thing — the pricing
+             * window, the ranking basis, what a sample can support.
+             */}
+            <Group title="This session">
               <SessionHeadline stats={stats} />
-            </Section>
+            </Group>
 
-            <Section title="Style read" subtitle="And how much to trust it">
-              <ArchetypeCard verdict={verdict} />
-            </Section>
+            <div className="grid gap-12 lg:grid-cols-2">
+              <Group title="How you play">
+                <TrackerOverall stats={stats} />
+              </Group>
 
-            <Section title="Tracker" subtitle="Overall">
-              <TrackerOverall stats={stats} />
-            </Section>
+              <Group
+                title="Your style, from the outside"
+                lede="And how much of it the sample can actually support."
+              >
+                <ArchetypeCard verdict={verdict} />
+              </Group>
+            </div>
 
-            <Section title="By position" subtitle="The same six stats, sliced" wide>
+            <Group title="The same six, by position">
               <TrackerByPosition stats={stats} />
-            </Section>
+            </Group>
 
-            <Section
-              title="Cost of mistakes"
-              subtitle={
+            <Group
+              title="What your mistakes cost"
+              lede={
                 hands.length > EV_WINDOW
-                  ? `Priced over the most recent ${EV_WINDOW} hands`
-                  : `Priced over all ${priced.length} hands`
+                  ? `Priced over your most recent ${EV_WINDOW} hands — each decision costs two simulations, so the window is bounded.`
+                  : `Priced over all ${priced.length} recorded hand${priced.length === 1 ? "" : "s"}.`
               }
-              wide
             >
               {pricing && !session ? (
-                <p className="py-6 text-center text-sm text-ivory/50" data-testid="pricing">
+                <p className="py-6 text-sm text-ivory/50" data-testid="pricing">
                   Pricing {priced.length} hand{priced.length === 1 ? "" : "s"}…
                 </p>
               ) : !session ? (
-                <EmptyPanel title="Nothing to price yet">
-                  This seat has not made a decision the model can put a number on.
-                </EmptyPanel>
+                <EmptyState
+                  title="Nothing to price yet"
+                  action={
+                    <ButtonLink to="/table" variant="primary">
+                      Play a hand out
+                    </ButtonLink>
+                  }
+                >
+                  This seat has not yet made a decision the model can put a
+                  number on — that needs a hand you took past the blinds.
+                </EmptyState>
               ) : (
-                <div className="space-y-5">
+                <div className="space-y-8">
                   <LeakTotals session={session} />
                   <div>
-                    <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.22em] text-ivory/40">
-                      Cumulative chips lost to mistakes
-                    </p>
-                    <LossCurve session={session} />
+                    <h3 className="font-display text-sm font-semibold tracking-wide text-ivory/75">
+                      Chips given away, accumulating
+                    </h3>
+                    <div className="mt-3">
+                      <LossCurve session={session} />
+                    </div>
                   </div>
                   <div>
-                    <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.22em] text-ivory/40">
-                      By street
-                    </p>
-                    <LeakByStreet session={session} />
+                    <h3 className="font-display text-sm font-semibold tracking-wide text-ivory/75">
+                      Where it went, by street
+                    </h3>
+                    <div className="mt-3">
+                      <LeakByStreet session={session} />
+                    </div>
                   </div>
                 </div>
               )}
-            </Section>
+            </Group>
 
-            <Section
-              title="Biggest leaks"
-              subtitle={`Ranked by model EV lost · ${session?.decisionCount ?? 0} decisions priced`}
-              wide
+            <Group
+              title="Your biggest leaks"
+              lede={`Ranked by the model's EV, over ${session?.decisionCount ?? 0} priced decision${
+                session?.decisionCount === 1 ? "" : "s"
+              }. Open any of them and play the hand again differently.`}
             >
               {session ? (
                 <LeakList session={session} onReplay={openReplay} />
               ) : (
-                <p className="py-6 text-center text-sm text-ivory/50">
+                <p className="py-6 text-sm text-ivory/50">
                   {pricing ? "Pricing…" : "Nothing priced yet."}
                 </p>
               )}
-            </Section>
+            </Group>
           </div>
         )}
 
         {/* -------------------------- Archive -------------------------- */}
-        {hands.length > 0 && (
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[0.68rem] text-ivory/40">
-              Stored locally in this browser. Nothing leaves the device.
+        {!empty && (
+          <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-ivory/10 pt-5">
+            <p className="text-[0.72rem] text-ivory/40" data-testid="storage-notice">
+              {storageNotice(sync)}
             </p>
-            <button
+            <Button
+              size="sm"
+              variant="quiet"
               onClick={reset}
               data-testid="profile-reset"
-              className="min-h-[36px] rounded-lg border px-3 py-1.5 font-display text-[0.68rem] tracking-wide text-ivory/60 transition hover:text-ivory"
-              style={{ borderColor: "rgba(244,237,228,0.16)", background: "rgba(0,0,0,0.3)" }}
             >
-              Clear archive
-            </button>
+              Clear the archive
+            </Button>
           </div>
         )}
-      </div>
+      </PageBody>
     </main>
   );
 }

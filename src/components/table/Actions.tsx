@@ -16,14 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { money } from "../../lib/format";
 import type { SizingOption, TableAction } from "../../poker/table/rules";
-
-const ACTION_STYLES: Record<string, string> = {
-  fold: "border border-ivory/25 bg-black/40 text-ivory/80 hover:border-ivory/50 hover:text-ivory",
-  check: "border border-gold/50 bg-gold/15 text-gold-soft hover:bg-gold/25",
-  call: "border border-gold/60 bg-gold/20 text-gold-soft hover:bg-gold/30",
-  bet: "border border-pkred-light/70 bg-pkred/80 text-ivory hover:bg-pkred-light",
-  raise: "border border-pkred-light/70 bg-pkred/80 text-ivory hover:bg-pkred-light",
-};
+import { ActionButton, LINE, RADIUS, Tabs } from "../ui";
 
 /** Re-label a bet or raise at a chosen size. Mirrors the engine's own wording. */
 export function sized(base: TableAction, cost: number): TableAction {
@@ -117,28 +110,26 @@ export function ActionBar({
 
       <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
         {simple.map((action) => (
-          <button
+          <ActionButton
             key={action.type}
+            action={action.type}
             data-testid={`action-${action.type}`}
             onClick={() => onAct(action)}
-            className={`min-h-[46px] flex-1 rounded-xl px-4 py-3 font-display text-sm font-semibold tracking-wide shadow-lg transition-all duration-200 ease-out hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 sm:flex-none sm:min-w-[8rem] sm:px-6 ${
-              ACTION_STYLES[action.type] ?? "bg-black/30"
-            }`}
+            className="flex-1 sm:min-w-[8rem] sm:flex-none"
           >
             {action.label}
-          </button>
+          </ActionButton>
         ))}
 
         {commit && (
-          <button
+          <ActionButton
+            action={commit.type}
             data-testid={`action-${commit.type}`}
             onClick={() => (narrow ? setSheet(true) : onAct(commit))}
-            className={`min-h-[46px] flex-1 rounded-xl px-4 py-3 font-display text-sm font-semibold tracking-wide shadow-lg transition-all duration-200 ease-out hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 sm:flex-none sm:min-w-[9rem] sm:px-6 ${
-              ACTION_STYLES[commit.type]
-            }`}
+            className="flex-1 sm:min-w-[9rem] sm:flex-none"
           >
             {narrow ? (commit.type === "bet" ? "Bet…" : "Raise…") : commit.label}
-          </button>
+          </ActionButton>
         )}
       </div>
 
@@ -153,16 +144,17 @@ export function ActionBar({
             stack={stack}
             onChange={setCost}
           />
-          <button
+          <ActionButton
+            action={raise.type}
             data-testid="sheet-confirm"
             onClick={() => {
               setSheet(false);
               onAct(sized(raise, cost));
             }}
-            className={`mt-4 min-h-[50px] w-full rounded-xl px-5 py-3 font-display text-base font-semibold tracking-wide shadow-lg ${ACTION_STYLES[raise.type]}`}
+            className="mt-4 w-full"
           >
             {sized(raise, cost).label}
-          </button>
+          </ActionButton>
         </Sheet>
       )}
     </div>
@@ -205,14 +197,11 @@ function SizingPanel({
 
   return (
     <div
-      className="rounded-2xl border p-3"
-      style={{
-        borderColor: "rgba(201,162,39,0.3)",
-        background: "rgba(0,0,0,0.42)",
-      }}
+      className={`border p-3 ${RADIUS.surface}`}
+      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.42)" }}
     >
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="font-display text-[0.62rem] uppercase tracking-[0.3em] text-ivory/50">
+        <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">
           {raise.type === "bet" ? "Bet size" : "Raise to"}
         </span>
         <span className="flex items-baseline gap-2">
@@ -243,27 +232,23 @@ function SizingPanel({
         }}
       />
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {sizings.map((option) => {
-          const active = option.cost === preview.cost;
-          return (
-            <button
-              key={option.label}
-              data-testid={`sizing-${option.label}`}
-              onClick={() => onChange(option.cost)}
-              className="min-h-[34px] flex-1 rounded-lg border px-2 py-1.5 font-display text-[0.7rem] tracking-wide transition"
-              style={{
-                borderColor: active
-                  ? "rgba(201,162,39,0.85)"
-                  : "rgba(244,237,228,0.18)",
-                background: active ? "rgba(201,162,39,0.22)" : "rgba(0,0,0,0.35)",
-                color: active ? "#e2c563" : "rgba(244,237,228,0.7)",
-              }}
-            >
-              {option.label}
-            </button>
-          );
-        })}
+      <div className="mt-2">
+        <Tabs
+          label="Preset sizes"
+          as="options"
+          layout="wrap"
+          size="sm"
+          testIdPrefix="sizing"
+          value={preview.cost}
+          onChange={onChange}
+          options={sizings.map((option) => ({
+            value: option.cost,
+            label: option.label,
+            // A rung's identity is its label ("½ pot"); its cost moves with the
+            // pot, so the hook is pinned to the label it has always used.
+            testId: `sizing-${option.label}`,
+          }))}
+        />
       </div>
     </div>
   );

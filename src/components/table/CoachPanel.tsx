@@ -20,6 +20,7 @@ import type { TableAction } from "../../poker/table/rules";
 import type { HeroRead } from "../../store/TableContext";
 import type { TableMode } from "../../lib/tableOptions";
 import type { TableSeat } from "../../poker/table/state";
+import { LINE, RADIUS, Stat, TONE } from "../ui";
 
 export interface CoachPanelProps {
   mode: TableMode;
@@ -65,7 +66,7 @@ export function CoachPanel({
       {read.toCall > 0 && (
         <span
           className="font-mono text-[0.68rem]"
-          style={{ color: ahead ? "#34d399" : "#f87171" }}
+          style={{ color: ahead ? TONE.good : TONE.bad }}
         >
           need {pct(read.required, 1)}
         </span>
@@ -108,22 +109,30 @@ export function CoachPanel({
           </button>
         )}
 
-        <div className="flex flex-wrap items-stretch gap-1.5" data-testid="coach-stats">
+        {/* One surface, five numbers. Each of these used to sit in its own
+            bordered box inside this already-bordered strip. */}
+        <div
+          className="grid grid-cols-2 gap-x-5 gap-y-2 sm:flex sm:flex-wrap sm:items-start sm:gap-x-7"
+          data-testid="coach-stats"
+        >
           <Stat
             label="Your equity"
             value={pct(share, 1)}
+            tone="gold"
             note={`±${pct(read.equity.se * 1.96, 1)}`}
           />
           <Stat
             label="Pot"
             value={money(read.pot)}
-            note={read.toCall > 0 ? `${money(read.toCall)} to call` : "no bet"}
+            tone="gold"
+            note={read.toCall > 0 ? `${money(read.toCall)} to call` : "no bet to you"}
           />
           {read.toCall > 0 ? (
             <>
               <Stat
                 label="Pot odds"
                 value={read.odds ? `${read.odds.toFixed(1)} : 1` : "—"}
+                tone="gold"
                 note="pot : call"
               />
               <Stat
@@ -137,6 +146,7 @@ export function CoachPanel({
             <Stat
               label="Chop risk"
               value={pct(read.equity.pTie, 1)}
+              tone="gold"
               note="ties split the pot"
             />
           )}
@@ -167,7 +177,7 @@ function StudyDetail({
   return (
     <div
       className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t pt-1.5"
-      style={{ borderColor: "rgba(201,162,39,0.18)" }}
+      style={{ borderColor: LINE.goldFaint }}
     >
       <Label>vs each</Label>
       {read.opponents.map((id) => (
@@ -209,11 +219,11 @@ function Chip({
 }) {
   return (
     <span
-      className="rounded-md border px-1.5 py-0.5 font-mono text-[0.62rem]"
+      className={`border px-1.5 py-0.5 font-mono text-[0.62rem] ${RADIUS.marker}`}
       style={{
-        borderColor: "rgba(244,237,228,0.14)",
+        borderColor: LINE.quiet,
         background: "rgba(0,0,0,0.35)",
-        color: tone === "good" ? "#34d399" : tone === "bad" ? "#f87171" : "#f4ede4",
+        color: tone ? TONE[tone] : TONE.neutral,
       }}
     >
       <span className="text-ivory/50">{label}</span> {value}
@@ -221,52 +231,12 @@ function Chip({
   );
 }
 
-function Stat({
-  label,
-  value,
-  note,
-  tone,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  tone?: "good" | "bad";
-}) {
-  return (
-    <div
-      className="min-w-[5.5rem] flex-1 rounded-xl border px-2.5 py-1"
-      style={{
-        borderColor: "rgba(244,237,228,0.12)",
-        background: "rgba(0,0,0,0.35)",
-      }}
-    >
-      <div className="font-mono text-[0.55rem] uppercase tracking-[0.18em] text-ivory/45">
-        {label}
-      </div>
-      <div
-        className="font-display text-base font-semibold"
-        style={{
-          color: tone === "good" ? "#34d399" : tone === "bad" ? "#f87171" : "#e2c563",
-        }}
-      >
-        {value}
-      </div>
-      {note && (
-        <div className="font-mono text-[0.55rem] text-ivory/40">{note}</div>
-      )}
-    </div>
-  );
-}
-
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-testid="coach-panel"
-      className="mx-auto flex w-full max-w-3xl items-center rounded-2xl border px-3 py-1.5"
-      style={{
-        borderColor: "rgba(201,162,39,0.25)",
-        background: "rgba(0,0,0,0.4)",
-      }}
+      className={`mx-auto flex w-full max-w-3xl items-center border px-3.5 py-2 ${RADIUS.surface}`}
+      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
     >
       {children}
     </div>

@@ -30,7 +30,7 @@ import { BOT_ARCHETYPES, BOT_PROFILES } from "../../poker/model/profiles";
 import type { SimulationOptions } from "../../poker/replay";
 import type { TableHandReport } from "../../poker/table/contract";
 import { positionOf } from "../../poker/table/position";
-import { CardRow, EmptyPanel } from "../report/ui";
+import { CardRow, EmptyState, RADIUS } from "../ui";
 import { Scrubber } from "./Scrubber";
 
 const SIM = "#b07fd4";
@@ -51,14 +51,14 @@ export function SimulatedBanner({
 }) {
   return (
     <div
-      className="rounded-xl border-2 border-dashed px-3 py-2.5"
+      className={`border-2 border-dashed px-3 py-2.5 ${RADIUS.surface}`}
       style={{ borderColor: SIM_BORDER, background: SIM_BG }}
       data-testid="simulated-banner"
       data-rederived={rederived}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
-          className="rounded-md px-2 py-0.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.18em]"
+          className={`px-2 py-0.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.18em] ${RADIUS.marker}`}
           style={{ background: SIM, color: "#150a1d" }}
         >
           Simulated
@@ -127,9 +127,9 @@ export function CounterfactualPanel({
 
   if (indexes.length === 0) {
     return (
-      <EmptyPanel title="No decisions to change">
+      <EmptyState title="No decisions to change">
         {seatName(seat)} never acted in this hand — there is nothing to replace.
-      </EmptyPanel>
+      </EmptyState>
     );
   }
 
@@ -160,7 +160,7 @@ export function CounterfactualPanel({
                   setResult(null);
                   setError(null);
                 }}
-                className="min-h-[34px] shrink-0 rounded-lg border px-2.5 py-1 font-display text-[0.64rem] tracking-wide transition"
+                className={`min-h-[34px] shrink-0 border px-2.5 py-1 font-display text-[0.64rem] tracking-wide transition ${RADIUS.control}`}
                 style={{
                   borderColor: active ? "rgba(201,162,39,0.6)" : "rgba(244,237,228,0.14)",
                   background: active ? "rgba(201,162,39,0.18)" : "rgba(0,0,0,0.3)",
@@ -188,7 +188,7 @@ export function CounterfactualPanel({
               disabled={alternative.actual}
               onClick={() => run(alternative)}
               title={alternative.actual ? "This is what actually happened" : undefined}
-              className="min-h-[38px] rounded-lg border px-3 py-1.5 font-display text-[0.68rem] tracking-wide transition enabled:hover:-translate-y-px disabled:opacity-45"
+              className={`min-h-[38px] border px-3 py-1.5 font-display text-[0.68rem] tracking-wide transition enabled:hover:-translate-y-px disabled:opacity-45 ${RADIUS.control}`}
               style={{
                 borderColor: alternative.actual ? "rgba(244,237,228,0.16)" : SIM_BORDER,
                 background: alternative.actual ? "rgba(0,0,0,0.3)" : SIM_BG,
@@ -232,7 +232,7 @@ export function CounterfactualPanel({
           </div>
 
           <div
-            className="rounded-xl border-2 border-dashed p-3"
+            className={`border-2 border-dashed p-3 ${RADIUS.surface}`}
             style={{ borderColor: SIM_BORDER, background: "rgba(0,0,0,0.2)" }}
           >
             <Scrubber
@@ -262,7 +262,7 @@ function Outcome({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-xl border p-2.5 ${simulated ? "border-dashed" : ""}`}
+      className={`min-w-0 border p-2.5 ${RADIUS.control} ${simulated ? "border-dashed" : ""}`}
       style={{
         borderColor: simulated ? SIM_BORDER : "rgba(244,237,228,0.14)",
         background: simulated ? SIM_BG : "rgba(0,0,0,0.25)",
@@ -335,7 +335,7 @@ export function LineupPanel({
         {profiles.map((profile, id) => (
           <label
             key={id}
-            className="flex min-w-0 items-center gap-2 rounded-xl border p-2.5"
+            className={`flex min-w-0 items-center gap-2 border p-2.5 ${RADIUS.control}`}
             style={{ borderColor: "rgba(244,237,228,0.12)", background: "rgba(0,0,0,0.28)" }}
           >
             <span className="min-w-0 flex-1 truncate font-display text-xs text-ivory">
@@ -348,7 +348,7 @@ export function LineupPanel({
               value={profile}
               data-testid={`lineup-seat-${id}`}
               onChange={(e) => setSeatProfile(id, e.target.value)}
-              className="min-h-[34px] shrink-0 rounded-lg border px-2 py-1 font-display text-[0.68rem] text-ivory outline-none"
+              className={`min-h-[34px] shrink-0 border px-2 py-1 font-display text-[0.68rem] text-ivory outline-none ${RADIUS.control}`}
               style={{ borderColor: "rgba(201,162,39,0.35)", background: "rgba(0,0,0,0.5)" }}
             >
               {BOT_ARCHETYPES.map((id) => (
@@ -364,7 +364,7 @@ export function LineupPanel({
       <button
         onClick={run}
         data-testid="lineup-run"
-        className="mt-3 min-h-[42px] w-full rounded-xl border-2 border-dashed px-4 py-2 font-display text-sm font-semibold tracking-wide transition hover:-translate-y-px sm:w-auto"
+        className={`mt-3 min-h-[42px] w-full border-2 border-dashed px-4 py-2 font-display text-sm font-semibold tracking-wide transition hover:-translate-y-px sm:w-auto ${RADIUS.action}`}
         style={{ borderColor: SIM_BORDER, background: SIM_BG, color: SIM }}
       >
         Deal it again to this table
@@ -398,7 +398,7 @@ export function LineupPanel({
               <div
                 key={row.seat}
                 data-testid={`lineup-outcome-${row.seat}`}
-                className="min-w-0 rounded-xl border p-2.5"
+                className={`min-w-0 border p-2.5 ${RADIUS.control}`}
                 style={{
                   borderColor:
                     row.seat === seat ? "rgba(201,162,39,0.45)" : "rgba(244,237,228,0.12)",
@@ -428,12 +428,12 @@ export function LineupPanel({
             ))}
           </div>
 
-          <div className="rounded-xl border p-3" style={{ borderColor: "rgba(244,237,228,0.1)", background: "rgba(0,0,0,0.2)" }}>
+          <div className={`border p-3 ${RADIUS.control}`} style={{ borderColor: "rgba(244,237,228,0.1)", background: "rgba(0,0,0,0.2)" }}>
             <CardRow label="Board in this run" cards={result.report.board} size="sm" empty="Folded out" />
           </div>
 
           <div
-            className="rounded-xl border-2 border-dashed p-3"
+            className={`border-2 border-dashed p-3 ${RADIUS.surface}`}
             style={{ borderColor: SIM_BORDER, background: "rgba(0,0,0,0.2)" }}
           >
             <Scrubber

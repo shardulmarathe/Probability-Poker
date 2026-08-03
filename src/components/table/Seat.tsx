@@ -20,6 +20,7 @@ import {
   BeliefBar,
   SpeechBubble,
   ThoughtBubble,
+  bubbleAlign,
   type SeatPoint,
 } from "./chrome";
 
@@ -60,6 +61,9 @@ export function SeatView(props: SeatViewProps) {
 
   // The bottom seat speaks upward; the top arc speaks down, toward the pot.
   const side = atBottom ? "top" : "bottom";
+  // …and a seat at either end of the arc opens its bubble inward, so a phone
+  // never slices one off at the viewport edge.
+  const align = bubbleAlign(point.x);
 
   return (
     <div
@@ -72,9 +76,11 @@ export function SeatView(props: SeatViewProps) {
       data-seat-reveal={props.reveal ? "1" : "0"}
     >
       {props.fx.thinking ? (
-        <ThoughtBubble step={props.fx.thinking} side={side} />
+        <ThoughtBubble step={props.fx.thinking} side={side} align={align} />
       ) : (
-        props.fx.bubble && <SpeechBubble text={props.fx.bubble} side={side} />
+        props.fx.bubble && (
+          <SpeechBubble text={props.fx.bubble} side={side} align={align} />
+        )
       )}
 
       {hero ? <HeroSeat {...props} /> : compact ? <CompactSeat {...props} /> : <FullSeat {...props} />}

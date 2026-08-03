@@ -13,18 +13,23 @@
  * `headsUpEquity`) — post-hand every card is face up, so the honest answer is
  * available and no estimate needs to stand in for it. And:
  *
- * `rangeView` reconstructs what the sampler drew from. The table's read on a
- * seat is a three-tier belief (weak / medium / strong), and the multiway
- * sampler turns that into hole cards by bucketing every available two-card
- * combo with `tierOf` and drawing uniformly inside the chosen tier. That is
- * reproduced here exactly, so the 13x13 chart the review draws is the same
- * distribution the equity estimate was sampled from — not a prettier stand-in
- * for it. See `../../poker/equity/multiway.ts`, `runMultiwayCountsFromCodes`.
+ * `rangeView` reconstructs what the sampler drew from: a weight for each of the
+ * 1326 hole-card combinations, built exactly the way `model/decider.ts`'s
+ * `opponentRanges` builds the ranges it hands the estimator. A flat prior with
+ * the dead cards removed, multiplied by P(action | bucket, street, position,
+ * facing) for every action the seat took, renormalised after each factor.
+ *
+ * It deliberately does NOT project the three-tier belief onto the chart through
+ * `bayesian.tierOf`. That is a *preflop* Chen score, and the sampler was
+ * migrated off it precisely because on K-7-2-9-4 it calls 7-2 weak when it is
+ * two pair (see `../../poker/equity/multiway.ts`, "WHAT A SEAT'S HAND IS DRAWN
+ * FROM"). Drawing the superseded distribution beside the claim that it is the
+ * live one is the one failure this file cannot afford, so the chart is built
+ * from the same `model/buckets.ts` classification the engine used.
  */
 
-import { INITIAL_BELIEF } from "../../data/constants";
-import { normalize, tierOf, updateBelief } from "../../poker/bayesian";
-import { decodeCard } from "../../poker/core/card";
+import { ACTION_LIKELIHOODS, INITIAL_BELIEF } from "../../data/constants";
+import { updateBelief } from "../../poker/bayesian";
 import { hashSeed, makeRng } from "../../poker/core/rng";
 import { scoreInts } from "../../poker/handEvaluator";
 import {
@@ -32,16 +37,29 @@ import {
   BUCKET_NAMES,
   classifyAll,
   makeBoardContext,
+  tierFromBucket,
   type HandBucket,
 } from "../../poker/model/buckets";
+import {
+  createLikelihoodModel,
+  likelihoodRow,
+  type Facing,
+  type LearnStreet,
+  type LikelihoodModel,
+} from "../../poker/model/likelihood";
 import {
   COMBO_COUNT,
   GRID_CELLS,
   GRID_SIZE,
   comboIndex,
   gridCellOf,
+  normalizeRange,
+  removeCards,
   toGrid,
+  uniformRange,
+  type Range,
 } from "../../poker/model/range";
+import { positionOf, type PositionName } from "../../poker/table/position";
 import type {
   ActionRecord,
   BotDecision,
@@ -49,7 +67,7 @@ import type {
   SeatResult,
   TableHandReport,
 } from "../../poker/table/contract";
-import type { BeliefDistribution, Street, StrengthTier } from "../../types";
+import type { BeliefDistribution, Street } from "../../types";
 
 // ---------------------------------------------------------------------------
 // Streets
@@ -123,6 +141,17 @@ export function reviewStreets(report: TableHandReport): ReviewStreet[] {
 // ---------------------------------------------------------------------------
 
 /**
+ * The three-tier row every belief update on this table multiplies by.
+ *
+ * Declared once, applied below and quoted by `appliedLikelihood` — the Math tab
+ * must never reach for the constant on its own, or the worked example becomes a
+ * second opinion about what the engine did rather than a readout of it.
+ * `decider.readsFromActions` calls `updateBelief` with no override, so this is
+ * the row the live table applies too.
+ */
+const TIER_LIKELIHOODS = ACTION_LIKELIHOODS;
+
+/**
  * The table's read on every seat after the first `count` actions.
  *
  * Deliberately a local re-derivation of `decider.readsFromActions` rather than
@@ -139,7 +168,11 @@ export function readsAfter(
   for (let id = 0; id < seatCount; id++) reads[id] = INITIAL_BELIEF;
   for (let i = 0; i < Math.min(count, actions.length); i++) {
     const record = actions[i];
-    reads[record.seat] = updateBelief(reads[record.seat] ?? INITIAL_BELIEF, record.action);
+    reads[record.seat] = updateBelief(
+      reads[record.seat] ?? INITIAL_BELIEF,
+      record.action,
+      TIER_LIKELIHOODS
+    );
   }
   return reads;
 }
@@ -159,8 +192,6 @@ export function aliveAfter(report: TableHandReport, count: number): number[] {
 // Chart geometry, computed once
 // ---------------------------------------------------------------------------
 
-const TIER_INDEX: Record<StrengthTier, number> = { weak: 0, medium: 1, strong: 2 };
-
 export const TIER_NAMES = ["weak", "medium", "strong"] as const;
 
 /**
@@ -177,43 +208,88 @@ export const CELL_TOTAL: Uint16Array = (() => {
   return out;
 })();
 
-/**
- * The strength tier each chart cell falls in.
- *
- * `tierOf` reads only ranks and suitedness, so it is constant across a cell —
- * which is exactly why the belief can be projected onto the chart at all. One
- * representative combo per cell settles all 169.
- */
-const CELL_TIER: Uint8Array = (() => {
-  const out = new Uint8Array(GRID_CELLS);
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const hi = 14 - Math.min(row, col);
-      const lo = 14 - Math.max(row, col);
-      const suited = row < col;
-      const a = (hi - 2) * 4;
-      const b = (lo - 2) * 4 + (suited ? 0 : 1);
-      out[row * GRID_SIZE + col] =
-        TIER_INDEX[tierOf(decodeCard(a), decodeCard(b))];
-    }
-  }
-  return out;
-})();
-
 // ---------------------------------------------------------------------------
 // Ranges
 // ---------------------------------------------------------------------------
 
+/** How much of the board a decision on each street could see. */
+const BOARD_CARDS_AT: Record<LearnStreet, number> = {
+  preflop: 0,
+  flop: 3,
+  turn: 4,
+  river: 5,
+};
+
+const learnStreet = (street: Street): LearnStreet =>
+  street === "showdown" ? "river" : street;
+
+/** Where in the likelihood model an action was taken. */
+interface NodeContext {
+  street: LearnStreet;
+  facing: Facing;
+}
+
+/**
+ * The node every action in the hand was taken at.
+ *
+ * `facing` is not stored on an action, so it is reconstructed from the
+ * aggression that preceded it on that street: preflop the big blind is already
+ * an open, which is why the count starts at one there and at zero on every
+ * later street. One walk, one rule — the range reweighting and the Math tab's
+ * quoted likelihoods must agree about which node they are talking about.
+ */
+function nodeContexts(actions: ActionRecord[]): NodeContext[] {
+  const out: NodeContext[] = [];
+  let street: LearnStreet = "preflop";
+  let aggressors = 1;
+  for (const record of actions) {
+    const recordStreet = learnStreet(record.street);
+    if (recordStreet !== street) {
+      street = recordStreet;
+      aggressors = recordStreet === "preflop" ? 1 : 0;
+    }
+    out.push({
+      street,
+      facing:
+        record.toCall <= 0
+          ? "unopened"
+          : aggressors >= 2
+            ? "facing-raise"
+            : "facing-bet",
+    });
+    if (record.action === "bet" || record.action === "raise") aggressors++;
+  }
+  return out;
+}
+
+/**
+ * The model `opponentRanges` runs backwards, rebuilt rather than imported.
+ *
+ * `decider.ts` keeps its `OPPONENT_MODEL` private, but it is a fresh
+ * `createLikelihoodModel("poker")` that is never written to — so this is the
+ * same object, not an approximation of it. `derive.test.ts` pins the two
+ * together by asserting this module's range equals `opponentRanges`' output.
+ */
+const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
+
 export interface RangeView {
   seat: number;
-  belief: BeliefDistribution;
+  /**
+   * The weight on each of the 1326 hole-card combinations — what the sampler
+   * draws from, per combo rather than per tier. Sums to 1.
+   */
+  range: Range;
   /** Per-cell probability the seat holds a hand in that class. Sums to 1. */
   grid: Float64Array;
   /** Combos left in each cell once the dead cards are removed. */
   cellCombos: Uint16Array;
   /** Live combos in total, out of 1326. */
   liveCombos: number;
-  /** Belief mass on each tier after removal, renormalised. */
+  /**
+   * The range's weight collapsed onto the three legacy tiers by
+   * `tierFromBucket` — board-relative, so on K-7-2 the 7-2 combos count as
+   * strong. Not a preflop judgement, and not the three-tier belief.
+   */
   tierWeight: [number, number, number];
   /** Weight on each board-relative bucket, from `classifyAll`. */
   buckets: Float64Array;
@@ -221,70 +297,182 @@ export interface RangeView {
   maxCell: number;
   /**
    * Smallest set of combos holding half the range's weight. The honest measure
-   * of "how narrow is this read": a flat read needs half the deck, a read
-   * pinned on one tier needs a fraction of it.
+   * of "how narrow is this read": a flat range needs half the deck, a range
+   * three streets of betting have sharpened needs a fraction of it.
    */
   half: { combos: number; fraction: number };
 }
 
 /**
- * The distribution the sampler would draw this seat's hole cards from.
+ * `decider.opponentRanges` for one seat, at an arbitrary prefix of the hand.
  *
- * `dead` is every card the range cannot contain — the reviewing seat's own
- * hole cards plus the board. Blockers are not a special case here any more than
- * they are in `range.removeCards`: a card that is visible is simply absent from
- * the pool the combos are built out of.
+ * A local re-derivation for the same reason `readsAfter` is one: the review
+ * needs the range as it stood *entering* a street, and `opponentRanges` only
+ * knows how to fold in a whole hand from a live `TableState`. Every step is the
+ * same step, in the same order, off the same model — the flat prior with the
+ * dead cards removed, one `P(action | bucket, street, position, facing)` factor
+ * per action the seat took, renormalised after each.
+ *
+ * Buckets are measured against the board *as it stood on the action's own
+ * street*: a flop bet must not be scored against a river the actor could not
+ * see, which would be reading its mind rather than its bets.
+ */
+function opponentRangeAt(
+  report: TableHandReport,
+  seat: number,
+  actionsUpTo: number,
+  board: number[],
+  dead: number[]
+): Range {
+  const range = normalizeRange(removeCards(uniformRange(), dead));
+
+  const cache = new Map<LearnStreet, Uint8Array>();
+  const bucketsAt = (street: LearnStreet): Uint8Array => {
+    let hit = cache.get(street);
+    if (hit === undefined) {
+      const visible = Math.min(BOARD_CARDS_AT[street], board.length);
+      hit = classifyAll(makeBoardContext(board.slice(0, visible)));
+      cache.set(street, hit);
+    }
+    return hit;
+  };
+
+  const position = positionOf(seat, report.button, report.seatCount);
+  const nodes = nodeContexts(report.actions);
+  const n = Math.min(actionsUpTo, report.actions.length);
+  for (let i = 0; i < n; i++) {
+    const record = report.actions[i];
+    if (record.seat !== seat) continue;
+    const { street, facing } = nodes[i];
+    const buckets = bucketsAt(street);
+    const perBucket = new Float64Array(BUCKET_COUNT);
+    for (let b = 0; b < BUCKET_COUNT; b++) {
+      perBucket[b] = likelihoodRow(OPPONENT_MODEL, {
+        bucket: b,
+        street,
+        position,
+        facing,
+      })[record.action];
+    }
+    for (let c = 0; c < COMBO_COUNT; c++) range[c] *= perBucket[buckets[c]];
+    // Every likelihood is bounded below by the prior's uniform mixture, so no
+    // product can reach zero and this can never divide by nothing.
+    normalizeRange(range);
+  }
+
+  return range;
+}
+
+/**
+ * The likelihoods the engine actually applied to one action — both of them.
+ *
+ * The table runs two models over the same action and the Math tab has to be
+ * able to say which is which:
+ *
+ *  - `tier` is the flat three-tier row `updateBelief` multiplies the belief by.
+ *    It is `TIER_LIKELIHOODS` verbatim, because `readsAfter` and
+ *    `decider.readsFromActions` both call `updateBelief` with no override — the
+ *    N-handed table has no learned per-player table, and the report carries
+ *    none. Read from the same constant this module applies rather than fetched
+ *    independently, so the worked example cannot drift from the arithmetic.
+ *  - `byBucket` is `P(action | bucket)` at this node, which is what actually
+ *    reweights the range the sampler draws from. It is recomputed rather than
+ *    read back: `TableHandReport` records no likelihoods, but the model is a
+ *    fixed prior and the node is fully determined by the record, so this is a
+ *    re-derivation of a deterministic quantity and not an estimate of one.
+ */
+export interface AppliedLikelihood {
+  action: ActionRecord["action"];
+  street: LearnStreet;
+  position: PositionName;
+  facing: Facing;
+  tier: BeliefDistribution;
+  byBucket: Float64Array;
+}
+
+export function appliedLikelihood(
+  report: TableHandReport,
+  index: number
+): AppliedLikelihood | null {
+  const record = report.actions[index];
+  if (!record) return null;
+  const { street, facing } = nodeContexts(report.actions)[index];
+  const position = positionOf(record.seat, report.button, report.seatCount);
+  const byBucket = new Float64Array(BUCKET_COUNT);
+  for (let b = 0; b < BUCKET_COUNT; b++) {
+    byBucket[b] = likelihoodRow(OPPONENT_MODEL, {
+      bucket: b,
+      street,
+      position,
+      facing,
+    })[record.action];
+  }
+  return {
+    action: record.action,
+    street,
+    position,
+    facing,
+    tier: TIER_LIKELIHOODS[record.action],
+    byBucket,
+  };
+}
+
+/**
+ * The distribution the sampler would draw this seat's hole cards from, as it
+ * stood entering `street`.
+ *
+ * `heroHole` plus the visible board is every card the range cannot contain.
+ * Blockers are not a special case here any more than they are in
+ * `range.removeCards`: a card that is visible is simply absent from the pool
+ * the combos are built out of, and the likelihood factors that follow can only
+ * scale a zero.
  */
 export function rangeView(
+  report: TableHandReport,
+  street: ReviewStreet,
   seat: number,
-  belief: BeliefDistribution,
-  dead: number[],
-  board: number[]
+  heroHole: number[]
 ): RangeView {
+  const board = report.board.slice(0, street.boardLen);
+  const dead = [...heroHole, ...board].filter(
+    (c) => Number.isInteger(c) && c >= 0 && c < 52
+  );
+
   const used = new Uint8Array(52);
-  for (const c of dead) if (c >= 0 && c < 52) used[c] = 1;
+  for (const c of dead) used[c] = 1;
   const pool: number[] = [];
   for (let c = 0; c < 52; c++) if (!used[c]) pool.push(c);
 
   const cellCombos = new Uint16Array(GRID_CELLS);
-  const tierCount: [number, number, number] = [0, 0, 0];
-  const live: number[] = [];
+  let liveCombos = 0;
   for (let i = 0; i < pool.length; i++) {
     for (let j = i + 1; j < pool.length; j++) {
-      const combo = comboIndex(pool[i], pool[j]);
-      const cell = gridCellOf(combo);
-      cellCombos[cell]++;
-      tierCount[CELL_TIER[cell]]++;
-      live.push(combo);
+      cellCombos[gridCellOf(comboIndex(pool[i], pool[j]))]++;
+      liveCombos++;
     }
   }
 
-  // A tier with no live combos cannot be held, so its mass is redistributed
-  // rather than silently lost — the same choice `beliefsFor` makes when it
-  // normalises a read before sampling from it.
-  const b = normalize(belief);
-  const raw: [number, number, number] = [b.weak, b.medium, b.strong];
-  let total = 0;
-  for (let t = 0; t < 3; t++) if (tierCount[t] > 0) total += raw[t];
-  const tierWeight: [number, number, number] = [0, 0, 0];
-  for (let t = 0; t < 3; t++) {
-    tierWeight[t] = total > 0 && tierCount[t] > 0 ? raw[t] / total : 0;
-  }
-
-  const range = new Float64Array(COMBO_COUNT);
-  for (const combo of live) {
-    const t = CELL_TIER[gridCellOf(combo)];
-    range[combo] = tierCount[t] > 0 ? tierWeight[t] / tierCount[t] : 0;
-  }
+  const range = opponentRangeAt(report, seat, street.actionsUpTo, board, dead);
 
   const grid = toGrid(range);
   let maxCell = 0;
   for (let i = 0; i < GRID_CELLS; i++) if (grid[i] > maxCell) maxCell = grid[i];
 
-  const ctx = makeBoardContext(Uint8Array.from(board));
-  const classes = classifyAll(ctx);
+  // One classification pass, read twice: the nine-rung ladder the engine works
+  // in, and the three-tier collapse the meters speak. Both are the *same*
+  // board-relative judgement at two resolutions, which is why they can no
+  // longer disagree the way a preflop band and a postflop bucket did.
+  const classes = classifyAll(makeBoardContext(Uint8Array.from(board)));
   const buckets = new Float64Array(BUCKET_COUNT);
-  for (const combo of live) buckets[classes[combo]] += range[combo];
+  const tierWeight: [number, number, number] = [0, 0, 0];
+  for (let c = 0; c < COMBO_COUNT; c++) {
+    const w = range[c];
+    if (w <= 0) continue;
+    const bucket = classes[c] as HandBucket;
+    buckets[bucket] += w;
+    const tier = tierFromBucket(bucket);
+    tierWeight[tier === "weak" ? 0 : tier === "medium" ? 1 : 2] += w;
+  }
 
   // Rank cells by weight *per combo* — the density the sampler actually sees —
   // and walk down until half the mass is covered.
@@ -305,14 +493,14 @@ export function rangeView(
 
   return {
     seat,
-    belief: b,
+    range,
     grid,
     cellCombos,
-    liveCombos: live.length,
+    liveCombos,
     tierWeight,
     buckets,
     maxCell,
-    half: { combos, fraction: live.length > 0 ? combos / live.length : 0 },
+    half: { combos, fraction: liveCombos > 0 ? combos / liveCombos : 0 },
   };
 }
 

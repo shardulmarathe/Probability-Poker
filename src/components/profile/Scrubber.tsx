@@ -13,7 +13,7 @@ import { useCallback, useEffect } from "react";
 import { money } from "../../lib/format";
 import type { ReplayFrame } from "../../poker/replay";
 import { positionOf } from "../../poker/table/position";
-import { CardRow, Tag } from "../report/ui";
+import { CardRow, Tag } from "../ui";
 
 const STREET_LABEL: Record<string, string> = {
   preflop: "Pre-Flop",
@@ -23,11 +23,11 @@ const STREET_LABEL: Record<string, string> = {
   showdown: "Showdown",
 };
 
-const STATUS_TONE: Record<string, "quiet" | "gold" | "good" | "bad"> = {
+const STATUS_TONE: Record<string, "neutral" | "gold" | "good" | "bad"> = {
   active: "good",
   allin: "gold",
   folded: "bad",
-  out: "quiet",
+  out: "neutral",
 };
 
 export interface ScrubberProps {
@@ -109,7 +109,7 @@ export function Scrubber({
           {clamped === 0 ? "Deal" : `Action ${clamped}`} / {frames.length - 1}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Tag tone="quiet">{STREET_LABEL[frame.street] ?? frame.street}</Tag>
+          <Tag tone="neutral">{STREET_LABEL[frame.street] ?? frame.street}</Tag>
           <Tag tone="gold">Pot {money(frame.pot)}</Tag>
         </div>
       </div>
@@ -176,7 +176,7 @@ export function Scrubber({
                   {positionOf(seat.seat, button, seatCount)}
                 </span>
                 {onClock && <Tag tone="gold">To act</Tag>}
-                <Tag tone={STATUS_TONE[seat.status] ?? "quiet"}>{seat.status}</Tag>
+                <Tag tone={STATUS_TONE[seat.status] ?? "neutral"}>{seat.status}</Tag>
               </div>
 
               <div className="mt-2 flex items-end justify-between gap-2">

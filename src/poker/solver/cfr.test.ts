@@ -385,19 +385,30 @@ describe("river subgame solve", () => {
   it("holds its throughput on the widest ranges the river allows", () => {
     // Both players holding every combo the board leaves alive: 1081 x 1081, the
     // widest a river subgame can physically be, and about 6x the hand count of
-    // the realistic spot above. Asserted per iteration rather than in absolute
-    // milliseconds so the bound means the same thing on slower hardware.
+    // the realistic spot above.
     const solved = solveRiver(spec, BOARD, uniformRange(), uniformRange());
     const mbb = exploitability(solved.tree, solved.interaction, solved.priors, solved.strategy) * 1000;
+    const msPerIter = solved.elapsedMs / solved.iterations;
     // eslint-disable-next-line no-console
     console.log(
       `[river worst case] ${solved.hands[0].count}x${solved.hands[1].count} hands, ` +
         `${solved.tree.nodeCount} nodes, ${solved.iterations} iters in ` +
-        `${solved.elapsedMs.toFixed(0)}ms (${(solved.elapsedMs / solved.iterations).toFixed(2)}ms/iter)` +
+        `${solved.elapsedMs.toFixed(0)}ms (${msPerIter.toFixed(2)}ms/iter)` +
         ` -> ${mbb.toFixed(1)} mbb/h`
     );
     expect(solved.hands[0].count).toBe(1081);
-    expect(solved.elapsedMs / solved.iterations).toBeLessThan(4);
+
+    // The substantive claim is that the widest river still *solves*, and that
+    // is deterministic: exploitability is a pure function of the strategy.
+    expect(mbb).toBeLessThan(60);
+
+    // The timing bound is deliberately an order of magnitude above the ~2ms/iter
+    // this actually runs at. A tight wall-clock assertion is not a test, it is a
+    // measurement of how busy the machine is — this one flaked at 4ms while the
+    // suite ran beside a build. Loose, it still catches the regression that
+    // matters (someone making the showdown sweep quadratic again) and never
+    // fails for being unlucky with the scheduler.
+    expect(msPerIter).toBeLessThan(40);
   });
 
   it("costs what the bet-size abstraction says it costs", () => {

@@ -21,7 +21,7 @@ import type {
   SessionEvLoss,
 } from "../../poker/coach/evLoss";
 import { money } from "../../lib/format";
-import { EmptyPanel, HowCalculated, Scroller, Tag } from "../report/ui";
+import { Button, EmptyState, HowCalculated, RADIUS, Scroller, Tag } from "../ui";
 
 /** Gold for what was knowable; slate for what only the cards knew. */
 const MODEL_COLOR = "#e2c563";
@@ -41,7 +41,7 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
     <div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div
-          className="min-w-0 rounded-xl border p-3"
+          className={`min-w-0 border p-3.5 ${RADIUS.surface}`}
           style={{ borderColor: "rgba(201,162,39,0.4)", background: "rgba(201,162,39,0.08)" }}
           data-testid="model-total"
         >
@@ -64,7 +64,7 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
         </div>
 
         <div
-          className="min-w-0 rounded-xl border border-dashed p-3"
+          className={`min-w-0 border border-dashed p-3.5 ${RADIUS.surface}`}
           style={{ borderColor: "rgba(127,159,184,0.45)", background: "rgba(127,159,184,0.06)" }}
           data-testid="hindsight-total"
         >
@@ -72,7 +72,7 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
             <p className="truncate text-[0.6rem] uppercase tracking-wider text-ivory/50">
               Hindsight EV lost
             </p>
-            <Tag tone="quiet">Results-oriented</Tag>
+            <Tag>Results-oriented</Tag>
           </div>
           <p
             className="mt-1 font-display text-2xl font-semibold"
@@ -88,7 +88,7 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
       </div>
 
       <p
-        className="mt-2 rounded-lg border-l-2 px-3 py-2 text-[0.72rem] leading-relaxed text-ivory/60"
+        className={`mt-3 border-l-2 px-3 py-2 text-[0.75rem] leading-relaxed text-ivory/65 ${RADIUS.control}`}
         style={{ borderColor: "#c9a227", background: "rgba(201,162,39,0.06)" }}
         data-testid="never-sum"
       >
@@ -238,33 +238,28 @@ function LeakRow({
   const share = worst > 0 ? Math.abs(decision.modelEvLoss) / worst : 0;
   return (
     <div
-      className="rounded-xl border p-3"
-      style={{ borderColor: "rgba(244,237,228,0.12)", background: "rgba(0,0,0,0.28)" }}
+      className="border-t border-ivory/10 py-4 first:border-t-0 first:pt-0"
       data-testid="leak-row"
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-display text-xs font-semibold text-ivory">
+        <span className="font-display text-sm font-semibold text-ivory">
           Hand #{decision.handNumber}
         </span>
-        <Tag tone="quiet">{STREET_SHORT[decision.street] ?? decision.street}</Tag>
-        <Tag tone="quiet">{decision.position}</Tag>
+        <Tag>{STREET_SHORT[decision.street] ?? decision.street}</Tag>
+        <Tag>{decision.position}</Tag>
         <span className="font-mono text-[0.68rem] uppercase tracking-wider text-ivory/50">
           {decision.action}
           {decision.cost > 0 ? ` ${money(decision.cost)}` : ""}
         </span>
         {onReplay && (
-          <button
+          <Button
+            size="sm"
             onClick={() => onReplay(decision)}
-            className="ml-auto min-h-[30px] shrink-0 rounded-lg border px-2.5 py-1 font-display text-[0.62rem] tracking-wide transition hover:-translate-y-px"
-            style={{
-              borderColor: "rgba(201,162,39,0.45)",
-              background: "rgba(201,162,39,0.12)",
-              color: "#e2c563",
-            }}
+            className="ml-auto shrink-0"
             data-testid="leak-replay"
           >
-            Replay this hand
-          </button>
+            Play it again
+          </Button>
         )}
       </div>
 
@@ -292,7 +287,7 @@ function LeakRow({
 
       {/* ---- The results lens: no bar, dashed, kept apart ------- */}
       <div
-        className="mt-2.5 rounded-lg border border-dashed px-2.5 py-1.5"
+        className={`mt-2.5 border border-dashed px-2.5 py-1.5 ${RADIUS.control}`}
         style={{ borderColor: "rgba(127,159,184,0.35)", background: "rgba(127,159,184,0.05)" }}
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[0.68rem]">
@@ -331,18 +326,18 @@ export function LeakList({
 
   if (ranked.length === 0) {
     return (
-      <EmptyPanel title="No priced mistakes yet">
+      <EmptyState title="Nothing has cost you yet">
         Every decision so far came out at or above the best line the model could
-        find. Play more hands — leaks show up faster than they feel like they
+        find. Keep playing — leaks show up faster than they feel like they
         should.
-      </EmptyPanel>
+      </EmptyState>
     );
   }
 
   const worst = Math.abs(ranked[0].modelEvLoss);
   return (
     <div>
-      <div className="space-y-2" data-testid="leak-list" data-count={ranked.length}>
+      <div data-testid="leak-list" data-count={ranked.length}>
         {ranked.map((decision) => (
           <LeakRow
             key={`${decision.handNumber}:${decision.index}`}

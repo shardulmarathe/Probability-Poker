@@ -6,9 +6,15 @@
  * table — deep green felt, gold rims, Cinzel display type, one soft animation
  * per event — and adds exactly one thing that table did not need: a seat's
  * position is now a number rather than "top" or "bottom".
+ *
+ * What is *not* here any more: `FeltBackground` and `Rail`. Both existed in
+ * `components/ui` as well, and both had drifted — the felt in texture opacity,
+ * the rail into a different font, colour and radius from the one used on the
+ * review page one hop away. This file keeps only what is specific to a table
+ * with seats around it.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import type { ThinkStep } from "../../store/TableContext";
 
 // ---------------------------------------------------------------------------
@@ -172,32 +178,6 @@ export function TableStyles() {
 }
 
 // ---------------------------------------------------------------------------
-// Background
-// ---------------------------------------------------------------------------
-
-export function FeltBackground() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(1100px 700px at 50% -10%, #0f3324 0%, transparent 60%), linear-gradient(180deg, #0a1c14 0%, #060f0a 100%)",
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 25% 30%, #f4ede4 0.5px, transparent 0.6px), radial-gradient(circle at 75% 70%, #f4ede4 0.5px, transparent 0.6px)",
-          backgroundSize: "26px 26px",
-        }}
-      />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Badges
 // ---------------------------------------------------------------------------
 
@@ -238,17 +218,43 @@ const BUBBLE_SKIN = {
   color: "#1a1a1a",
 };
 
+/**
+ * Which way a bubble opens.
+ *
+ * A bubble centred on the seat that owns it hangs half its width past that
+ * seat, and the seats at the ends of the arc sit within half a bubble of the
+ * screen edge — so on a phone the rightmost bot's "Running simulations…" was
+ * sliced off by the viewport. Edge seats anchor their bubble to the inside
+ * instead of centring it.
+ */
+export type BubbleAlign = "center" | "left" | "right";
+
+/** Anchor a bubble by where its seat sits across the felt. */
+export function bubbleAlign(x: number): BubbleAlign {
+  if (x < 22) return "left";
+  if (x > 78) return "right";
+  return "center";
+}
+
+const ALIGN: Record<BubbleAlign, string> = {
+  center: "left-1/2 -translate-x-1/2",
+  left: "left-0",
+  right: "right-0",
+};
+
 export function SpeechBubble({
   text,
   side,
+  align = "center",
 }: {
   text: string;
   side: "top" | "bottom";
+  align?: BubbleAlign;
 }) {
   const pos = side === "top" ? "bottom-full mb-2" : "top-full mt-2";
   return (
     <div
-      className={`pp-bubble pointer-events-none absolute left-1/2 z-30 -translate-x-1/2 whitespace-nowrap ${pos}`}
+      className={`pp-bubble pointer-events-none absolute z-30 max-w-[80vw] whitespace-nowrap ${ALIGN[align]} ${pos}`}
     >
       <div
         className="rounded-xl border px-3 py-1.5 font-display text-xs font-semibold shadow-xl sm:text-sm"
@@ -263,14 +269,16 @@ export function SpeechBubble({
 export function ThoughtBubble({
   step,
   side,
+  align = "center",
 }: {
   step: ThinkStep;
   side: "top" | "bottom";
+  align?: BubbleAlign;
 }) {
   const pos = side === "top" ? "bottom-full mb-2" : "top-full mt-2";
   return (
     <div
-      className={`pp-bubble pointer-events-none absolute left-1/2 z-30 w-[min(13rem,60vw)] -translate-x-1/2 ${pos}`}
+      className={`pp-bubble pointer-events-none absolute z-30 w-[min(13rem,52vw)] ${ALIGN[align]} ${pos}`}
     >
       <div className="rounded-xl border px-3 py-2 shadow-xl" style={BUBBLE_SKIN}>
         {/* Re-keying on the step index re-runs the fade for each new message. */}
@@ -340,20 +348,6 @@ export function ChipLayer({
 // ---------------------------------------------------------------------------
 // Small shared bits
 // ---------------------------------------------------------------------------
-
-export function Rail({ children }: { children: ReactNode }) {
-  return (
-    <span
-      className="rounded-lg border px-2.5 py-1 font-display text-[0.65rem] tracking-widest text-gold-soft sm:px-3 sm:py-1.5 sm:text-xs"
-      style={{
-        borderColor: "rgba(201,162,39,0.35)",
-        background: "rgba(0,0,0,0.3)",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
 
 /** A 3-segment weak/medium/strong read, as a bar. */
 export function BeliefBar({

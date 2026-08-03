@@ -9,12 +9,19 @@
  */
 
 import { pct } from "../../lib/format";
-import { ACTION_LIKELIHOODS, INITIAL_BELIEF } from "../../data/constants";
+import { INITIAL_BELIEF } from "../../data/constants";
 import { updateBelief } from "../../poker/bayesian";
 import { standardError, wilsonInterval } from "../../poker/core/stats";
+import { BUCKET_COUNT } from "../../poker/model/buckets";
 import type { BotDecision, TableHandReport } from "../../poker/table/contract";
 import type { PlayerActionType } from "../../types";
-import { STREET_LABEL, readsAfter } from "./derive";
+import {
+  STREET_LABEL,
+  appliedLikelihood,
+  bucketName,
+  readsAfter,
+  type AppliedLikelihood,
+} from "./derive";
 import {
   Calc,
   EmptyPanel,
@@ -54,12 +61,17 @@ export function MathTab({ report, focus, seatName }: Props) {
     report.decisions[report.decisions.length - 1] ??
     null;
 
-  // First action that actually moved a read — the Bayes example.
+  // First action that actually moved a read — the Bayes example. The
+  // likelihoods come from `appliedLikelihood` rather than from the constants
+  // module: the worked example has to be a readout of what the engine did to
+  // this hand, not a second opinion about it.
   const moveIndex = report.actions.findIndex((a) => a.action !== "fold");
+  const applied = moveIndex >= 0 ? appliedLikelihood(report, moveIndex) : null;
   const bayes =
-    moveIndex >= 0
+    moveIndex >= 0 && applied
       ? {
           record: report.actions[moveIndex],
+          applied,
           prior: readsAfter(report.actions, moveIndex, report.seatCount)[
             report.actions[moveIndex].seat
           ],
@@ -112,6 +124,7 @@ export function MathTab({ report, focus, seatName }: Props) {
             street={bayes.record.street}
             seat={bayes.record.seat}
             prior={bayes.prior}
+            applied={bayes.applied}
             seatName={seatName}
           />
         )}
@@ -325,15 +338,17 @@ function BayesWorked({
   street,
   seat,
   prior,
+  applied,
   seatName,
 }: {
   action: PlayerActionType;
   street: string;
   seat: number;
   prior: { weak: number; medium: number; strong: number };
+  applied: AppliedLikelihood;
   seatName: (seat: number) => string;
 }) {
-  const like = ACTION_LIKELIHOODS[action];
+  const like = applied.tier;
   const nw = like.weak * prior.weak;
   const nm = like.medium * prior.medium;
   const ns = like.strong * prior.strong;
@@ -372,8 +387,9 @@ function BayesWorked({
       </Heading>
       <Lead>
         {seatName(seat)} chose to{" "}
-        <strong className="uppercase text-gold-soft">{label}</strong>. The model
-        supplies how likely that action is from each tier:
+        <strong className="uppercase text-gold-soft">{label}</strong>. These are
+        the three numbers this update was multiplied by — the flat table, one row
+        per action, the same on every street and in every seat:
       </Lead>
       <Calc>
         P({label} | weak) = {num(like.weak, 2)}
@@ -427,10 +443,43 @@ function BayesWorked({
         </div>
       </div>
 
+      <Heading>The likelihoods the ranges were actually built from</Heading>
+      <Lead>
+        The three numbers above move the coarse read, and that is all they do.
+        The distribution the sampler drew this seat's hands from was reweighted
+        by a different row: the same action conditioned on the{" "}
+        <em>class of hand on this board</em>, plus the street, the position and
+        what the seat was facing. Same action, same hand, nine answers —{" "}
+        {applied.street}, {applied.position}, {applied.facing.replace("-", " ")}:
+      </Lead>
+      <Calc>
+        {Array.from({ length: BUCKET_COUNT }, (_, b) => b).map((b) => (
+          <div key={b}>
+            P({label} | {bucketName(b)}) = {num(applied.byBucket[b], 3)}
+          </div>
+        ))}
+        <div className="mt-2 text-ivory/60">
+          spread from {num(Math.min(...applied.byBucket), 3)} to{" "}
+          {num(Math.max(...applied.byBucket), 3)} — a factor of{" "}
+          {num(
+            Math.max(...applied.byBucket) / Math.max(1e-9, Math.min(...applied.byBucket)),
+            2
+          )}{" "}
+          between the class this action is least likely from and the class it is
+          most likely from.
+        </div>
+      </Calc>
+      <Lead>
+        The report records no likelihoods, so both rows above are recomputed
+        rather than read back — but neither is a guess. The three-tier table is a
+        constant, the conditioned model is a fixed prior with no player data in
+        it, and the node (street, position, facing) is fully determined by the
+        action record. Re-running the lookup returns what ran at the table.
+      </Lead>
       <Why>
-        This is the arithmetic behind every chart on the Ranges tab. The 13×13
-        grids are these three numbers spread over the combinations each tier can
-        contain — nothing more and nothing less.
+        Two models over one action, and only one of them prices anything. The
+        three tiers are a summary a human can hold in their head; the nine
+        classes are what the 13×13 charts on the Ranges tab are made of.
       </Why>
     </>
   );

@@ -13,7 +13,6 @@
  * the same hand as a hand played.
  */
 
-import { Link } from "react-router-dom";
 import { PlayingCard } from "../PlayingCard";
 import { money } from "../../lib/format";
 import { TABLE_MODES, type TableMode } from "../../lib/tableOptions";
@@ -21,14 +20,14 @@ import { findProfile } from "../../poker/model/profiles";
 import { positionOf } from "../../poker/table/position";
 import { useTable } from "../../store/TableContext";
 import type { Street } from "../../types";
+import { PageHeader } from "../shell";
+import { Button, ButtonLink, LINE, RADIUS, Rail, Tabs } from "../ui";
 import { ActionBar } from "./Actions";
 import { CoachPanel } from "./CoachPanel";
 import { SeatView } from "./Seat";
 import {
   ChipLayer,
-  FeltBackground,
   POT_CENTRE,
-  Rail,
   TableStyles,
   boardTop,
   seatLayout,
@@ -93,7 +92,7 @@ export default function TableGame() {
 
   return (
     <main
-      className="relative min-h-[100svh] overflow-x-hidden text-ivory"
+      className="pp-screen relative overflow-x-hidden text-ivory"
       data-testid="table"
       data-hand={table.handNumber}
       data-status={table.status}
@@ -104,11 +103,10 @@ export default function TableGame() {
       data-busy={fx.busy ? "1" : "0"}
       data-mode={mode}
     >
-      <FeltBackground />
       <TableStyles />
 
       <div
-        className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col px-2 pt-3 sm:px-4 sm:pt-4"
+        className="pp-screen relative z-10 mx-auto flex max-w-6xl flex-col px-2 pt-3 sm:px-4 sm:pt-4"
         style={{
           paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))",
           paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
@@ -117,6 +115,7 @@ export default function TableGame() {
       >
         <TopBar
           handNumber={table.handNumber}
+          seatCount={table.seats.length}
           mode={mode}
           onMode={setMode}
           observer={options.observer}
@@ -125,7 +124,7 @@ export default function TableGame() {
 
         {/* ------------------------------ Felt ------------------------------ */}
         <div
-          className="relative mt-3 min-h-[25rem] flex-1 rounded-[1.75rem] border shadow-2xl sm:mt-4 sm:min-h-[32rem] sm:rounded-[2.5rem]"
+          className={`relative mt-3 min-h-[25rem] flex-1 border shadow-2xl sm:mt-4 sm:min-h-[32rem] ${RADIUS.felt}`}
           style={{
             borderColor: "rgba(201,162,39,0.35)",
             background:
@@ -161,7 +160,7 @@ export default function TableGame() {
                 ) : (
                   <div
                     key={`s-${i}`}
-                    className={`${LG_CARD_BOX} rounded-xl border border-dashed sm:rounded-2xl`}
+                    className={`${LG_CARD_BOX} rounded-xl border border-dashed`}
                     style={{ borderColor: "rgba(244,237,228,0.12)" }}
                   />
                 );
@@ -261,68 +260,78 @@ export default function TableGame() {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The table's own header: what this page is, what it is showing you, and how to
+ * change either.
+ *
+ * `/table` had no `<h1>` at all — the main activity of the whole product opened
+ * with a link labelled "← New table" and a chip reading "HAND #1". It also had
+ * the only copy of the mode switch, whose three blurbs were `title=` attributes
+ * and therefore invisible to every phone. Both fixed here: a real heading, and
+ * the active mode's meaning printed under the control that sets it.
+ */
 function TopBar({
   handNumber,
+  seatCount,
   mode,
   onMode,
   observer,
   narrow,
 }: {
   handNumber: number;
+  seatCount: number;
   mode: TableMode;
   onMode: (mode: TableMode) => void;
   observer: boolean;
   narrow: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <Link
-        to="/"
-        className="font-display text-xs tracking-wide text-ivory/70 transition hover:text-ivory sm:text-sm"
-      >
-        ← New table
-      </Link>
+    <div className="flex flex-col gap-2">
+      <PageHeader
+        compact
+        title={observer ? "The table" : "Your table"}
+        lede={`${seatCount}-handed`}
+        meta={
+          <>
+            {observer && <Rail>Watching</Rail>}
+            <Rail>Hand #{handNumber}</Rail>
+          </>
+        }
+      />
 
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <div
-          className="flex items-center gap-0.5 rounded-lg border p-0.5"
-          style={{
-            borderColor: "rgba(201,162,39,0.3)",
-            background: "rgba(0,0,0,0.35)",
-          }}
-        >
-          {TABLE_MODES.map((m) => (
-            <button
-              key={m.id}
-              data-testid={`mode-${m.id}`}
-              onClick={() => onMode(m.id)}
-              title={m.blurb}
-              className="rounded-md px-2 py-1 font-display text-[0.62rem] tracking-wide transition sm:px-3 sm:text-xs"
-              style={{
-                background: mode === m.id ? "rgba(201,162,39,0.25)" : "transparent",
-                color: mode === m.id ? "#e2c563" : "rgba(244,237,228,0.6)",
-              }}
-            >
-              {narrow ? m.name.split(" ")[0] : m.name}
-            </button>
-          ))}
+      {/*
+       * The mode switch is a setting on this screen, not a second navigation,
+       * so it keeps its natural width instead of spanning the page — a
+       * full-width three-up sitting under the shell's own nav read as one.
+       * Its blurb sits beside it, which is the whole reason the blurb is on
+       * screen at all rather than in a `title=`.
+       */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="w-full max-w-[19rem] shrink-0 sm:w-[19rem]">
+          <Tabs
+            label="What the table shows you"
+            as="options"
+            layout="fill"
+            size="sm"
+            testIdPrefix="mode"
+            value={mode}
+            onChange={onMode}
+            options={TABLE_MODES.map((m) => ({
+              value: m.id,
+              label: narrow ? m.name.split(" ")[0] : m.name,
+              hint: m.blurb,
+            }))}
+          />
         </div>
-        {/* The hand review shares this route group's store, so the history
-            survives the hop. See the `/review` routes in App.tsx. */}
-        <Link
-          to="/review"
-          data-testid="open-review"
-          className="rounded-full border px-2.5 py-1 font-display text-[0.6rem] uppercase tracking-[0.18em] transition hover:-translate-y-px sm:text-[0.65rem]"
-          style={{
-            borderColor: "rgba(201,162,39,0.5)",
-            background: "rgba(201,162,39,0.12)",
-            color: "#e2c563",
-          }}
+        <p
+          className="min-w-0 flex-1 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
+          data-testid="mode-hint"
         >
-          Review
-        </Link>
-        {observer && <Rail>WATCHING</Rail>}
-        <Rail>HAND #{handNumber}</Rail>
+          {TABLE_MODES.find((m) => m.id === mode)?.blurb}
+        </p>
+        <ButtonLink to="/" variant="quiet" size="sm">
+          Change table
+        </ButtonLink>
       </div>
     </div>
   );
@@ -348,28 +357,31 @@ function ResultStrip({
   return (
     <div
       data-testid="result"
-      className="mx-auto flex w-full max-w-3xl flex-col items-center gap-2 rounded-2xl border px-4 py-3 sm:flex-row sm:justify-between"
+      className={`mx-auto flex w-full max-w-3xl flex-col items-center gap-3 border px-4 py-3 sm:flex-row sm:justify-between ${RADIUS.surface}`}
       style={{
-        borderColor: "rgba(201,162,39,0.4)",
+        borderColor: LINE.goldStrong,
         background:
           "radial-gradient(120% 140% at 50% 0%, rgba(26,74,50,0.9) 0%, rgba(11,34,24,0.9) 70%)",
       }}
     >
       <div className="text-center sm:text-left">
-        <div className="font-mono text-[0.55rem] uppercase tracking-[0.3em] text-ivory/45">
-          {showdown ? "Showdown" : "Everyone folded"}
+        <div className="text-[0.7rem] text-ivory/50">
+          {showdown ? "Showdown" : "Everyone else folded"}
         </div>
         <div className="font-display text-base font-semibold text-gold-soft sm:text-lg">
           {label || "No winner"}
         </div>
       </div>
-      <button
-        data-testid="next-hand"
-        onClick={onNext}
-        className="min-h-[46px] w-full rounded-xl border border-pkred-light/70 bg-pkred/80 px-6 py-2.5 font-display text-sm font-semibold tracking-wide text-ivory transition hover:-translate-y-0.5 hover:bg-pkred-light sm:w-auto"
-      >
-        {observer ? "Deal next hand" : "Next hand"}
-      </button>
+      {/* The review shares this route group's store, so the hand survives the
+          hop. See the `/review` routes in App.tsx. */}
+      <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:w-auto">
+        <ButtonLink to="/review" size="md" testId="open-review">
+          See how it was played
+        </ButtonLink>
+        <Button data-testid="next-hand" variant="primary" size="md" onClick={onNext}>
+          {observer ? "Deal the next hand" : "Deal me another"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { PlayingCard } from "../components/PlayingCard";
 import TableSetupPanel from "../components/TableSetupPanel";
+import { ButtonLink } from "../components/ui";
 import { makeCard } from "../poker/cards";
 
 const ACE_SPADES = makeCard(14, "s");
@@ -17,39 +18,36 @@ interface Concept {
 
 const CONCEPTS: Concept[] = [
   {
-    suit: "\u2660",
-    title: "Bayesian Opponent Modeling",
+    suit: "♠",
+    title: "Bayesian opponent modelling",
     eq: "P(H | A)",
-    desc: "Beliefs about opponent hand strength update after every action.",
+    desc: "Beliefs about what an opponent holds update after every action they take.",
   },
   {
-    suit: "\u2665",
+    suit: "♥",
     red: true,
-    title: "Monte Carlo Simulation",
-    eq: "40,000 Simulations",
-    desc: "Tens of thousands of randomized outcomes estimate true win probability.",
+    title: "Monte Carlo simulation",
+    eq: "40,000 runouts",
+    desc: "Tens of thousands of randomised outcomes estimate your true win probability.",
   },
   {
-    suit: "\u2666",
+    suit: "♦",
     red: true,
-    title: "Expected Value",
-    eq: "EV = \u03a3 p(x)V(x)",
-    desc: "Every bot action maximizes long-term expected return.",
+    title: "Expected value",
+    eq: "EV = Σ p(x)V(x)",
+    desc: "Every bot action is the one with the highest long-run return, priced live.",
   },
 ];
 
 export default function Home() {
   return (
-    <main className="relative min-h-[100svh] overflow-x-hidden bg-pkblack font-sans text-ivory">
-      <FeltBackground />
-
-      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-6xl flex-col px-4 py-[clamp(1rem,2.5vh,1.75rem)] sm:px-6">
-        {/* Hero */}
-        <div className="grid flex-1 items-center gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12">
-          {/* Left: copy */}
+    <main className="relative overflow-x-hidden font-sans text-ivory">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-14 pt-6 sm:px-6 sm:pt-10">
+        {/* ------------------------------ Hero ------------------------------ */}
+        <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
           <div className="text-center lg:text-left">
             <h1
-              className="pp-fade-up font-display text-[clamp(3.25rem,7vw,5.25rem)] font-bold leading-[1.0] tracking-tight text-ivory"
+              className="pp-fade-up font-display text-[clamp(3rem,6.5vw,4.75rem)] font-bold leading-[1.02] tracking-tight text-ivory"
               style={{ animationDelay: "80ms" }}
             >
               Probability
@@ -58,7 +56,7 @@ export default function Home() {
             </h1>
 
             <p
-              className="pp-fade-up mt-5 font-cormorant text-[clamp(1.55rem,2.8vw,2.2rem)] italic text-ivory/85"
+              className="pp-fade-up mt-5 font-cormorant text-[clamp(1.5rem,2.6vw,2.1rem)] italic text-ivory/85"
               style={{ animationDelay: "160ms" }}
             >
               Can probability outperform human intuition?
@@ -68,32 +66,26 @@ export default function Home() {
               className="pp-fade-up mx-auto mt-4 max-w-lg text-[0.95rem] leading-relaxed text-ivory/60 lg:mx-0"
               style={{ animationDelay: "240ms" }}
             >
-              Play Texas Hold'em against a Bayesian poker bot that uses Monte
-              Carlo simulation and expected value calculations to make every
-              decision.
+              Play Texas Hold'em against bots that model your range, simulate the
+              runout, and take the highest-EV line every time. Then read back
+              exactly where your hand differed from theirs.
             </p>
 
             <div
-              className="pp-fade-up mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
+              className="pp-fade-up mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start"
               style={{ animationDelay: "320ms" }}
             >
-              <Link
-                to="/table"
-                className="group relative inline-flex items-center gap-3 rounded-xl border border-gold/40 bg-pkred px-10 py-4 text-lg font-semibold tracking-wide text-ivory shadow-[0_10px_30px_-10px_rgba(122,0,25,0.8)] transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/70 hover:bg-pkred-light"
-              >
-                <span className="font-display tracking-widest">TAKE A SEAT</span>
-                <span
-                  aria-hidden
-                  className="text-gold transition-transform duration-200 group-hover:translate-x-1"
-                >
-                  &rarr;
+              <ButtonLink to="/table" variant="primary" size="lg" testId="hero-deal">
+                Deal me in
+                <span aria-hidden className="text-gold">
+                  →
                 </span>
-              </Link>
+              </ButtonLink>
               <a
                 href="#setup"
-                className="font-display text-sm tracking-widest text-gold/80 underline-offset-4 transition hover:text-gold hover:underline"
+                className="font-display text-sm tracking-wide text-gold/80 underline-offset-4 transition hover:text-gold hover:underline"
               >
-                CHOOSE THE TABLE ↓
+                Set up the table first ↓
               </a>
             </div>
 
@@ -109,7 +101,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Right: poker matchup centerpiece */}
           <div
             className="pp-fade-up flex justify-center"
             style={{ animationDelay: "300ms" }}
@@ -118,38 +109,67 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Connector → ties the hero to the setup panel */}
-        <Divider label="Sit Down" delay={400} />
-
-        <div className="pp-fade-up" style={{ animationDelay: "440ms" }}>
+        {/* --------------------------- Set up ------------------------------ */}
+        <div className="pp-fade-up mt-12 sm:mt-16" style={{ animationDelay: "420ms" }}>
           <TableSetupPanel />
         </div>
 
-        {/* Connector → ties the setup panel to the concept row */}
-        <Divider label="The Probability Engine" delay={480} />
+        {/* -------------------------- The engine --------------------------- */}
+        <section className="mt-14 sm:mt-20" aria-labelledby="engine">
+          <h2
+            id="engine"
+            className="font-display text-2xl font-semibold tracking-wide text-ivory sm:text-3xl"
+          >
+            What the bots are actually doing
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ivory/55">
+            No lookup tables and no scripted personalities. Every decision at the
+            table is three pieces of arithmetic, run live, and the review pages
+            show you each one for the hand you just played.
+          </p>
 
-        {/* Concept cards */}
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5">
-          {CONCEPTS.map((c, i) => (
-            <ConceptCard key={c.title} concept={c} delay={520 + i * 90} />
-          ))}
-        </div>
+          <div className="mt-7 grid gap-x-8 gap-y-8 sm:grid-cols-3">
+            {CONCEPTS.map((c, i) => (
+              <Concept key={c.title} concept={c} first={i === 0} />
+            ))}
+          </div>
+        </section>
       </div>
     </main>
   );
 }
 
-function Divider({ label, delay }: { label: string; delay: number }) {
+// ---------------------------------------------------------------------------
+
+/**
+ * Three peers, separated by a hairline rather than boxed.
+ *
+ * They were three bordered cards with hover states, which implied they were
+ * selectable and grouped things that are already obviously a group. The suit
+ * watermark carries the identity; the rule carries the separation.
+ */
+function Concept({ concept, first }: { concept: Concept; first: boolean }) {
   return (
     <div
-      className="pp-fade-up mb-4 mt-8 flex items-center justify-center gap-3"
-      style={{ animationDelay: `${delay}ms` }}
+      className={`relative min-w-0 sm:pl-8 ${first ? "sm:border-l-0 sm:pl-0" : "sm:border-l"}`}
+      style={{ borderColor: "rgba(201,162,39,0.18)" }}
     >
-      <span className="h-px w-12 bg-gradient-to-r from-transparent to-gold/40" />
-      <span className="font-mono text-[10px] uppercase tracking-[0.35em] text-gold/70">
-        {label}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -top-6 right-0 select-none text-7xl leading-none"
+        style={{ color: concept.red ? "#a30222" : "#c9a227", opacity: 0.12 }}
+      >
+        {concept.suit}
       </span>
-      <span className="h-px w-12 bg-gradient-to-l from-transparent to-gold/40" />
+      <p className="relative font-mono text-base font-semibold text-gold">
+        {concept.eq}
+      </p>
+      <h3 className="relative mt-2 font-display text-[1.05rem] font-semibold leading-snug text-ivory">
+        {concept.title}
+      </h3>
+      <p className="relative mt-2 text-sm leading-relaxed text-ivory/55">
+        {concept.desc}
+      </p>
     </div>
   );
 }
@@ -157,13 +177,12 @@ function Divider({ label, delay }: { label: string; delay: number }) {
 function Matchup() {
   return (
     <div
-      className="relative w-full max-w-lg rounded-3xl border border-gold/20 px-4 py-6 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] sm:px-7 sm:py-9"
+      className="relative w-full max-w-lg rounded-[2rem] border border-gold/20 px-4 py-6 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] sm:px-7 sm:py-9"
       style={{
         background:
           "radial-gradient(120% 100% at 50% 0%, #1a4a32 0%, #123524 45%, #0b2218 100%)",
       }}
     >
-      {/* faint table arc marking */}
       <div className="pointer-events-none absolute inset-x-8 bottom-4 top-4 rounded-[50%] border border-gold/10" />
 
       <div className="relative flex items-center justify-between gap-2">
@@ -227,9 +246,7 @@ function Seat({
         {avatar}
       </div>
       <div className="text-center leading-tight">
-        <div className="font-display text-base tracking-wide text-ivory">
-          {label}
-        </div>
+        <div className="font-display text-base tracking-wide text-ivory">{label}</div>
         <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold/70">
           {tag}
         </div>
@@ -260,92 +277,6 @@ function FloatCard({
       }}
     >
       {children}
-    </div>
-  );
-}
-
-function ConceptCard({ concept, delay }: { concept: Concept; delay: number }) {
-  return (
-    <div
-      className="pp-fade-up group relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-2xl border border-gold/15 bg-pkblack/40 p-4 backdrop-blur-sm transition-colors duration-200 hover:border-gold/40 sm:min-h-[9.5rem] sm:p-5"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {/* suit watermark */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-2 -top-3 select-none text-7xl leading-none"
-        style={{
-          color: concept.red ? "#a30222" : "#c9a227",
-          opacity: 0.1,
-        }}
-      >
-        {concept.suit}
-      </span>
-
-      <div className="relative flex items-center gap-2.5">
-        <span
-          aria-hidden
-          className="inline-block h-3 w-3 rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 30%, #e2c563, #c9a227 55%, #7a0019)",
-          }}
-        />
-        <span className="font-mono text-base font-semibold text-gold">
-          {concept.eq}
-        </span>
-      </div>
-
-      <h3 className="relative mt-3 font-display text-[1.1rem] font-semibold leading-snug text-ivory">
-        {concept.title}
-      </h3>
-      <p className="relative mt-2 text-sm leading-relaxed text-ivory/60">
-        {concept.desc}
-      </p>
-    </div>
-  );
-}
-
-function FeltBackground() {
-  return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden">
-      {/* Felt base + lighting */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(130% 95% at 50% 30%, #1a4a32 0%, #123524 42%, #0b2218 80%, #050d09 100%)",
-        }}
-      />
-      {/* Felt micro-texture */}
-      <div
-        className="absolute inset-0 opacity-[0.06] mix-blend-overlay"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, #ffffff 0 1px, transparent 1px 3px), repeating-linear-gradient(-45deg, #000000 0 1px, transparent 1px 3px)",
-        }}
-      />
-      {/* Edge vignette */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 100% at 50% 45%, transparent 55%, rgba(0,0,0,0.55) 100%)",
-        }}
-      />
-      {/* Corner suit symbols — fully contained, subtle watermark */}
-      <span className="absolute left-4 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.14]">
-        {"\u2660"}
-      </span>
-      <span className="absolute right-5 top-2 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.22]">
-        {"\u2665"}
-      </span>
-      <span className="absolute bottom-2 left-5 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-pkred/[0.22]">
-        {"\u2666"}
-      </span>
-      <span className="absolute bottom-2 right-4 select-none text-[clamp(4.5rem,9vw,8rem)] leading-none text-ivory/[0.14]">
-        {"\u2663"}
-      </span>
     </div>
   );
 }

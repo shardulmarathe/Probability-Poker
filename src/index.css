@@ -7,20 +7,16 @@
   --font-display: "Cinzel", "Cormorant Garamond", Georgia, serif;
   --font-cormorant: "Cormorant Garamond", Georgia, serif;
 
-  --color-ink-950: #060a13;
-  --color-ink-900: #0b1120;
-  --color-ink-850: #0f172a;
-  --color-ink-800: #131c31;
-  --color-ink-700: #1e293b;
-  --color-ink-600: #334155;
-
-  --color-accent: #38bdf8;
-  --color-accent-soft: #0ea5e9;
-  --color-good: #34d399;
-  --color-bad: #f87171;
-  --color-warn: #fbbf24;
-
-  /* Poker palette */
+  /*
+   * The poker palette, and the only palette.
+   *
+   * A slate `--color-ink-*` ramp and a sky-blue `--color-accent` used to live
+   * here, left over from a theme this product no longer has. Nothing referenced
+   * them except the `body` rule below, which painted a blue radial gradient
+   * under every page — invisible only because each route covered it with its
+   * own felt, and visible at exactly two moments: the first paint, and every
+   * overscroll bounce.
+   */
   --color-felt: #123524;
   --color-felt-light: #1a4a32;
   --color-felt-deep: #0b2218;
@@ -203,23 +199,59 @@
   }
 }
 
+/* ------------------------------------------------------------------------ */
+/* Root                                                                      */
+/* ------------------------------------------------------------------------ */
+
+:root {
+  /* One source of truth for the shell header's height. `AppShell` sizes the
+     header from it and the rule below shortens every page by it. */
+  --pp-header-h: 3.25rem;
+}
+
 html,
 body,
 #root {
   height: 100%;
 }
 
+/*
+ * The root background is the felt.
+ *
+ * It was a blue radial over near-black, which is what the browser painted
+ * before React mounted and what an overscroll bounce revealed at the top and
+ * bottom of every page. `overscroll-behavior: none` stops the bounce as well;
+ * the colour is fixed either way so that a slow first paint is the product's
+ * own colour rather than a flash of a different app.
+ */
 body {
   margin: 0;
-  background: radial-gradient(
-      1200px 800px at 50% -10%,
-      #16233f 0%,
-      transparent 55%
-    ),
-    var(--color-ink-950);
-  color: #e2e8f0;
+  background: #060f0a;
+  color: #f4ede4;
   font-family: var(--font-sans);
+  overscroll-behavior-y: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Under the shell, a page is one viewport minus the header — otherwise every
+ * route carries a permanent scrollbar exactly one header tall.
+ *
+ * Deliberately an unlayered rule so it outranks the `min-h-[100svh]` utility
+ * each page sets on its own `<main>`. That includes the pages this module does
+ * not own, which is the point: one rule, no edits to five files.
+ */
+.pp-shell main {
+  min-height: calc(100svh - var(--pp-header-h));
+}
+
+/*
+ * The same measurement, available as a class, for the layouts that need it on
+ * an element the rule above cannot reach — the table's inner flex column,
+ * which has to fill the screen exactly so the felt can flex into what is left.
+ */
+.pp-screen {
+  min-height: calc(100svh - var(--pp-header-h));
 }
 
 ::-webkit-scrollbar {
@@ -227,7 +259,7 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: rgba(201, 162, 39, 0.3);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-track {

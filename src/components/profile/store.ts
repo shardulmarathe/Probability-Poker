@@ -21,6 +21,7 @@
 
 import type { ActionType, Street } from "../../types";
 import { HAND_CATEGORY_NAMES, HandCategory } from "../../types";
+import { syncArchive } from "../../lib/api";
 import type {
   ActionRecord,
   PotRecord,
@@ -352,6 +353,33 @@ export function saveArchive(archive: ProfileArchive): void {
   } catch {
     /* private browsing / quota — the archive just will not persist */
   }
+
+  // Mirror upward, after the local write and never instead of it.
+  //
+  // This is the one seam where a finished hand can be seen without the table
+  // having to know an account exists: every path that archives a hand comes
+  // through here. `syncArchive` enqueues and returns — it does not await the
+  // network, does not throw, and does nothing at all when signed out — so the
+  // line above remains the whole story for a player who never signs in.
+  syncArchive(archive);
+}
+
+/**
+ * Fold hands pulled from an account into the stored archive.
+ *
+ * The merge is a union keyed by deal seed, and the local copy wins a collision:
+ * it is the one the replay and what-if pages were built against, and the server
+ * round-trip cannot restore a showdown category the archive never stored. The
+ * server side is not modified here at all — reconciling two devices never
+ * deletes a hand from either.
+ */
+export function mergeSyncedHands(incoming: TableHandReport[]): ProfileArchive {
+  const stored = loadArchive();
+  // `dedupe` keeps the last entry for a seed, so local goes second to win.
+  const hands = dedupe([...incoming, ...stored.hands]).slice(-MAX_STORED_HANDS);
+  const merged: ProfileArchive = { ...stored, hands };
+  saveArchive(merged);
+  return merged;
 }
 
 export function clearArchive(): void {

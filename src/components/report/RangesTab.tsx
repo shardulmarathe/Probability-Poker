@@ -4,8 +4,17 @@
  * The centrepiece. Each opponent gets the 13x13 chart of the distribution the
  * equity estimate was actually sampled from, at the street you pick, with the
  * dead cards already taken out of it. The charts are not an illustration of the
- * model; they are the model, projected onto the only 169 classes a poker player
- * thinks in.
+ * model; they are the model — `derive.rangeView` rebuilds the same per-combo
+ * range `decider.opponentRanges` handed the sampler, and the grid is its
+ * projection onto the only 169 classes a poker player thinks in.
+ *
+ * That claim is load-bearing, so it is worth saying what it costs: the grid can
+ * only be a *projection*, never the thing itself. A cell holds up to 12 combos
+ * that a board splits — on K-7-2 the 7-2 cell contains twelve two-pair hands,
+ * but on K-Q-J it contains twelve pieces of air with different backdoors — so
+ * the cell number is their total weight and the chart cannot show the spread
+ * inside it. The bucket meters beside each chart are there for exactly that
+ * reason: they read the same range through the classifier the engine used.
  */
 
 import { useMemo, useState } from "react";
@@ -29,7 +38,6 @@ import {
   CardRow,
   Calc,
   ChipRow,
-  Frac,
   Heading,
   HowCalculated,
   Lead,
@@ -66,11 +74,10 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
     [report, street.actionsUpTo, focus]
   );
 
-  const views = useMemo(() => {
-    const reads = readsAfter(report.actions, street.actionsUpTo, report.seatCount);
-    const dead = [...heroHole, ...board];
-    return opponents.map((seat) => rangeView(seat, reads[seat], dead, board));
-  }, [report, street.actionsUpTo, opponents, heroHole, board]);
+  const views = useMemo(
+    () => opponents.map((seat) => rangeView(report, street, seat, heroHole)),
+    [report, street, opponents, heroHole]
+  );
 
   /** The read on every seat at every street — the narrowing strip. */
   const narrowing = useMemo(
@@ -169,7 +176,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                       {[0, 1, 2].map((t) => (
                         <Meter
                           key={t}
-                          label={<span className="capitalize">{TIER_NAMES[t]} band</span>}
+                          label={<span className="capitalize">{TIER_NAMES[t]}</span>}
                           value={v.tierWeight[t]}
                           text={pct(v.tierWeight[t])}
                           color={TIER_COLOR[t]}
@@ -195,7 +202,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                         style={{ borderColor: "rgba(244,237,228,0.1)" }}
                       >
                         <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.2em] text-gold-soft/75">
-                          That range on this board
+                          What that range is, on this board
                         </p>
                         <div className="space-y-1.5">
                           {Array.from({ length: BUCKET_COUNT }, (_, b) => b)
@@ -212,11 +219,12 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                             ))}
                         </div>
                         <p className="mt-2 text-[0.68rem] leading-relaxed text-ivory/45">
-                          The bands above are a pre-flop judgement; this is the
-                          same weight re-classified against{" "}
-                          <span className="font-mono">{cardText(board)}</span>. A
-                          read that looks strong can be mostly air on the wrong
-                          board.
+                          Every combination in the range, classified against{" "}
+                          <span className="font-mono">{cardText(board)}</span> —
+                          the nine rungs the engine works in. The three bars
+                          above are these same nine collapsed into thirds, not a
+                          separate pre-flop judgement, so the two cannot
+                          disagree.
                         </p>
                       </div>
                     )}
@@ -230,39 +238,54 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
         <HowCalculated label="How A Read Becomes A Chart">
           <Heading>What the table actually knows</Heading>
           <Lead>
-            The read on a seat is not a list of hands. It is three numbers — how
-            likely that seat is to be <em>weak</em>, <em>medium</em> or{" "}
-            <em>strong</em> — moved by Bayes after every public action it takes.
-            No seat's hole cards are ever consulted, so the read drawn here is
-            exactly the read the bots were working from.
+            A read is not a list of hands, and it is not a mood either. It is one
+            weight on each of the 1326 two-card combinations a deck can make. No
+            seat's hole cards are ever consulted to build it — only the board and
+            the bets — so the chart drawn here is exactly the distribution the
+            bots' equity estimates were sampled from.
           </Lead>
-          <Heading>Turning three numbers into 1326</Heading>
+          <Heading>Where the weights come from</Heading>
           <Lead>
-            The sampler buckets every two-card combination still available into
-            those three tiers, picks a tier by its belief, then draws uniformly
-            inside it. So the weight on a single combination is:
+            Every combination starts equal: before anybody acts, "dealt at
+            random" is the whole story, and the only thing that has happened is
+            card removal. Each action the seat then takes multiplies every
+            combination by how likely that action is from a hand of{" "}
+            <em>that class on that board</em>:
           </Lead>
           <Calc>
             <div className="flex flex-wrap items-center gap-1">
-              P(combo) =
-              <Frac n={<>P(tier of that combo)</>} d={<>combos left in that tier</>} />
+              w(combo) ← w(combo) × P(action | class of combo, street, position,
+              facing)
+            </div>
+            <div className="mt-2 text-ivory/60">
+              renormalised after each action, so the weights are a probability
+              distribution at every step rather than only at the end.
             </div>
           </Calc>
           <Lead>
-            Summing that over the 6, 4 or 12 combinations in a chart cell gives
-            the number in the cell. A combo's tier depends only on its ranks and
-            whether it is suited, so a cell is always entirely inside one band —
-            which is why the chart reads as three plateaus rather than a smooth
-            gradient. The plateaus rise and fall as the read moves; heights inside
-            a plateau move only when cards are removed.
+            The class is measured against the board <em>as it stood when the
+            action was taken</em> — a flop bet is scored against the flop, never
+            against the river the hand later ran out to. That is what makes 7-2
+            a hand rather than a joke: on K-7-2 it has flopped two pair, so a bet
+            from it is unremarkable and the weight stays. A pre-flop ranking
+            would have filed the same combination under trash and folded it out
+            of the range the equity was measured against.
           </Lead>
           <Heading>Reading the chart</Heading>
           <Lead>
-            Pairs run down the diagonal, suited hands sit above it and offsuit
-            below — AKs one step right of AA, AKo one step below. Weight is drawn
-            twice over: as lightness, and as the width of the bar along the bottom
-            of each cell, so the ranking survives greyscale and colour blindness.
-            Hatched cells hold no combinations at all.
+            Each cell is the total weight of the 6, 4 or 12 combinations it
+            holds. Pairs run down the diagonal, suited hands sit above it and
+            offsuit below — AKs one step right of AA, AKo one step below. Weight
+            is drawn twice over: as lightness, and as the width of the bar along
+            the bottom of each cell, so the ranking survives greyscale and colour
+            blindness. Hatched cells hold no combinations at all.
+          </Lead>
+          <Lead>
+            The chart is a summary in one specific way, and it is worth knowing
+            which: a cell's twelve combinations can be twelve different hands on
+            the same board. The bucket bars beside it read the same weights
+            through the classifier the engine used, which is where that detail
+            survives.
           </Lead>
           <Why>
             This is the honest version of "putting someone on a hand". Nobody
@@ -273,7 +296,22 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section title="Narrowing" subtitle="The read on each seat, street by street">
+      <Section
+        title="Narrowing"
+        subtitle="The three-tier summary, street by street"
+      >
+        {/* Not the charts above in miniature. This is the coarse
+            `weak / medium / strong` read the table also keeps, moved by Bayes on
+            the flat action table — it is recorded with every decision and read
+            by the coach, but it is not what the sampler drew from. Saying so is
+            cheaper than letting the two be mistaken for each other. */}
+        <p className="mb-4 text-[0.7rem] leading-relaxed text-ivory/45">
+          A second, coarser read the table keeps alongside the ranges above:
+          three numbers per seat, moved by Bayes after every public action. It
+          ignores the board, so it is the one place a hand is still judged the
+          way it looked before the flop — useful for watching a seat's story
+          tighten, not for pricing a hand.
+        </p>
         <div className="space-y-4">
           {opponents.length === 0 && (
             <p className="text-sm text-ivory/55">No opponents to track.</p>

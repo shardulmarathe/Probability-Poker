@@ -1,0 +1,183 @@
+/**
+ * Every row of mutually-exclusive choices in the product.
+ *
+ * There were five idioms doing this job: the review's sticky tab bar, the
+ * replay's near-byte-copy of it, the report's scrollable `ChipRow`, two
+ * hand-rolled seat pickers, and the setup panel's `Pills` — which, along with
+ * the table's mode switch, used `aria-pressed` and declared no group role at
+ * all. They differed in radius, in active background, in whether they scrolled,
+ * and in what a screen reader was told they were.
+ *
+ * One component now. Three things vary, and each varies for a reason:
+ *
+ *   layout   "fill"   a fixed, small set that should divide the width — tabs
+ *            "scroll" a set that can outgrow the width — seats, hands, streets
+ *            "wrap"   a set that reads as a form field — seat count, depth
+ *
+ *   as       "tabs"    the choice swaps a panel        → tablist / tab
+ *            "options" the choice sets a value         → radiogroup / radio
+ *
+ *   hint     the active option's explanation, printed underneath.
+ *
+ * That last one is not cosmetic. The table's mode blurbs ("Nothing revealed.
+ * Just poker") and the replay's tab blurbs existed only as `title=` attributes,
+ * which no touch device has ever shown to anyone. Passing `showHint` puts them
+ * on the screen, where a first-time player can read them.
+ */
+
+import { useId, type ReactNode } from "react";
+import { LINE, RADIUS, SURFACE, TONE } from "./tokens";
+
+export interface TabOption<T extends string | number> {
+  value: T;
+  label: string;
+  /** Shown beside the label, in monospace: a count, a size, a shorthand. */
+  meta?: string;
+  /** One sentence explaining what choosing this does. */
+  hint?: string;
+  disabled?: boolean;
+  /**
+   * Overrides the `${testIdPrefix}-${value}` hook. Needed where the value is
+   * not the stable identity — bet sizings are keyed by cost, which moves with
+   * the pot, but have always been addressed in tests by their label.
+   */
+  testId?: string;
+}
+
+export interface TabsProps<T extends string | number> {
+  options: TabOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  /** Names the group for assistive tech. Required — every group is about something. */
+  label: string;
+  layout?: "fill" | "scroll" | "wrap";
+  as?: "tabs" | "options";
+  /** Print the active option's `hint` under the row. */
+  showHint?: boolean;
+  /** Renders `data-testid={`${testIdPrefix}-${value}`}` on each control. */
+  testIdPrefix?: string;
+  size?: "sm" | "md";
+}
+
+export function Tabs<T extends string | number>({
+  options,
+  value,
+  onChange,
+  label,
+  layout = "fill",
+  as = "tabs",
+  showHint = false,
+  testIdPrefix,
+  size = "md",
+}: TabsProps<T>) {
+  const uid = useId();
+  const tabs = as === "tabs";
+  const active = options.find((o) => o.value === value);
+
+  const row =
+    layout === "fill"
+      ? "flex gap-1"
+      : layout === "scroll"
+        ? "-mx-1 flex gap-1 overflow-x-auto px-1"
+        : "flex flex-wrap gap-1.5";
+
+  const cell =
+    layout === "fill"
+      ? "min-w-0 flex-1 truncate"
+      : layout === "scroll"
+        ? "shrink-0"
+        : "min-w-[3rem] flex-1";
+
+  // Off the tray, an inactive control needs its own hairline to read as one.
+  const idleBorder = layout === "fill" ? "transparent" : LINE.quiet;
+
+  // A "fill" row divides a fixed width between its labels, so on a phone the
+  // type has to come down or "Step through" becomes "Step thro…". Everything
+  // else keeps its size — it can wrap or scroll instead.
+  const metrics =
+    size === "sm"
+      ? `min-h-[34px] py-1 text-[0.68rem] ${layout === "fill" ? "px-1.5 sm:px-2.5" : "px-2.5"}`
+      : layout === "fill"
+        ? "min-h-[40px] px-1.5 py-2 text-[0.72rem] sm:px-3 sm:text-sm"
+        : "min-h-[40px] px-3 py-2 text-sm";
+
+  return (
+    <div className="min-w-0">
+      <div
+        role={tabs ? "tablist" : "radiogroup"}
+        aria-label={label}
+        // Only "fill" gets a tray. A wrapping set reads as a form field, and a
+        // scrolling set inside a fixed border looks broken the moment it
+        // overflows the border it is drawn inside.
+        className={`${row} ${layout === "fill" ? `border p-1 ${RADIUS.action}` : ""}`}
+        style={
+          layout === "fill"
+            ? { borderColor: LINE.gold, background: SURFACE.tray }
+            : undefined
+        }
+      >
+        {options.map((option, i) => {
+          const on = option.value === value;
+          return (
+            <button
+              key={`${uid}-${i}`}
+              type="button"
+              role={tabs ? "tab" : "radio"}
+              {...(tabs ? { "aria-selected": on } : { "aria-checked": on })}
+              disabled={option.disabled}
+              data-testid={
+                option.testId ??
+                (testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined)
+              }
+              onClick={() => onChange(option.value)}
+              className={`${cell} ${metrics} ${RADIUS.control} border font-display font-semibold tracking-wide transition disabled:cursor-not-allowed disabled:opacity-30`}
+              style={{
+                borderColor: on ? "rgba(201,162,39,0.6)" : idleBorder,
+                background: on ? SURFACE.goldWashStrong : "transparent",
+                color: on ? TONE.gold : "rgba(244,237,228,0.62)",
+              }}
+            >
+              {option.label}
+              {option.meta && (
+                <span className="ml-1.5 font-mono text-[0.62rem] opacity-70">
+                  {option.meta}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {showHint && active?.hint && (
+        <p
+          className="mt-2 font-cormorant text-[0.95rem] italic leading-snug text-ivory/60"
+          data-testid={testIdPrefix ? `${testIdPrefix}-hint` : undefined}
+        >
+          {active.hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A tab row that stays put while its panel scrolls under it.
+ *
+ * The review and the replay each grew their own copy of this wrapper, gradient
+ * and all. The gradient is doing real work — it fades the content out from
+ * under the bar instead of chopping it — so it is kept, once.
+ */
+export function StickyTabs({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="sticky top-0 z-30 -mx-3 px-3 py-2 sm:-mx-4 sm:px-4"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(6,15,10,0.96) 0%, rgba(6,15,10,0.82) 70%, rgba(6,15,10,0) 100%)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}

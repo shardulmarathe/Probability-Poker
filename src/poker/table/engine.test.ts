@@ -691,3 +691,47 @@ describe("hand report", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Narration
+// ---------------------------------------------------------------------------
+
+describe("the log narrates in the subject's person", () => {
+  /**
+   * Seat 0 is named "You", and the replay page prints `table.log` verbatim.
+   * Writing every line in the third person therefore produced "You folds.",
+   * "You calls $960." and "You rebuys for $2000." on screen. This sweeps enough
+   * random hands to reach every verb, including the rebuy, and fails on any
+   * third-person form attached to that subject.
+   */
+  it("never conjugates a verb against 'You'", () => {
+    // A short stack so seats bust and the rebuy line is reached too.
+    const t = table({ seatCount: 4, seed: 20260802, startingStack: 60 });
+    const lines = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      playHandHeadless(t, shuffleBot(i));
+      for (const line of t.log) lines.add(line);
+    }
+
+    const hero = [...lines].filter((l) => l.startsWith("You "));
+    // Guards the assertion below: a run that never spoke as the hero would
+    // pass it without checking anything.
+    expect(hero.length).toBeGreaterThan(4);
+    expect(hero.some((l) => /^You rebuy\b/.test(l))).toBe(true);
+    expect(hero.filter((l) => /^You \w+s\b/.test(l))).toEqual([]);
+  });
+
+  it("still conjugates a verb against a bot's name", () => {
+    const t = table({ seatCount: 4, seed: 4, startingStack: 60 });
+    const lines = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      playHandHeadless(t, shuffleBot(i));
+      for (const line of t.log) lines.add(line);
+    }
+    const bots = [...lines].filter((l) => /^Bot \d /.test(l));
+    expect(bots.length).toBeGreaterThan(4);
+    expect(bots.some((l) => /^Bot \d (folds|checks|calls|bets|raises)\b/.test(l))).toBe(
+      true
+    );
+  });
+});

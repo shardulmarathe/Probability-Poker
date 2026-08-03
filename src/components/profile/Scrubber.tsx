@@ -15,6 +15,20 @@ import type { ReplayFrame } from "../../poker/replay";
 import { positionOf } from "../../poker/table/position";
 import { CardRow, Tag } from "../ui";
 
+/**
+ * The pot to print for a frame.
+ *
+ * `frame.pot` is the live pot: right until the chips are pushed and wrong
+ * afterwards. The last frame of every hand read "Pot $0" directly above a
+ * narration line saying "Pot of $90 to Wildfire Wes". Once the hand is settled
+ * the total that was contested is the number being looked for, and every seat's
+ * `invested` still holds its share of it.
+ */
+function potOf(frame: ReplayFrame): number {
+  if (frame.status === "playing" || frame.pot > 0) return frame.pot;
+  return frame.seats.reduce((n, seat) => n + seat.invested, 0);
+}
+
 const STREET_LABEL: Record<string, string> = {
   preflop: "Pre-Flop",
   flop: "Flop",
@@ -110,7 +124,7 @@ export function Scrubber({
         </span>
         <div className="ml-auto flex items-center gap-2">
           <Tag tone="neutral">{STREET_LABEL[frame.street] ?? frame.street}</Tag>
-          <Tag tone="gold">Pot {money(frame.pot)}</Tag>
+          <Tag tone="gold">Pot {money(potOf(frame))}</Tag>
         </div>
       </div>
 

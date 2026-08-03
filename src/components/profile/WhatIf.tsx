@@ -64,7 +64,12 @@ export function SimulatedBanner({
           Simulated
         </span>
         <span className="font-mono text-[0.62rem] uppercase tracking-wider" style={{ color: SIM }}>
-          {rederived} move{rederived === 1 ? "" : "s"} re-derived
+          {/* Zero is a real and common answer — a fold that ends the hand
+              leaves nothing to re-derive — and "0 moves re-derived" reads as a
+              failure rather than as that fact. */}
+          {rederived === 0
+            ? "nothing to re-derive"
+            : `${rederived} move${rederived === 1 ? "" : "s"} re-derived`}
         </span>
       </div>
       <p className="mt-1.5 text-[0.75rem] leading-relaxed text-ivory/70">{children}</p>
@@ -219,10 +224,13 @@ export function CounterfactualPanel({
             {seatName(seat)} played{" "}
             <span style={{ color: SIM }}>{result.substitute.label.toLowerCase()}</span> instead
             of {result.actual.action}
-            {result.actual.cost > 0 ? ` ${money(result.actual.cost)}` : ""}. The{" "}
-            {result.rederived} move{result.rederived === 1 ? "" : "s"} after it came from
-            the bots just now, not from the record. This is one way the hand could
-            have gone, not the way it would have gone.
+            {result.actual.cost > 0 ? ` ${money(result.actual.cost)}` : ""}.{" "}
+            {/* With nothing left to re-derive there is no sampling in the
+                answer, so the usual "one way it could have gone" caveat would
+                be understating it. */}
+            {result.rederived === 0
+              ? "That ended the hand where it stood, so nothing after it had to come from the bots — this outcome is exact."
+              : `The ${result.rederived} move${result.rederived === 1 ? "" : "s"} after it came from the bots just now, not from the record. This is one way the hand could have gone, not the way it would have gone.`}
           </SimulatedBanner>
 
           <div className="grid grid-cols-3 gap-2">
@@ -380,8 +388,11 @@ export function LineupPanel({
         <div className="mt-5 space-y-3" data-testid="lineup-result">
           <SimulatedBanner rederived={result.rederived}>
             Not one move here was replayed — the recorded actions were answers to
-            a different table, so all {result.rederived} came from the bots just
-            now, including the seat you played.{" "}
+            a different table, so{" "}
+            {result.rederived === 0
+              ? "the hand ended before anyone had a decision to make"
+              : `all ${result.rederived} came from the bots just now, including the seat you played`}
+            .{" "}
             {result.sameCards ? (
               <span style={{ color: "#7fd3a8" }}>
                 Every seat was dealt the same cards as the real hand (verified).

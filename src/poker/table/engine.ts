@@ -315,18 +315,32 @@ function checkLegal(table: Table, seat: number, action: TableAction): void {
   }
 }
 
+/**
+ * A verb that agrees with its subject.
+ *
+ * The hero's seat is literally named "You", so writing the log in the third
+ * person printed "You folds.", "You calls $960." and "You rebuys for $2000."
+ * throughout the replay narration. `WhatIf.tsx` already special-cases the same
+ * name for its possessive; this is the verb half of that, and every log line
+ * with a subject goes through it so a new one cannot reintroduce the bug.
+ */
+function verb(seat: TableSeat, third: string): string {
+  return seat.name === "You" ? third.replace(/s$/, "") : third;
+}
+
 function describe(seat: TableSeat, action: TableAction): string {
+  const allIn = seat.stack === 0 ? " (all-in)" : "";
   switch (action.type) {
     case "fold":
-      return `${seat.name} folds.`;
+      return `${seat.name} ${verb(seat, "folds")}.`;
     case "check":
-      return `${seat.name} checks.`;
+      return `${seat.name} ${verb(seat, "checks")}.`;
     case "call":
-      return `${seat.name} calls $${action.cost}${seat.stack === 0 ? " (all-in)" : ""}.`;
+      return `${seat.name} ${verb(seat, "calls")} $${action.cost}${allIn}.`;
     case "bet":
-      return `${seat.name} bets $${seat.streetCommit}${seat.stack === 0 ? " (all-in)" : ""}.`;
+      return `${seat.name} ${verb(seat, "bets")} $${seat.streetCommit}${allIn}.`;
     case "raise":
-      return `${seat.name} raises to $${seat.streetCommit}${seat.stack === 0 ? " (all-in)" : ""}.`;
+      return `${seat.name} ${verb(seat, "raises")} to $${seat.streetCommit}${allIn}.`;
   }
 }
 
@@ -490,7 +504,9 @@ function rebuy(table: Table): void {
     if (seat.stack > 0) continue;
     seat.stack = table.startingStack;
     table.rebuys += table.startingStack;
-    table.log.push(`${seat.name} rebuys for $${table.startingStack}.`);
+    table.log.push(
+      `${seat.name} ${verb(seat, "rebuys")} for $${table.startingStack}.`
+    );
   }
 }
 

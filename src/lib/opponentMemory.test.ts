@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { INITIAL_BELIEF } from "../data/constants";
+import type { RankValue, Suit } from "../types";
 import { updateBelief } from "../poker/bayesian";
 import { encodeCard } from "../poker/core/card";
 import { makeCard } from "../poker/cards";
@@ -102,8 +103,7 @@ function report(partial: Partial<TableHandReport>): TableHandReport {
   };
 }
 
-const code = (rank: number, suit: "s" | "h" | "d" | "c") =>
-  encodeCard(makeCard(rank, suit));
+const code = (rank: RankValue, suit: Suit) => encodeCard(makeCard(rank, suit));
 
 // K-7-2 rainbow, then a 9 and a 4. 7-2 is Air preflop and two pair by the river:
 // the whole reason a decision has to be bucketed against the board it was taken
@@ -486,7 +486,7 @@ function readOnBluffer(model: LikelihoodModel): {
 describe("learning an exploitable player, end to end", () => {
   it("moves the bots' read onto air after watching a bluffer play", () => {
     const decide = tableDecider({ simulations: 200 });
-    const table = tableWithBluffer(0xb1u77);
+    const table = tableWithBluffer(0xb1bff);
     const memory = emptyMemory();
 
     const before = readOnBluffer(createLikelihoodModel("poker")).air;

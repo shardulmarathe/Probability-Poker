@@ -52,6 +52,16 @@ import {
   sizedCandidates,
   FOLD_EQUITY_SIMS,
 } from "../poker/model/decider";
+import {
+  clearMemory,
+  loadMemory,
+  memoryStats,
+  recordReport,
+  scheduleSave,
+  seatModelsFor,
+  type MemoryStats,
+  type OpponentMemory,
+} from "../lib/opponentMemory";
 import { BOT_PROFILES } from "../poker/model/profiles";
 import { COMBO_COUNT, type Range } from "../poker/model/range";
 import { planShards, runMultiwayEquity } from "../poker/equity/pool";
@@ -162,6 +172,10 @@ interface TableContextValue {
   heroRead: HeroRead | null;
   history: TableHandReport[];
   lastReport: TableHandReport | null;
+  /** How much the bots have learned about this player, for the UI to state. */
+  memory: MemoryStats;
+  /** Wipe what the bots have learned and go back to the shared prior. */
+  forgetMe: () => void;
   act: (action: TableAction) => void;
   nextHand: () => void;
   newTable: (options: TableOptions) => void;
@@ -446,15 +460,39 @@ function planStages(
   return stages;
 }
 
-/** The live decider: Monte Carlo goes to the worker pool, off the main thread. */
-const decide = asyncTableDecider();
-
 // ---------------------------------------------------------------------------
 
 export function TableProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<TableOptions>(loadSetup);
   const [table, setTable] = useState<Table>(() => buildTable(loadSetup()));
   const [history, setHistory] = useState<TableHandReport[]>([]);
+
+  // What the bots have learned about this player. Read on every decision,
+  // written only when a hand ends — never on the decision path. Refs rather
+  // than state because a re-render on every observation would be pointless: the
+  // model is an input to the next decision, not something the UI renders live.
+  const memoryRef = useRef<OpponentMemory>(loadMemory());
+  const heroRef = useRef<number | null>(null);
+  // Mirrored into state only so the UI can re-render when it changes; the
+  // decision path reads the ref, never this.
+  const [memory, setMemory] = useState<MemoryStats>(() =>
+    memoryStats(memoryRef.current)
+  );
+
+  /**
+   * The live decider: Monte Carlo goes to the worker pool, off the main thread.
+   *
+   * Built once. `models` is a function called per seat per decision, so it reads
+   * through the refs and the decider never needs rebuilding when the memory
+   * grows — which would otherwise throw away the worker pool mid-session.
+   */
+  const decide = useMemo(
+    () =>
+      asyncTableDecider({
+        models: (seat) => seatModelsFor(heroRef.current, memoryRef.current)(seat),
+      }),
+    []
+  );
 
   const [busy, setBusy] = useState(false);
   const [dealtCount, setDealtCount] = useState(0);
@@ -526,6 +564,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const resumeRef = useRef(false);
 
   const heroSeat = options.observer ? null : 0;
+  heroRef.current = heroSeat;
 
   // ---- Low-level presentation primitives ----------------------------------
   const commit = useCallback((next: Table) => {
@@ -826,7 +865,21 @@ export function TableProvider({ children }: { children: ReactNode }) {
         ? prev
         : [...prev, report]
     );
-  }, [table.lastReport]);
+
+    // The only place the bots learn. Hand-over, not decision time, so a growing
+    // model never costs a player a millisecond. `recordReport` de-duplicates by
+    // deal seed, so re-running this on the same hand is a no-op.
+    if (heroSeat !== null) {
+      recordReport(memoryRef.current, report, heroSeat);
+      scheduleSave(memoryRef.current);
+      setMemory(memoryStats(memoryRef.current));
+    }
+  }, [table.lastReport, heroSeat]);
+
+  const forgetMe = useCallback(() => {
+    memoryRef.current = clearMemory();
+    setMemory(memoryStats(memoryRef.current));
+  }, []);
 
   // ---- Observer mode deals itself on ---------------------------------------
   //
@@ -937,6 +990,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
       heroRead,
       history,
       lastReport: table.lastReport,
+      memory,
+      forgetMe,
       act,
       nextHand,
       newTable,
@@ -952,6 +1007,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
       reads,
       heroRead,
       history,
+      memory,
+      forgetMe,
       act,
       nextHand,
       newTable,

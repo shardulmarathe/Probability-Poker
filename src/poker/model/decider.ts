@@ -204,7 +204,8 @@ export function closesAction(state: TableState, seat: number): boolean {
 export function equityRequest(
   state: TableState,
   seat: number,
-  simulations?: number
+  simulations?: number,
+  models: SeatModels = defaultSeatModels
 ): EquityRequest {
   const hero = seatOf(state, seat);
   const opponents = opponentsOf(state, seat);
@@ -214,26 +215,123 @@ export function equityRequest(
     opponents,
     // The read the sampler draws from, per combo rather than per tier. See
     // `opponentRanges` — this is where `buckets.ts` reaches the equity number.
-    ranges: opponentRanges(state, seat),
+    ranges: opponentRanges(state, seat, models),
     simulations: simulations ?? decisionSims(state.street, opponents.length),
     seed: decisionSeed(state, seat),
   };
 }
 
 // ---------------------------------------------------------------------------
+// Who the bot is modelling
+// ---------------------------------------------------------------------------
+
+/**
+ * The bot's read on what an opponent does with each class of hand. A fresh
+ * model is the generated poker prior — bucket-, street- and facing-conditioned,
+ * with no player data in it — which is the right default for a bot that has
+ * observed nothing. It is never written to, so one instance is shared.
+ *
+ * Read in both directions. `foldByBucket` asks it how often a bet gets through;
+ * `opponentRanges` runs it backwards, asking what a seat's bets imply about
+ * what it holds. One model answering both is what keeps the range the bot bets
+ * against and the range it prices folds against the same range.
+ */
+export const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
+
+/**
+ * Which model describes each seat.
+ *
+ * A learned model is a claim about *one player*. `opponentMemory` accumulates
+ * one for the human seat, and pointing it at every seat would be a category
+ * error: it would tell a bot that the seat across the table folds to river bets
+ * 71% of the time on the evidence of somebody else's folds. So the model is a
+ * function of the seat being read, not a module constant, and the default says
+ * "I have observed nobody" for everybody.
+ *
+ * Three consequences the tests pin. The engine's own tests get a fresh prior and
+ * stay deterministic; a bot modelling another bot is untouched; and an empty
+ * learned model is *bit-identical* to the default, because `betaMean(0, 0, m)`
+ * is exactly `m` at every level of the backoff, so a model with no cells cannot
+ * move a single lookup.
+ */
+export type SeatModels = (seat: number) => LikelihoodModel;
+
+/** Nobody has been observed: the shared prior describes every seat. */
+export const defaultSeatModels: SeatModels = () => OPPONENT_MODEL;
+
+/**
+ * Apply a learned model to exactly one seat, and the prior to all the others.
+ *
+ * The whole scoping decision, in one line and in one place, so "which seats does
+ * this describe" has a single answer that can be read off the call site.
+ */
+export function modelForSeat(seat: number, model: LikelihoodModel): SeatModels {
+  return (id) => (id === seat ? model : OPPONENT_MODEL);
+}
+
+// ---------------------------------------------------------------------------
 // Opponent ranges
 // ---------------------------------------------------------------------------
 
-/** How much of the board a decision on each street could see. */
-const BOARD_CARDS_AT: Record<LearnStreet, number> = {
+/**
+ * How much of the board a decision on each street could see.
+ *
+ * Exported because anything that *writes* the likelihood model has to bucket a
+ * decision against the same board prefix this reads it back with, or the counts
+ * are filed under one hand class and looked up under another. See
+ * `lib/opponentMemory.handObservations`.
+ */
+export const BOARD_CARDS_AT: Record<LearnStreet, number> = {
   preflop: 0,
   flop: 3,
   turn: 4,
   river: 5,
 };
 
-const learnStreet = (street: Street): LearnStreet =>
+export const learnStreet = (street: Street): LearnStreet =>
   street === "showdown" ? "river" : street;
+
+/** Where in the hand one action record sat, as the likelihood model keys it. */
+export interface ActionContext {
+  street: LearnStreet;
+  facing: Facing;
+}
+
+/**
+ * Replay a hand's records and label each with the node it happened at.
+ *
+ * `facing` is not stored on an action, so it is reconstructed from the
+ * aggression that preceded it on that street: preflop the big blind is already
+ * an open, which is why the count starts at one there and at zero on every later
+ * street. A call adds no aggression, so it cannot change the question.
+ *
+ * One implementation, not two. `opponentRanges` reads the model at these nodes
+ * and `opponentMemory` writes it at them; if the two reconstructions ever drifted
+ * apart, every observation would be recorded at a node nothing looks up.
+ */
+export function actionContexts(actions: ActionRecord[]): ActionContext[] {
+  const out: ActionContext[] = [];
+  let street: LearnStreet = "preflop";
+  let aggressors = 1;
+  for (const record of actions) {
+    const recordStreet = learnStreet(record.street);
+    if (recordStreet !== street) {
+      street = recordStreet;
+      aggressors = recordStreet === "preflop" ? 1 : 0;
+    }
+    out.push({
+      street,
+      facing:
+        record.toCall <= 0
+          ? "unopened"
+          : aggressors >= 2
+            ? "facing-raise"
+            : "facing-bet",
+    });
+    if (record.action === "bet" || record.action === "raise") aggressors++;
+  }
+  return out;
+}
 
 /**
  * Bucket tables for a board's street prefixes, built on demand and cached.
@@ -302,7 +400,7 @@ function actionByBucket(
 export function opponentRanges(
   state: TableState,
   seat: number,
-  model: LikelihoodModel = OPPONENT_MODEL
+  models: SeatModels = defaultSeatModels
 ): Record<number, Range> {
   const hero = seatOf(state, seat);
   const board = Array.from(encodeCards(state.board));
@@ -315,40 +413,28 @@ export function opponentRanges(
     ranges[id] = normalizeRange(removeCards(uniformRange(), dead));
   }
 
-  // One pass over the hand's record. `facing` is not stored on an action, so it
-  // is reconstructed here from the aggression that preceded it on that street:
-  // preflop the big blind is already an open, which is why the count starts at
-  // one there and at zero on every later street.
-  let street: LearnStreet = "preflop";
-  let aggressors = 1;
-  for (const record of handActions(state)) {
-    const recordStreet = learnStreet(record.street);
-    if (recordStreet !== street) {
-      street = recordStreet;
-      aggressors = recordStreet === "preflop" ? 1 : 0;
-    }
+  // One pass over the hand's record, each action read at the node it happened
+  // at (`actionContexts`) and through the model that describes the seat that
+  // took it — so a learned read on one player never colours another's range.
+  const actions = handActions(state);
+  const contexts = actionContexts(actions);
+  for (let i = 0; i < actions.length; i++) {
+    const record = actions[i];
     const range = ranges[record.seat];
-    if (range !== undefined) {
-      const facing: Facing =
-        record.toCall <= 0
-          ? "unopened"
-          : aggressors >= 2
-            ? "facing-raise"
-            : "facing-bet";
-      const buckets = bucketsAt(street);
-      const perBucket = actionByBucket(
-        model,
-        record.action,
-        street,
-        positionOf(record.seat, state.button, seatCount),
-        facing
-      );
-      for (let c = 0; c < COMBO_COUNT; c++) range[c] *= perBucket[buckets[c]];
-      // Every likelihood is bounded below by the prior's uniform mixture, so no
-      // product can reach zero and this can never divide by nothing.
-      normalizeRange(range);
-    }
-    if (record.action === "bet" || record.action === "raise") aggressors++;
+    if (range === undefined) continue;
+    const { street, facing } = contexts[i];
+    const buckets = bucketsAt(street);
+    const perBucket = actionByBucket(
+      models(record.seat),
+      record.action,
+      street,
+      positionOf(record.seat, state.button, seatCount),
+      facing
+    );
+    for (let c = 0; c < COMBO_COUNT; c++) range[c] *= perBucket[buckets[c]];
+    // Every likelihood is bounded below by the prior's uniform mixture, so no
+    // product can reach zero and this can never divide by nothing.
+    normalizeRange(range);
   }
 
   return ranges;
@@ -473,19 +559,6 @@ export const REFERENCE_FRACTION = 0.5;
  * calling on strength rather than on price.
  */
 export const MAX_TILT_FRACTION = 1;
-
-/**
- * The bot's read on what an opponent does with each class of hand. A fresh
- * model is the generated poker prior — bucket-, street- and facing-conditioned,
- * with no player data in it — which is the right default for a bot that has
- * observed nothing. It is never written to, so one instance is shared.
- *
- * Read in both directions. `foldByBucket` asks it how often a bet gets through;
- * `opponentRanges` runs it backwards, asking what a seat's bets imply about
- * what it holds. One model answering both is what keeps the range the bot bets
- * against and the range it prices folds against the same range.
- */
-const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
 
 /**
  * P(fold) at a bet of `fraction` of the pot, given the rate at the reference
@@ -623,7 +696,8 @@ export function priceSizes(
   sizings: SizingOption[],
   simulations: number,
   seed: number,
-  ranges?: Record<number, Range>
+  ranges?: Record<number, Range>,
+  models: SeatModels = defaultSeatModels
 ): PricedSizes | null {
   const opponents = opponentsOf(state, seat);
   if (opponents.length === 0 || simulations <= 0) return null;
@@ -634,7 +708,7 @@ export function priceSizes(
   const heroHole = Array.from(encodeCards(hero.hole));
   const board = Array.from(encodeCards(state.board));
   const buckets = classifyAll(makeBoardContext(board));
-  const byId = ranges ?? opponentRanges(state, seat);
+  const byId = ranges ?? opponentRanges(state, seat, models);
   const pot = state.pot;
   const toCall = toCallOf(state, seat);
   const potAfterCall = pot + toCall;
@@ -652,7 +726,7 @@ export function priceSizes(
       seatOf(state, id).status === "allin"
         ? null
         : foldByBucket(
-            OPPONENT_MODEL,
+            models(id),
             street,
             positionOf(id, state.button, state.seats.length),
             facing
@@ -679,7 +753,7 @@ export function priceSizes(
     // understate the pot a raise builds. Capped by the stack: an opponent
     // cannot put in more than it has, and the surplus would be returned.
     const newLevel = hero.streetCommit + action.cost;
-    const models: FoldingOpponent[] = priors.map((range, i) => {
+    const field: FoldingOpponent[] = priors.map((range, i) => {
       const opp = seatOf(state, opponents[i]);
       return {
         range,
@@ -690,7 +764,7 @@ export function priceSizes(
     byLabel[action.label] = foldEquityEv({
       heroHole,
       board,
-      opponents: models,
+      opponents: field,
       pot,
       toCall,
       cost: action.cost,
@@ -751,7 +825,8 @@ export function priceCall(
   call: TableAction,
   simulations: number,
   seed: number,
-  ranges?: Record<number, Range>
+  ranges?: Record<number, Range>,
+  models: SeatModels = defaultSeatModels
 ): FoldEquityBreakdown | null {
   const opponents = opponentsOf(state, seat);
   if (opponents.length === 0 || simulations <= 0) return null;
@@ -772,13 +847,13 @@ export function priceCall(
   const heroHole = Array.from(encodeCards(hero.hole));
   const board = Array.from(encodeCards(state.board));
   const buckets = classifyAll(makeBoardContext(board));
-  const byId = ranges ?? opponentRanges(state, seat);
+  const byId = ranges ?? opponentRanges(state, seat, models);
   const pot = state.pot;
   const potAfterCall = pot + toCall;
   const street = learnStreet(state.street);
   const facing = facingThisStreet(state);
 
-  const models: FoldingOpponent[] = opponents.map((id, i) => {
+  const field: FoldingOpponent[] = opponents.map((id, i) => {
     const range = byId[id] ?? uniformRange();
     const owes = owed[i];
     // The bettor, an earlier caller, anyone all-in: already in for this street,
@@ -796,7 +871,7 @@ export function priceCall(
       range,
       foldByCombo: foldByCombo(
         foldByBucket(
-          OPPONENT_MODEL,
+          models(id),
           street,
           positionOf(id, state.button, state.seats.length),
           facing
@@ -811,7 +886,7 @@ export function priceCall(
   return callEv({
     heroHole,
     board,
-    opponents: models,
+    opponents: field,
     pot,
     toCall,
     simulations,
@@ -853,7 +928,8 @@ function finish(
   config: TableConfig,
   equity: MultiwayEquity,
   foldEquitySims: number,
-  ranges: Record<number, Range>
+  ranges: Record<number, Range>,
+  models: SeatModels
 ): BotDecision {
   const actions = legalActions(state, seat, config);
   if (actions.length === 0) {
@@ -878,7 +954,8 @@ function finish(
         decisionSeed(state, seat),
         // The ranges the showdown estimate was just run against, not a second
         // set built from the same records — one read per decision, priced twice.
-        ranges
+        ranges,
+        models
       )
     : null;
 
@@ -894,7 +971,8 @@ function finish(
         call,
         foldEquitySims,
         decisionSeed(state, seat),
-        ranges
+        ranges,
+        models
       )
     : null;
   if (call && pricedCall) evs[call.label] = pricedCall.ev;
@@ -953,6 +1031,14 @@ export interface DeciderOptions {
    * to run whole hands quickly; the game leaves it unset.
    */
   simulations?: number;
+  /**
+   * Which learned model describes each seat. Injected rather than imported so
+   * the engine's tests keep a fresh prior — and stay deterministic — while the
+   * live table can hand in the one `opponentMemory` has accumulated for the
+   * human seat. Unset means the shared prior for everybody, which is exactly
+   * what this file did before the model was learnable at all.
+   */
+  models?: SeatModels;
 }
 
 /**
@@ -969,8 +1055,9 @@ function foldEquityBudget(options: DeciderOptions): number {
  * scripts, and by the browser whenever the worker pool is unavailable.
  */
 export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
+  const models = options.models ?? defaultSeatModels;
   return (state, seat, config) => {
-    const request = equityRequest(state, seat, options.simulations);
+    const request = equityRequest(state, seat, options.simulations, models);
     const equity =
       request.opponents.length === 0
         ? uncontestedEquity()
@@ -981,7 +1068,8 @@ export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
       config,
       equity,
       foldEquityBudget(options),
-      request.ranges ?? {}
+      request.ranges ?? {},
+      models
     );
   };
 }
@@ -993,8 +1081,9 @@ export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
  * shard order, never completion order.
  */
 export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
+  const models = options.models ?? defaultSeatModels;
   return async (state, seat, config) => {
-    const request = equityRequest(state, seat, options.simulations);
+    const request = equityRequest(state, seat, options.simulations, models);
     const equity =
       request.opponents.length === 0
         ? uncontestedEquity()
@@ -1005,7 +1094,8 @@ export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
       config,
       equity,
       foldEquityBudget(options),
-      request.ranges ?? {}
+      request.ranges ?? {},
+      models
     );
   };
 }

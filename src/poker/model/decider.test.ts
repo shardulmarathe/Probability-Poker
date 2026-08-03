@@ -19,7 +19,9 @@ import {
   makeBoardContext,
   HandBucket,
 } from "./buckets";
-import { createLikelihoodModel } from "./likelihood";
+import { BUCKET_COUNT as MODEL_BUCKETS, createLikelihoodModel } from "./likelihood";
+import type { LikelihoodModel } from "./likelihood";
+import { observe } from "./learn";
 import {
   COMBO_COUNT,
   comboCardA,
@@ -43,6 +45,9 @@ import {
   foldAtSize,
   foldByBucket,
   handActions,
+  actionContexts,
+  defaultSeatModels,
+  modelForSeat,
   opponentRange,
   opponentRanges,
   opponentsOf,
@@ -1233,5 +1238,211 @@ describe("pricing a call", () => {
     ).toEqual(
       priceCall(b.table, b.seat, callOf(b.table, b.seat), FOLD_EQUITY_SIMS, 7)
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reading the hand's nodes
+// ---------------------------------------------------------------------------
+
+describe("actionContexts", () => {
+  const at = (
+    seat: number,
+    street: ActionRecord["street"],
+    action: ActionRecord["action"],
+    toCall: number
+  ): ActionRecord => ({ seat, street, action, cost: 0, potBefore: 0, toCall });
+
+  it("counts the big blind as the preflop open", () => {
+    // A caller preflop is answering a bet, not acting into an unopened pot —
+    // somebody already put chips in, by force.
+    expect(actionContexts([at(0, "preflop", "call", 10)])).toEqual([
+      { street: "preflop", facing: "facing-bet" },
+    ]);
+    expect(actionContexts([at(0, "flop", "bet", 0)])).toEqual([
+      { street: "flop", facing: "unopened" },
+    ]);
+  });
+
+  it("promotes to facing-raise once a second aggressor has acted", () => {
+    const contexts = actionContexts([
+      at(1, "preflop", "raise", 10),
+      at(2, "preflop", "call", 30),
+      at(0, "flop", "bet", 0),
+      at(1, "flop", "raise", 20),
+      at(0, "flop", "call", 40),
+    ]);
+    expect(contexts.map((c) => c.facing)).toEqual([
+      "facing-bet", // over the blind
+      "facing-raise", // the blind plus the raise
+      "unopened", // fresh street, nothing bet
+      "facing-bet", // answering the lead
+      "facing-raise", // answering the raise over it
+    ]);
+  });
+
+  it("resets the aggression count on every new street", () => {
+    const contexts = actionContexts([
+      at(0, "preflop", "raise", 10),
+      at(0, "flop", "check", 0),
+      at(0, "turn", "bet", 0),
+    ]);
+    expect(contexts.map((c) => c.street)).toEqual(["preflop", "flop", "turn"]);
+    expect(contexts.map((c) => c.facing)).toEqual([
+      "facing-bet",
+      "unopened",
+      "unopened",
+    ]);
+  });
+
+  it("prices a showdown record as a river one", () => {
+    expect(actionContexts([at(0, "showdown", "check", 0)])[0].street).toBe("river");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Injecting a learned model
+// ---------------------------------------------------------------------------
+//
+// `opponentMemory` accumulates a model of the *human* seat. Two things have to
+// be true for that to be safe to plug in: an empty one must change nothing at
+// all, and a populated one must change only the seat it is a claim about.
+
+/** A player who has been seen calling with everything, at every flop node. */
+function neverFolds(): LikelihoodModel {
+  const model = createLikelihoodModel("poker");
+  for (const facing of ["unopened", "facing-bet", "facing-raise"] as const) {
+    for (let i = 0; i < 40; i += 1) {
+      for (let b = 0; b < MODEL_BUCKETS; b += 1) {
+        observe(model, {
+          action: facing === "unopened" ? "check" : "call",
+          bucket: b,
+          street: "flop",
+          position: "BTN",
+          facing,
+        });
+      }
+    }
+  }
+  return model;
+}
+
+describe("injecting a learned model", () => {
+  it("plays a whole session bit-identically through an empty model", () => {
+    // The determinism guarantee. A learned model is extra input to every
+    // decision, so the only thing that makes it safe to add is that an empty
+    // one is exactly the identity: `betaMean(0, 0, m)` is `m` at every level of
+    // the backoff, so a model with no cells cannot move a single lookup. Not
+    // "within the sampling error" — the same bits.
+    const play = (models?: Parameters<typeof tableDecider>[0]) => {
+      const table = seatedTable(["tag", "station", "maniac", "rock"], 99);
+      const decide = tableDecider({ simulations: 400, ...models });
+      const reports = [];
+      for (let i = 0; i < 3; i++) reports.push(playHandHeadless(table, decide));
+      return reports;
+    };
+
+    const base = play();
+    expect(play({ models: defaultSeatModels })).toEqual(base);
+    expect(play({ models: modelForSeat(0, createLikelihoodModel("poker")) })).toEqual(
+      base
+    );
+    // Not vacuous: those reports carry the Monte Carlo estimates, the whole EV
+    // table and the fold-equity breakdown for every decision of three hands.
+    expect(base.flatMap((r) => r.decisions).length).toBeGreaterThan(10);
+    expect(base[0].decisions[0].foldEquity ?? base[0].decisions[0].evByAction).toBeTruthy();
+  });
+
+  it("prices fold equity through the model of the seat being priced", () => {
+    const spot = () =>
+      flopSpot({
+        seats: 3,
+        hero: [makeCard(7, "c"), makeCard(2, "d")],
+        board: [makeCard(13, "s"), makeCard(9, "h"), makeCard(4, "d")],
+        pot: 60,
+        seed: 77,
+      });
+    const price = (models?: ReturnType<typeof modelForSeat>) => {
+      const { table, seat } = spot();
+      const base = legalActions(table, seat, table.config).find(
+        (a) => a.type === "bet"
+      )!;
+      return priceSizes(
+        table,
+        seat,
+        base,
+        sizingLadder(table, seat, table.config),
+        FOLD_EQUITY_SIMS,
+        99,
+        undefined,
+        models
+      )!;
+    };
+
+    const before = price();
+    const after = price(modelForSeat(1, neverFolds()));
+    const label = before.candidates[1].label;
+
+    // Opponents are in seat order. Seat 1 is the one that has been watched, and
+    // it folds less than the prior said; seat 2 has been watched by nobody and
+    // its number is untouched to the bit.
+    expect(after.byLabel[label].pFoldEach[0]).toBeLessThan(
+      before.byLabel[label].pFoldEach[0]
+    );
+    expect(after.byLabel[label].pFoldEach[1]).toBe(
+      before.byLabel[label].pFoldEach[1]
+    );
+    // ...and a bluff into a player who never folds is worth less.
+    expect(after.byLabel[label].foldEv).toBeLessThan(
+      before.byLabel[label].foldEv
+    );
+  });
+
+  it("prices a call through the model of the seat still to act", () => {
+    const price = (models?: ReturnType<typeof modelForSeat>) => {
+      const { table, seat } = callSpot({ seats: 3, behind: 1 });
+      return priceCall(
+        table,
+        seat,
+        callOf(table, seat),
+        FOLD_EQUITY_SIMS,
+        99,
+        undefined,
+        models
+      )!;
+    };
+    // Only seat 2 still owes chips, so only its model can move this number.
+    const before = price();
+    expect(price(modelForSeat(1, neverFolds()))).toEqual(before);
+    expect(price(modelForSeat(2, neverFolds())).potIfCalled).not.toBe(
+      before.potIfCalled
+    );
+  });
+
+  it("leaves a bot modelling another bot on the data-free prior", () => {
+    // The scoping claim, from the other side: the learned model belongs to seat
+    // 0, and the read seat 1 forms about seat 2 must be exactly what it was.
+    const board = [makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d")];
+    const build = () => {
+      const { table } = flopSpot({
+        seats: 4,
+        hero: [makeCard(14, "h"), makeCard(14, "c")],
+        board,
+        pot: 60,
+        seed: 4242,
+      });
+      table.actions = [
+        { seat: 0, street: "flop", action: "bet", cost: 10, potBefore: 60, toCall: 0 },
+        { seat: 2, street: "flop", action: "call", cost: 10, potBefore: 70, toCall: 10 },
+        { seat: 3, street: "flop", action: "fold", cost: 0, potBefore: 80, toCall: 10 },
+      ];
+      return table;
+    };
+
+    const before = opponentRanges(build(), 1);
+    const after = opponentRanges(build(), 1, modelForSeat(0, neverFolds()));
+    expect(Array.from(after[2])).toEqual(Array.from(before[2]));
+    expect(Array.from(after[3])).toEqual(Array.from(before[3]));
+    expect(Array.from(after[0])).not.toEqual(Array.from(before[0]));
   });
 });

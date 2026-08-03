@@ -169,6 +169,16 @@ export function observeMany(model: LikelihoodModel, observations: Observation[])
  *     categorical. The unit of observation moves from "hands in which the
  *     action occurred" to "decisions taken at this node", which is the stronger
  *     statistic and the one that makes the per-node row sum to 1.
+ *
+ * ONE BUCKET PER HAND IS AN ASSUMPTION, and it is only true while the bucket is
+ * a *preflop* hand class. `buckets.ts` classes are board-relative: the same two
+ * cards are Air on the flop and TwoPair by the river, and the model conditions
+ * on which. A caller recording a real hand off a board therefore has to bucket
+ * each decision against the board as it stood on that street and pass the
+ * results to `observeMany` — see `lib/opponentMemory.handObservations`, which is
+ * the engine-facing writer in practice. This entry point stays because it is the
+ * honest shape for a preflop-only or already-collapsed hand, and because it is
+ * the direct like-for-like replacement for `recordShowdownHand`.
  */
 export function recordHand(model: LikelihoodModel, hand: HandObservation): void {
   for (const decision of hand.decisions) {

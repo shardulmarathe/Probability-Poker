@@ -70,3 +70,56 @@ describe("vercel.json covers the router", () => {
     }
   });
 });
+
+/**
+ * `vercel.json` is validated against a closed schema before anything is built,
+ * and an unknown top-level key is a hard error — not a warning, and not
+ * something any local command reports. A `"_comment"` array explaining why this
+ * file uses `routes` instead of `rewrites` therefore failed *every* production
+ * deploy for a day while `npm run build`, `tsc` and CI all stayed green,
+ * because none of them read this file. The explanation lives in the comment
+ * above instead, where it costs nothing.
+ */
+describe("vercel.json is a config Vercel will accept", () => {
+  // Not the whole schema — the keys a project like this one can legitimately
+  // use. Anything outside it is either a typo or a comment, and both break the
+  // deploy the same way.
+  const ALLOWED = new Set([
+    "$schema",
+    "build",
+    "buildCommand",
+    "cleanUrls",
+    "crons",
+    "devCommand",
+    "framework",
+    "functions",
+    "git",
+    "headers",
+    "images",
+    "installCommand",
+    "outputDirectory",
+    "public",
+    "redirects",
+    "regions",
+    "rewrites",
+    "routes",
+    "trailingSlash",
+    "version",
+  ]);
+
+  it("has no top-level key Vercel would reject", () => {
+    const unknown = Object.keys(vercel).filter((k) => !ALLOWED.has(k));
+    expect(unknown, `vercel.json would fail config validation on: ${unknown}`).toEqual(
+      []
+    );
+  });
+
+  it("routes nothing the router no longer serves", () => {
+    // The reverse of the check above: a path deleted from App.tsx but left in
+    // this table keeps answering 200 on the deployed site long after the page
+    // is gone. /game and /analysis did exactly that.
+    for (const url of ["/game", "/analysis"]) {
+      expect(match(url)?.status, `${url} is gone and should 404`).toBe(404);
+    }
+  });
+});

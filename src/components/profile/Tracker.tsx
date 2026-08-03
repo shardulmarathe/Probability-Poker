@@ -105,19 +105,35 @@ const THIN_SAMPLE = 12;
 export function TrackerOverall({ stats }: { stats: PlayerStats }) {
   const thin = stats.total.hands < THIN_SAMPLE;
   return (
-    <StatGrid columns={3}>
-      {STAT_SPECS.map((spec) => (
-        <Stat
-          key={spec.key}
-          testId={`stat-${spec.key}`}
-          label={spec.label}
-          value={spec.format(stats.total)}
-          meter={spec.fraction(stats.total)}
-          meterThin={thin}
-          note={spec.blurb}
-        />
-      ))}
-    </StatGrid>
+    <>
+      {/*
+       * A dimmed meter was the only signal that a number came off two hands,
+       * and a dimmed bar is not something a first-time reader can decode. The
+       * figures themselves are unhedged and printed to a decimal — "VPIP
+       * 100.0%" off two hands claims a precision of one part in a thousand for
+       * an estimate whose resolution is a half. This says the quiet part.
+       */}
+      {thin && (
+        <p className="mb-3 text-[0.8rem] leading-snug text-ivory/50" data-testid="thin-sample">
+          {stats.total.hands === 0
+            ? "No hands yet — these fill in as you play."
+            : `From ${stats.total.hands} hand${stats.total.hands === 1 ? "" : "s"}. Every figure below still swings by tens of points with each new one; they start meaning something around ${THIN_SAMPLE}.`}
+        </p>
+      )}
+      <StatGrid columns={3}>
+        {STAT_SPECS.map((spec) => (
+          <Stat
+            key={spec.key}
+            testId={`stat-${spec.key}`}
+            label={spec.label}
+            value={spec.format(stats.total)}
+            meter={spec.fraction(stats.total)}
+            meterThin={thin}
+            note={spec.blurb}
+          />
+        ))}
+      </StatGrid>
+    </>
   );
 }
 

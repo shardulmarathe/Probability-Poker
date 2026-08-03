@@ -25,6 +25,7 @@
  * exactly one header tall.
  */
 
+import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { FeltBackground } from "../ui";
 import { AccountMenu } from "./AccountMenu";
@@ -40,6 +41,21 @@ const NAV = [
 
 export default function AppShell() {
   const { pathname } = useLocation();
+  const navRef = useRef<HTMLUListElement>(null);
+
+  /*
+   * Keep the current page's tab visible in the nav.
+   *
+   * Four labels, the wordmark and the account control do not fit across 390px,
+   * so the list scrolls rather than overlapping — but nothing scrolled it, and
+   * the last tab was the one that got cut. Landing on /learn from a phone
+   * showed a gold-ringed "Lear" sliced off where the account button starts,
+   * which reads as a layout bug rather than as "there is more this way".
+   */
+  useEffect(() => {
+    const active = navRef.current?.querySelector("[aria-current='page']");
+    active?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [pathname]);
   // The landing page keeps the fuller felt — brighter centre, vignette, the
   // four suit watermarks — because it is the only page that is a poster.
   const flourish = pathname === "/";
@@ -93,6 +109,7 @@ export default function AppShell() {
 
           <nav aria-label="Main" className="min-w-0 flex-1">
             <ul
+              ref={navRef}
               className="flex min-w-0 items-center gap-1 overflow-x-auto sm:gap-2"
               style={{ scrollbarWidth: "none" }}
             >

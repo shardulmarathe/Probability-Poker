@@ -4,10 +4,17 @@
       "PUPPETEER_SKIP_DOWNLOAD": "1"
     }
   },
+  "_comment": [
+    "`routes` rather than `rewrites` because only `routes` can attach a status,",
+    "and a single-page app that answers every URL with 200 tells crawlers a",
+    "mistyped path is a real page. The cost is that this table mirrors the",
+    "router in App.tsx and can drift from it — a route added there but not here",
+    "still renders, it just answers 404. Add new paths to the list below."
+  ],
   "routes": [
     { "handle": "filesystem" },
     { "src": "^/$", "dest": "/index.html" },
-    { "src": "^/(?:game|table|profile)/?$", "dest": "/index.html" },
+    { "src": "^/(?:game|table|profile|learn)/?$", "dest": "/index.html" },
     { "src": "^/(?:review|replay|analysis)(?:/[^/]+)?/?$", "dest": "/index.html" },
     { "src": "^/(?!api/).*$", "status": 404, "dest": "/index.html" }
   ]

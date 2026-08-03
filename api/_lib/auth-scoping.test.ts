@@ -16,7 +16,18 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb("hand access scoping (two users)", () => {
-  const sql = neon(DATABASE_URL!);
+  /*
+   * Connected lazily, not at collection time.
+   *
+   * `describe.skip` still *evaluates* its callback — it only marks the tests
+   * inside as skipped — so a top-level `neon(DATABASE_URL!)` ran even when the
+   * suite was meant to be skipped, and threw "No database connection string was
+   * provided". `npm run test:api` therefore failed rather than skipped for
+   * anyone without the env var, which is a bad state for the one test standing
+   * between two accounts and each other's hands: a suite that always errors is
+   * a suite nobody reads.
+   */
+  let sql: ReturnType<typeof neon>;
   const userA = randomUUID();
   const userB = randomUUID();
   let handAId = "";
@@ -25,6 +36,7 @@ describeIfDb("hand access scoping (two users)", () => {
   let sessionB = "";
 
   beforeAll(async () => {
+    sql = neon(DATABASE_URL!);
     await sql`
       insert into neon_auth.user (id, name, email, "emailVerified", "createdAt", "updatedAt")
       values

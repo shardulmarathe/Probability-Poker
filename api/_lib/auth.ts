@@ -31,6 +31,26 @@ export function methodNotAllowed(res: VercelResponse, allow: string[]): void {
   res.status(405).json({ error: "Method not allowed" });
 }
 
+/**
+ * A client-supplied id, checked before it reaches a query.
+ *
+ * Every id from a request is interpolated as `${id}::uuid`, and Postgres raises
+ * `invalid input syntax for type uuid` on anything that is not one. That threw
+ * past the `HttpError` branch below and answered 500 — a server error, for a
+ * request the client got wrong. It never leaked (the generic handler saw to
+ * that), but it told the caller to retry something that can never succeed and
+ * paged whoever watches the 5xx rate. Malformed input is a 400.
+ */
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function requireUuid(value: unknown, field: string): string {
+  if (typeof value !== "string" || !UUID.test(value)) {
+    throw new HttpError(400, `${field} must be a UUID`);
+  }
+  return value;
+}
+
 export function sendError(res: VercelResponse, err: unknown): void {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });

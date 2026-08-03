@@ -4,6 +4,7 @@ import {
   methodNotAllowed,
   readBody,
   requireUser,
+  requireUuid,
   sendError,
   HttpError,
 } from "../_lib/auth.js";
@@ -37,6 +38,7 @@ export default async function handler(
     if (!sessionId || !hand || typeof hand.hand_number !== "number") {
       throw new HttpError(400, "Invalid hand/record payload");
     }
+    requireUuid(sessionId, "sessionId");
     if (!Array.isArray(decisions)) {
       throw new HttpError(400, "decisions must be an array");
     }

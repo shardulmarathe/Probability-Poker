@@ -3,6 +3,7 @@ import {
   methodNotAllowed,
   readBody,
   requireUser,
+  requireUuid,
   sendError,
   HttpError,
 } from "../_lib/auth.js";
@@ -22,6 +23,7 @@ export default async function handler(
     const user = await requireUser(req);
     const { sessionId } = readBody<EndBody>(req);
     if (!sessionId) throw new HttpError(400, "sessionId is required");
+    requireUuid(sessionId, "sessionId");
 
     const sql = getSql();
     const rows = await sql`

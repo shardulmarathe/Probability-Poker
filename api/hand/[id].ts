@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   methodNotAllowed,
   requireUser,
+  requireUuid,
   sendError,
   HttpError,
 } from "../_lib/auth.js";
@@ -17,8 +18,8 @@ export default async function handler(
   }
   try {
     const user = await requireUser(req);
-    const id = typeof req.query.id === "string" ? req.query.id : null;
-    if (!id) throw new HttpError(400, "Hand id is required");
+    if (!req.query.id) throw new HttpError(400, "Hand id is required");
+    const id = requireUuid(req.query.id, "Hand id");
 
     const sql = getSql();
 

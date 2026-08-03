@@ -2,7 +2,7 @@
  * Precision reporting for Monte Carlo estimates.
  *
  * Every probability the engine shows is a sample mean over N Bernoulli trials,
- * so it carries sampling error. The Analysis page currently quotes the crude
+ * so it carries sampling error. The review's Math tab quotes the crude
  * worst-case bound ±100/√N (which assumes p = 0.5); these helpers report the
  * actual interval for the estimate that was measured.
  */

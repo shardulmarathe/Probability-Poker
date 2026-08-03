@@ -34,12 +34,23 @@ export interface ThinkingProps {
   step: ThinkStep | null;
   /** Placement, for whatever mounts it. */
   className?: string;
+  /**
+   * How many finished stages to keep above the running one. Defaults to three,
+   * which is the right trade beside a chair on a desktop, where the panel can
+   * grow into empty felt.
+   *
+   * Pass `0` where the panel sits in the page flow rather than floating: there,
+   * every finished stage pushes the *running* one further down, and by stage
+   * five it is below the fold on a phone — the one line that is actually live
+   * is the one you cannot see. Zero holds the height constant instead.
+   */
+  history?: number;
 }
 
-export function Thinking({ step, className }: ThinkingProps) {
+export function Thinking({ step, className, history = HISTORY }: ThinkingProps) {
   if (!step) return null;
 
-  const hidden = Math.max(0, step.done.length - HISTORY);
+  const hidden = Math.max(0, step.done.length - Math.max(0, history));
   const shown = step.done.slice(hidden);
   const progress = step.total > 0 ? (step.step + 1) / step.total : 0;
 
@@ -125,8 +136,15 @@ function Done({ line }: { line: ThinkLine }) {
       <p className="truncate font-display text-[0.68rem] font-semibold text-ivory/50">
         {line.title}
       </p>
+      {/*
+       * The detail wraps rather than truncating. These lines are the counts the
+       * narration exists to show — a clipped "1,225 of 1,326 combos surv…" is
+       * worse than one that takes a second line.
+       */}
       {line.detail && (
-        <p className="truncate font-mono text-[0.55rem] text-ivory/28">{line.detail}</p>
+        <p className="font-mono text-[0.55rem] leading-snug text-ivory/28">
+          {line.detail}
+        </p>
       )}
     </li>
   );

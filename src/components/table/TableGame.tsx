@@ -13,6 +13,8 @@
  * the same hand as a hand played.
  */
 
+import { useMemo } from "react";
+import { HandCategory } from "../../types";
 import { PlayingCard } from "../PlayingCard";
 import { money } from "../../lib/format";
 import { TABLE_MODES, type TableMode } from "../../lib/tableOptions";
@@ -25,6 +27,7 @@ import { Button, ButtonLink, LINE, RADIUS, Rail, Tabs } from "../ui";
 import { ActionBar } from "./Actions";
 import { CoachPanel } from "./CoachPanel";
 import { SeatView } from "./Seat";
+import { Thinking } from "./Thinking";
 import {
   ChipLayer,
   POT_CENTRE,
@@ -51,6 +54,25 @@ const STREET_LABEL: Record<Street, string> = {
   showdown: "Showdown",
 };
 
+/**
+ * How a made hand is spoken, not how it is titled.
+ *
+ * `HAND_CATEGORY_NAMES` is a label — "Pair", "Flush" — and lowercasing it after
+ * the word "with" produces "with pair" and "with flush". These carry their own
+ * articles so the showdown line reads as a sentence.
+ */
+const MADE_HAND: Record<HandCategory, string> = {
+  [HandCategory.HighCard]: "high card",
+  [HandCategory.Pair]: "a pair",
+  [HandCategory.TwoPair]: "two pair",
+  [HandCategory.ThreeOfAKind]: "trips",
+  [HandCategory.Straight]: "a straight",
+  [HandCategory.Flush]: "a flush",
+  [HandCategory.FullHouse]: "a full house",
+  [HandCategory.FourOfAKind]: "quads",
+  [HandCategory.StraightFlush]: "a straight flush",
+};
+
 export default function TableGame() {
   const {
     table,
@@ -74,6 +96,40 @@ export default function TableGame() {
   const handOver = !playing && !!lastReport;
   const heroTurn = playing && heroSeat !== null && table.toAct === heroSeat;
 
+  /*
+   * What each winner actually held, by seat. A showdown that only says who was
+   * paid teaches nothing — the point of the table is that a player can see
+   * *why* the chips moved. Folded seats have a null `final` and are skipped,
+   * which is also why this is empty when everyone else folded.
+   */
+  const madeHands = useMemo(() => {
+    const out = new Map<number, string>();
+    for (const seat of lastReport?.seats ?? []) {
+      if (seat.final) out.set(seat.seat, MADE_HAND[seat.final.category]);
+    }
+    return out;
+  }, [lastReport]);
+
+  /*
+   * The pot chip, once the hand is over. `table.pot` is zero by then — the
+   * chips have been pushed — and a showdown captioned "Pot $0" reads as a bug.
+   * The total that was contested is the sum of the layers instead.
+   */
+  const potShown = handOver
+    ? (lastReport?.pots ?? []).reduce((n, layer) => n + layer.amount, 0)
+    : table.pot;
+
+  // Which seat is narrating, if any. On a phone its panel is rendered below the
+  // felt rather than beside the chair, so the whole screen needs to know.
+  const thinkingId = table.seats.find((s) => fx.seats[s.id]?.thinking)?.id;
+  const thinkingSeat =
+    thinkingId === undefined
+      ? null
+      : {
+          name: table.seats[thinkingId].name,
+          step: fx.seats[thinkingId].thinking!,
+        };
+
   // Reveal rules, in order of precedence: Study and observer show everything;
   // a showdown shows the hands that got there (a fold-out winner keeps its
   // cards, as at a real table); the human always sees its own.
@@ -85,8 +141,18 @@ export default function TableGame() {
     revealAll || id === heroSeat || (handOver && showdownSeats.has(id));
 
   const wonBy = new Map<number, number>();
+  /*
+   * What the hand was worth to each seat, signed. Distinct from `won`, which is
+   * the pot collected and includes the seat's own money — announcing "+$2010"
+   * beside a player who profited $1010 overstates it, and says nothing at all
+   * to the seat that paid for it. Every seat that put chips in gets a number.
+   */
+  const netBy = new Map<number, number>();
   if (handOver && lastReport) {
-    for (const s of lastReport.seats) if (s.won > 0) wonBy.set(s.seat, s.won);
+    for (const s of lastReport.seats) {
+      if (s.won > 0) wonBy.set(s.seat, s.won);
+      if (s.net !== 0) netBy.set(s.seat, s.net);
+    }
   }
 
   const decisionKey = `${table.handNumber}:${table.street}:${table.actions.length}`;
@@ -185,13 +251,13 @@ export default function TableGame() {
                   }}
                 >
                   {/* The pot is chips before it is a number. */}
-                  <PotChips pot={table.pot} bigBlind={options.bigBlind} />
+                  <PotChips pot={potShown} bigBlind={options.bigBlind} />
                   <span>
                     <span className="font-mono text-[0.55rem] uppercase tracking-[0.25em] text-ivory/50">
                       Pot{" "}
                     </span>
                     <span className="font-display text-base font-bold text-gold-soft sm:text-xl">
-                      {money(table.pot)}
+                      {money(potShown)}
                     </span>
                   </span>
                 </span>
@@ -213,6 +279,8 @@ export default function TableGame() {
                 fx={fx.seats[seat.id] ?? { bubble: null, thinking: null }}
                 read={mode === "study" ? (reads[seat.id] ?? null) : null}
                 won={wonBy.get(seat.id) ?? null}
+                net={netBy.get(seat.id) ?? null}
+                settled={handOver}
                 showBlurb={mode === "study" && !narrow}
                 bigBlind={options.bigBlind}
               />
@@ -238,6 +306,7 @@ export default function TableGame() {
               names={table.seats.map((s) => s.name)}
               winners={[...wonBy.entries()]}
               showdown={lastReport!.wentToShowdown}
+              madeHands={madeHands}
               observer={options.observer}
               onNext={nextHand}
             />
@@ -251,6 +320,21 @@ export default function TableGame() {
               narrow={narrow}
               onAct={act}
             />
+          ) : narrow && thinkingSeat ? (
+            /*
+             * On a phone the narration does not fit beside the chair it belongs
+             * to — hung off the seat it covered the board, and truncating it to
+             * fit made the numbers unreadable, which defeats the point of
+             * narrating them. It moves here instead, into space that is idle
+             * anyway, and the chair keeps its marker so you still know who is
+             * deciding.
+             */
+            <div className="py-2">
+              <p className="mb-1.5 text-center font-cormorant text-sm italic text-ivory/40">
+                {thinkingSeat.name} is deciding
+              </p>
+              <Thinking step={thinkingSeat.step} history={0} />
+            </div>
           ) : (
             <p className="py-4 text-center font-cormorant text-base italic text-ivory/40">
               {fx.busy ? "Watching the table…" : " "}
@@ -365,18 +449,36 @@ function ResultStrip({
   names,
   winners,
   showdown,
+  madeHands,
   observer,
   onNext,
 }: {
   names: string[];
   winners: [number, number][];
   showdown: boolean;
+  /** Seat → the hand it showed down with. Empty when nobody showed. */
+  madeHands: Map<number, string>;
   observer: boolean;
   onNext: () => void;
 }) {
   const label = winners
     .map(([id, amount]) => `${names[id]} ${money(amount)}`)
     .join(" · ");
+
+  /*
+   * "Callin' Carla $3000" says who was paid. It does not say why, and the whole
+   * table exists to answer why — so the winning hand is named right where the
+   * chips are announced rather than one click away in the review.
+   *
+   * Only at a showdown: when everyone else folds, the winner's cards were never
+   * shown, and naming them here would leak a hand the table never revealed.
+   */
+  const won = showdown
+    ? winners
+        .map(([id]) => madeHands.get(id))
+        .filter((n): n is string => !!n)
+    : [];
+  const withHand = won.length > 0 ? [...new Set(won)].join(" · ") : null;
 
   return (
     <div
@@ -395,6 +497,11 @@ function ResultStrip({
         <div className="font-display text-base font-semibold text-gold-soft sm:text-lg">
           {label || "No winner"}
         </div>
+        {withHand && (
+          <div className="font-cormorant text-sm italic text-ivory/60">
+            with {withHand}
+          </div>
+        )}
       </div>
       {/* The review shares this route group's store, so the hand survives the
           hop. See the `/review` routes in App.tsx. */}

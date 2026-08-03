@@ -315,7 +315,7 @@ export function ThoughtPocket({
   const pos = offset(side, clearance);
   return (
     <div
-      className={`pp-bubble pointer-events-none absolute z-30 w-[min(15rem,62vw)] ${ALIGN[align]} ${pos}`}
+      className={`pp-bubble pointer-events-none absolute z-30 w-[min(20rem,62vw)] ${ALIGN[align]} ${pos}`}
     >
       {children}
     </div>

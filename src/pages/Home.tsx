@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { PlayingCard } from "../components/PlayingCard";
 import TableSetupPanel from "../components/TableSetupPanel";
 import { ButtonLink } from "../components/ui";
@@ -89,16 +88,6 @@ export default function Home() {
               </a>
             </div>
 
-            <p
-              className="pp-fade-up mt-4 text-xs text-ivory/40"
-              style={{ animationDelay: "360ms" }}
-            >
-              Or play the original{" "}
-              <Link to="/game" className="text-gold/70 underline-offset-2 hover:underline">
-                heads-up match
-              </Link>
-              .
-            </p>
           </div>
 
           <div

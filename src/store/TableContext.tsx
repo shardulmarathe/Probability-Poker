@@ -794,29 +794,62 @@ export function TableProvider({ children }: { children: ReactNode }) {
     [drive, perform, runExclusive]
   );
 
+  /*
+   * Why these two queue instead of returning.
+   *
+   * The result strip — and with it "Deal me another" — renders as soon as the
+   * table reaches `hand-over`, but the sequence that got it there is still
+   * unwinding: the last reveals, the final `setThinking({})`. During that tail
+   * `busyRef` is true, and `runExclusive` drops any call that arrives while it
+   * is held. So a player who clicked the button the moment it appeared got
+   * nothing at all, no error and no hand, and had to click it a second time.
+   * It reproduced on roughly one hand in three, always the ones with the most
+   * to reveal, which is exactly when the button is on screen the longest before
+   * the lock clears.
+   *
+   * The same trap as the pause/resume path below, and the same escape: record
+   * the intent and let the effect that watches `busy` spend it. Later intents
+   * overwrite earlier ones — clicking "Deal me another" twice deals one hand,
+   * and changing the table after asking for a hand gives you the new table.
+   */
+  const pendingRef = useRef<(() => void) | null>(null);
+
   const nextHand = useCallback(() => {
-    if (busyRef.current) return;
-    runExclusive(async () => {
-      const next = structuredClone(tableRef.current);
-      startHand(next);
-      await beginHand(next);
-    });
+    const deal = () =>
+      runExclusive(async () => {
+        const next = structuredClone(tableRef.current);
+        startHand(next);
+        await beginHand(next);
+      });
+    if (busyRef.current) pendingRef.current = deal;
+    else deal();
   }, [beginHand, runExclusive]);
 
   const newTable = useCallback(
     (next: TableOptions) => {
-      if (busyRef.current) return;
-      saveSetup(next);
-      setOptions(next);
-      setHistory([]);
-      runExclusive(async () => {
-        const fresh = buildTable(next);
-        startHand(fresh);
-        await beginHand(fresh);
-      });
+      const build = () => {
+        saveSetup(next);
+        setOptions(next);
+        setHistory([]);
+        runExclusive(async () => {
+          const fresh = buildTable(next);
+          startHand(fresh);
+          await beginHand(fresh);
+        });
+      };
+      if (busyRef.current) pendingRef.current = build;
+      else build();
     },
     [beginHand, runExclusive]
   );
+
+  /** Spend a queued deal the moment the lock clears. */
+  useEffect(() => {
+    if (busy || !pendingRef.current) return;
+    const run = pendingRef.current;
+    pendingRef.current = null;
+    run();
+  }, [busy]);
 
   /**
    * Switching mode mid-session is deliberately cheap: it re-renders and nothing

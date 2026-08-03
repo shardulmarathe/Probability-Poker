@@ -1,43 +1,15 @@
-import type { BeliefDistribution, PlayerActionType, Street } from "../types";
+import type { BeliefDistribution, PlayerActionType } from "../types";
 
-export const STARTING_BANKROLL = 1000;
 export const SMALL_BLIND = 5;
 export const BIG_BLIND = 10;
 
-/** Fixed-limit bet size per street. */
-export const BET_SIZE: Record<Exclude<Street, "showdown">, number> = {
-  preflop: 10,
-  flop: 10,
-  turn: 20,
-  river: 20,
-};
-
-/** Maximum number of raises allowed per betting round (keeps rounds bounded). */
-export const MAX_RAISES_PER_STREET = 4;
-
-/** Sims for the representative post-hand report run (off the gameplay path). */
-export const MONTE_CARLO_SIMS = 5000;
-
-/**
- * Per-street sim counts for the bot's live in-hand decisions. Later streets get
- * fewer samples because fewer cards remain unknown.
- *
- * These are ~6x what they were when a decision ran on the main thread. The run
- * is now split four ways across the equity worker pool (`poker/equity/pool`),
- * so preflop costs ~11ms wall clock in the browser instead of ~6ms, and ±0.25%
- * on the equity estimate instead of ±0.60%. The ceiling is the machine that
- * gets one worker and runs every shard serially: ~35ms here, still far inside
- * the 250ms budget on hardware several times slower.
+/*
+ * The fixed-limit bet ladder, the raise cap, the fixed starting bankroll and
+ * the three sim budgets that used to live here went with the heads-up engine.
+ * The table is No-Limit and its stack depth is chosen per session, so sizing
+ * comes from `table/rules.ts` and the sim budget from `TABLE_DECISION_SIMS`,
+ * which divides by the number of live opponents rather than by street.
  */
-export const DECISION_SIMS: Record<Exclude<Street, "showdown">, number> = {
-  preflop: 40000,
-  flop: 40000,
-  turn: 30000,
-  river: 20000,
-};
-
-/** Sims for the post-hand probability timeline (kept light for snappy streets). */
-export const TIMELINE_SIMS = 1500;
 
 /** Initial preflop belief over opponent hand strength. */
 export const INITIAL_BELIEF: BeliefDistribution = {

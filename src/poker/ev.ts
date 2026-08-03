@@ -454,12 +454,19 @@ export function rangeEquity(input: RangeEquityInput): number {
 // The kernel
 // ---------------------------------------------------------------------------
 //
-// `equity/multiway.ts` samples opponents from a three-tier `BeliefDistribution`
-// and cannot express an arbitrary weight per combo. A continuing range *is* an
-// arbitrary weight per combo — that is the entire point of deriving it — so
-// this module needs its own sampler. It differs in exactly two ways: hands come
-// off a `ComboSampler` instead of a tier bucket, and a seat may sit the hand out
-// according to its own fold probability.
+// `equity/multiway.ts` samples a seat's hand from a `Range` — an arbitrary
+// weight per combo — which is exactly what a continuing range is, so that part
+// is not the reason this module has its own kernel. (It once was: multiway
+// sampled the three-tier `BeliefDistribution` and could not express a per-combo
+// weight. `beliefRange` is now only an adapter for callers that still hold a
+// belief rather than a range.)
+//
+// The reason is the coin. Fold equity needs each seat to *sit the hand out*
+// with its own probability before the field is dealt, so the number of live
+// opponents is itself random. `runMultiway` deals a fixed field. Everything
+// else here — the `ComboSampler`, the whole-tuple redraw — is shared in spirit
+// with that module and duplicated only because the fold coin sits inside the
+// same inner loop.
 
 /** Whole-tuple redraws before the field is dealt short. See `multiway.ts`. */
 const MAX_TUPLE_ATTEMPTS = 64;

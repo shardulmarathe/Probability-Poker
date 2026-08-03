@@ -49,6 +49,19 @@ export interface SeatViewProps {
   read: BeliefDistribution | null;
   /** Set when the hand is over and this seat collected chips. */
   won: number | null;
+  /** What the finished hand was worth to this seat, signed. Null if it broke even. */
+  net: number | null;
+  /**
+   * The hand has been resolved and the chips pushed.
+   *
+   * Until then an all-in seat prints "ALL IN" in place of its stack, because
+   * the number would be a meaningless 0 while the pot is still live. Once it is
+   * settled that stops being true and starts being a lie: a seat that shoved
+   * and lost sat there reading "ALL IN" with no stack and no result, while the
+   * winner beside it showed "+$2010". Settled seats show what they are left
+   * with.
+   */
+  settled: boolean;
   showBlurb: boolean;
   /** The table's big blind, for pricing a bet into chips. */
   bigBlind: number;
@@ -110,7 +123,7 @@ export function SeatView(props: SeatViewProps) {
        * the seat that is thinking, so the narration stays attached to the
        * player it belongs to. `ThoughtPocket` supplies only the placement.
        */}
-      {props.fx.thinking ? (
+      {props.fx.thinking && !compact ? (
         <ThoughtPocket side={side} align={align} clearance={hasCommit}>
           <Thinking step={props.fx.thinking} />
         </ThoughtPocket>
@@ -231,8 +244,34 @@ function Commit({
  * desktop's tracking "ALL IN" is wider than the seat and two neighbouring
  * all-ins print straight through each other.
  */
-function Stack({ seat, tight }: { seat: TableSeat; tight?: boolean }) {
-  if (seat.status === "allin") {
+/**
+ * The signed result of the finished hand. Gold for a profit, muted red for a
+ * loss — the same two colours the felt already uses for a win and for an
+ * all-in, so it needs no legend.
+ */
+function Net({ net, className }: { net: number | null; className?: string }) {
+  if (net === null || net === 0) return null;
+  return (
+    <span
+      className={`${className ?? ""} font-mono`}
+      style={{ color: net > 0 ? "#e2c563" : "#e58a8a" }}
+    >
+      {net > 0 ? "+" : "\u2212"}
+      {money(Math.abs(net))}
+    </span>
+  );
+}
+
+function Stack({
+  seat,
+  tight,
+  settled,
+}: {
+  seat: TableSeat;
+  tight?: boolean;
+  settled?: boolean;
+}) {
+  if (seat.status === "allin" && !settled) {
     return (
       <span
         className={tight ? "font-mono text-[0.55rem]" : "font-mono tracking-[0.14em]"}
@@ -250,7 +289,7 @@ function Stack({ seat, tight }: { seat: TableSeat; tight?: boolean }) {
 // Hero — bottom centre, cards readable
 // ---------------------------------------------------------------------------
 
-function HeroSeat({ seat, position, reveal, won, profile, state, bigBlind }: Skinned) {
+function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, settled }: Skinned) {
   const skin = plate(state, won);
   return (
     <div className="flex items-end gap-3 sm:gap-4">
@@ -284,14 +323,14 @@ function HeroSeat({ seat, position, reveal, won, profile, state, bigBlind }: Ski
             "$901 · $99 in" two lines on a phone and grew the plate downward
             into the rail. */}
         <div className="mt-0.5 flex flex-nowrap items-center gap-2 whitespace-nowrap font-mono text-sm text-ivory/80">
-          <Stack seat={seat} />
+          <Stack seat={seat} settled={settled} />
           {seat.streetCommit > 0 && (
             <span className="flex items-center gap-1 text-gold-soft">
               <HeroCommit amount={seat.streetCommit} bigBlind={bigBlind} />
               {money(seat.streetCommit)} in
             </span>
           )}
-          {won ? <span className="text-gold-soft">+{money(won)}</span> : null}
+          <Net net={net} />
         </div>
       </div>
     </div>
@@ -325,6 +364,8 @@ function FullSeat({
   reveal,
   read,
   won,
+  net,
+  settled,
   showBlurb,
   state,
 }: Skinned) {
@@ -367,8 +408,8 @@ function FullSeat({
           {seat.name}
         </div>
         <div className="font-mono text-xs text-ivory/75">
-          <Stack seat={seat} />
-          {won ? <span className="ml-1 text-gold-soft">+{money(won)}</span> : null}
+          <Stack seat={seat} settled={settled} />
+          <Net net={net} className="ml-1" />
         </div>
         {/* Study's addition is the *live* read, not the static one. The
             archetype names the style in a line; the full blurb lives on hover
@@ -398,7 +439,7 @@ function FullSeat({
 // a revealed pair stays inside the same footprint.
 // ---------------------------------------------------------------------------
 
-function CompactSeat({ seat, position, profile, reveal, read, won, state }: Skinned) {
+function CompactSeat({ seat, position, profile, reveal, read, won, state, settled }: Skinned) {
   const inHand = state !== "folded" && seat.hole.length > 0;
 
   return (
@@ -433,7 +474,7 @@ function CompactSeat({ seat, position, profile, reveal, read, won, state }: Skin
         <Badge label={position} tone={position === "BTN" ? "dealer" : "quiet"} />
       </span>
       <span className="max-w-full truncate font-mono text-[0.62rem] leading-tight text-ivory/80">
-        <Stack seat={seat} tight />
+        <Stack seat={seat} tight settled={settled} />
       </span>
       {read && (
         <span className="mt-0.5">

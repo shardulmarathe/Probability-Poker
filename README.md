@@ -1,6 +1,11 @@
 # Probability Poker
 
+[![CI](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml/badge.svg)](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 > Can probability outperform human intuition?
+
+**[Play it →](https://probabilitypoker.vercel.app)**
 
 An educational, probability-focused **No-Limit Texas Hold'em** table for 2–6
 seats, built for a Stanford probability course. You play against bots that make
@@ -161,3 +166,7 @@ EV numbers on screen are literally the ones the bot decided with. The two things
 it *does* recompute — the street equities and the range charts — are recomputed
 from the record's own contents, and it says so: if a number cannot be recovered
 from what the engine wrote down, the review does not invent it.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

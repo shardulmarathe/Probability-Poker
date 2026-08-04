@@ -1,7 +1,6 @@
 # Probability Poker
 
 [![CI](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml/badge.svg)](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 > Can probability outperform human intuition?
 
@@ -167,6 +166,7 @@ it *does* recompute — the street equities and the range charts — are recompu
 from the record's own contents, and it says so: if a number cannot be recovered
 from what the engine wrote down, the review does not invent it.
 
-## License
+---
 
-MIT — see [LICENSE](./LICENSE).
+© 2026 Shardul Marathe. All rights reserved. This source is published for
+portfolio review; it is not licensed for reuse, modification, or redistribution.

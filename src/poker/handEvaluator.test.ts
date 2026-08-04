@@ -183,7 +183,7 @@ describe("evaluate vs brute-force reference", () => {
     }
 
     expect(failures).toEqual([]);
-    expect(dealt).toBe(DEALS); // the loop bails early on failure — prove it did not
+    expect(dealt).toBe(DEALS); // the loop bails early on failure, prove it did not
   });
 });
 

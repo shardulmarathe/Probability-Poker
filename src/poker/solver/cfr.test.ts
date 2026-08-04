@@ -358,8 +358,8 @@ describe("river subgame solve", () => {
     );
     expect(expl).toBeGreaterThanOrEqual(0);
 
-    // What the test is actually for. The solve is deterministic — the sibling
-    // test asserts strategy equality across two runs — so this bound is exact
+    // What the test is actually for. The solve is deterministic, the sibling
+    // test asserts strategy equality across two runs, so this bound is exact
     // rather than statistical: 400 iterations of DCFR on this subgame land at
     // 14.0 mbb/h, and 30 is loose enough to survive a re-tuned discount
     // schedule while still catching a solver that stops converging.
@@ -370,8 +370,8 @@ describe("river subgame solve", () => {
     // headroom and is not: the same solve takes over a second on a machine
     // that is merely busy, so it failed on load rather than on a regression.
     // Anything that tolerates load cannot detect a 4x slowdown either, so the
-    // honest version is a catastrophe guard — an infinite loop, a solve that
-    // went quadratic — and the deterministic assertions above do the real work.
+    // honest version is a catastrophe guard, an infinite loop, a solve that
+    // went quadratic, and the deterministic assertions above do the real work.
     expect(solved.elapsedMs).toBeLessThan(30_000);
   });
 
@@ -417,7 +417,7 @@ describe("river subgame solve", () => {
 
     // The timing bound is deliberately an order of magnitude above the ~2ms/iter
     // this actually runs at. A tight wall-clock assertion is not a test, it is a
-    // measurement of how busy the machine is — this one flaked at 4ms while the
+    // measurement of how busy the machine is, this one flaked at 4ms while the
     // suite ran beside a build. Loose, it still catches the regression that
     // matters (someone making the showdown sweep quadratic again) and never
     // fails for being unlucky with the scheduler.

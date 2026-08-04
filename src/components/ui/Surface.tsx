@@ -5,7 +5,7 @@
  * the profile lived in its own rounded box, so the boxes stopped meaning
  * anything. There are two containers here and a rule for choosing:
  *
- *   <Group>   a heading, a hairline, and content. No box. Use this by default —
+ *   <Group>   a heading, a hairline, and content. No box. Use this by default -
  *             whitespace and a rule group things perfectly well.
  *   <Panel>   a real surface: border, gradient, shadow. Use it when the thing
  *             inside is a distinct object you could point at (the table setup,
@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { LINE, RADIUS, SURFACE } from "./tokens";
 
 // ---------------------------------------------------------------------------
-// Group — the default
+// Group, the default
 // ---------------------------------------------------------------------------
 
 export interface GroupProps {
@@ -75,7 +75,7 @@ export function Group({
 }
 
 // ---------------------------------------------------------------------------
-// Panel — when the container is the point
+// Panel, when the container is the point
 // ---------------------------------------------------------------------------
 
 export interface PanelProps {
@@ -139,7 +139,7 @@ export const Section = Panel;
 // Recessed area inside a panel
 // ---------------------------------------------------------------------------
 
-/** A sunk well — a place to put a table, a chart, or a scrubber. */
+/** A sunk well, a place to put a table, a chart, or a scrubber. */
 export function Well({
   children,
   testId,

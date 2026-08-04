@@ -184,7 +184,7 @@ describe("the archive is untouched by sync", () => {
     expect(merged.hands.map((h) => h.seed).sort()).toEqual([100, 200]);
     // Union, not replace: the server hand is added and neither side is dropped.
     expect(merged.hands).toHaveLength(2);
-    // Local wins the collision — the archive's copy of seed 100 is kept.
+    // Local wins the collision, the archive's copy of seed 100 is kept.
     expect(merged.hands.find((h) => h.seed === 100)!.seats[0].invested).toBe(10);
   });
 });
@@ -292,7 +292,7 @@ describe("reconcile on sign-in", () => {
     expect(summary.shared).toBe(0);
     expect(store.loadArchive().hands.map((h) => h.seed).sort()).toEqual([100, 200]);
 
-    // The local hand went up once — not once through the reconcile and again
+    // The local hand went up once, not once through the reconcile and again
     // through the archive write the reconcile itself triggers.
     const records = calls.filter((c) => c.path.startsWith("/api/hand/record"));
     expect(records).toHaveLength(1);
@@ -331,7 +331,7 @@ describe("storageNotice", () => {
     for (const status of ["idle", "syncing", "pending", "error"] as const) {
       const text = storageNotice(state({ status, signedIn: true, queued: 2 }));
       expect(text).not.toMatch(/nothing leaves the device/i);
-      // It still has to say the local copy exists — that is the durable half.
+      // It still has to say the local copy exists, that is the durable half.
       expect(text).toMatch(/stored in this browser/i);
     }
   });

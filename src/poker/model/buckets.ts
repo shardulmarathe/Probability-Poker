@@ -3,13 +3,13 @@
  *
  * This replaces `bayesian.tierOf` everywhere a *postflop* judgement is needed.
  * `tierOf` scores a holding with a Chen preflop formula on every street, so on
- * K-7-2-9-4 it still calls 7-2 "weak" — a hand that has flopped two pair and is
+ * K-7-2-9-4 it still calls 7-2 "weak", a hand that has flopped two pair and is
  * beating most of the deck. Bucketing an opponent's range with that is not a
  * small inaccuracy: it puts the made hands in the wrong bin, and every equity
  * number sampled from those bins inherits the error.
  *
  * The fix is to classify against the board. The same combo is a different hand
- * on a different board, and that is the entire point — 7-2 is trash preflop and
+ * on a different board, and that is the entire point, 7-2 is trash preflop and
  * two pair on K-7-2, and AA is the best hand preflop and a chop on 5-6-7-8-9.
  *
  * Two rules make the classes honest rather than merely categorical:
@@ -25,7 +25,7 @@
  * the preflop story is unchanged.
  *
  * Hot path: `classifyAll` runs all 1326 combos for one board with no allocation
- * beyond the output array — ~190 µs, or 0.14 µs per combo, which buckets.test.ts
+ * beyond the output array, ~190 µs, or 0.14 µs per combo, which buckets.test.ts
  * measures. A decision runs it a handful of times, so it is free next to the
  * Monte Carlo it feeds.
  */
@@ -47,7 +47,7 @@ import { HandCategory, type Card, type StrengthTier } from "../../types";
  * The ordering is load-bearing, not cosmetic: downstream code aggregates
  * "belief mass at or above bucket k", which only means anything if the index is
  * monotone in strength. The cut points were placed by measurement, not by
- * intuition — buckets.test.ts rolls out every combo on 40 random boards per
+ * intuition, buckets.test.ts rolls out every combo on 40 random boards per
  * street and asserts the means come out in this order. Two results from that
  * measurement are worth stating, because both contradict the obvious guess:
  *
@@ -57,7 +57,7 @@ import { HandCategory, type Card, type StrengthTier } from "../../types";
  *    because they are usually held alongside something, and this bucket is what
  *    is left once that something is classified on its own (see classifyPostflop).
  *  - `TopPair` and `Overpair` are the same rung. They measure 0.776 / 0.796 on
- *    the flop, 0.773 / 0.756 on the turn and 0.783 / 0.791 on the river — the
+ *    the flop, 0.773 / 0.756 on the turn and 0.783 / 0.791 on the river, the
  *    sign of the gap flips with the boards drawn, so the test asserts they are
  *    close rather than pretending the ladder is sharper than the game is.
  *
@@ -65,14 +65,14 @@ import { HandCategory, type Card, type StrengthTier } from "../../types";
  * abstraction literature rejects: it "fails to account for the entire
  * probability distribution of hand strength" (Ganzfried & Sandholm, AAAI-14).
  * So the ladder was re-audited against that objection, with distributions
- * rather than means — see distribution.ts, and distribution.test.ts for the
+ * rather than means, see distribution.ts, and distribution.test.ts for the
  * numbers. It survives, more cleanly than the audit expected:
  *
  *  - Searching all 9! orderings for the one whose bucket-centroid Earth Mover's
  *    Distance matrix is most monotone away from the diagonal returns THIS
  *    order, on every street. Across six independent board samples the only
  *    alternative that ever ties it is the one that swaps `TopPair` and
- *    `Overpair` — the single adjacency the paragraph above already declines to
+ *    `Overpair`, the single adjacency the paragraph above already declines to
  *    order. Two unrelated metrics agreeing about which rung is not really a
  *    rung is worth more than either alone, and it means no reordering here is
  *    justified: the index is already the ordering the distributions want.
@@ -90,7 +90,7 @@ import { HandCategory, type Card, type StrengthTier } from "../../types";
  * and TsJs (the same straight, losing to every diamond) at 21.2 bins. Nine
  * hand-crafted classes have nowhere to put "ace-high with a gutshot" or "the
  * straight that a flush board has already beaten". Fixing that means more
- * classes, which means k-means over distributions with a free cluster count —
+ * classes, which means k-means over distributions with a free cluster count -
  * and BUCKET_COUNT is frozen by the persisted keys `likelihood.ts` builds from
  * these ids, so it is not a change that can be made here alone.
  */
@@ -117,7 +117,7 @@ export enum HandBucket {
 
 export const BUCKET_COUNT = 9;
 
-/** Postflop labels — what the bucket actually means once there is a board. */
+/** Postflop labels, what the bucket actually means once there is a board. */
 export const BUCKET_NAMES: Record<HandBucket, string> = {
   [HandBucket.Air]: "Air",
   [HandBucket.WeakDraw]: "Weak Draw",
@@ -134,7 +134,7 @@ export const BUCKET_NAMES: Record<HandBucket, string> = {
  * `holeScore` cut points, descending: band 8 - i covers scores >= BANDS[i].
  *
  * Placed on the Chen score's own quantiles rather than on round numbers,
- * because the score is lumpy — it takes only 17 distinct values over the 1326
+ * because the score is lumpy, it takes only 17 distinct values over the 1326
  * combos and 236 of them score exactly 5. These cuts give roughly
  * 2 / 2 / 2 / 4 / 7 / 8 / 18 / 24 / 33 percent of the deck per band, top to
  * bottom, which is the shape a preflop range chart actually has. Even cuts on
@@ -147,8 +147,8 @@ const PREFLOP_BANDS: readonly number[] = [12, 10, 9, 8, 7, 6, 5, 3];
 // ---------------------------------------------------------------------------
 //
 // A copy of the table in handEvaluator.ts, which does not export it. Rebuilding
-// 8 KB at module load is cheaper than the alternative — reaching into another
-// module's internals — and the wheel case below is the only subtlety.
+// 8 KB at module load is cheaper than the alternative, reaching into another
+// module's internals, and the wheel case below is the only subtlety.
 
 const MASKS = 1 << 13;
 /** High card of the best straight in the mask, 0 if none. */
@@ -202,7 +202,7 @@ export interface BoardContext {
   readonly needed: number;
   /** 13-bit rank mask of the board (bit r-2). */
   readonly boardMask: number;
-  /** Score of the board's own best hand — what "playing the board" is worth. */
+  /** Score of the board's own best hand, what "playing the board" is worth. */
   readonly boardScore: number;
   readonly boardCat: HandCategory;
   /** Distinct board ranks, descending. */
@@ -230,7 +230,7 @@ export interface BoardContext {
   readonly suitCount: Uint8Array;
   /**
    * Scratch buffer `[holeA, holeB, ...board]`, refilled per combo. Shared, so
-   * classification is not reentrant — same bargain the evaluator's SUIT_MASKS
+   * classification is not reentrant, same bargain the evaluator's SUIT_MASKS
    * makes, and for the same reason.
    */
   readonly hand: Uint8Array;
@@ -325,7 +325,7 @@ export function classifyHole(
 }
 
 /**
- * Every combo at once — the entry point a decision actually uses.
+ * Every combo at once, the entry point a decision actually uses.
  *
  * Combos that clash with the board are classified anyway (the evaluator simply
  * sees a repeated rank) rather than flagged: callers zero them with
@@ -333,8 +333,8 @@ export function classifyHole(
  * test per combo to protect a result nobody looks at.
  */
 export function classifyAll(ctx: BoardContext, out?: Uint8Array): Uint8Array {
-  // A short buffer would be written past its end silently — typed arrays drop
-  // out-of-range stores — and the caller would read stale buckets for the tail.
+  // A short buffer would be written past its end silently, typed arrays drop
+  // out-of-range stores, and the caller would read stale buckets for the tail.
   if (out !== undefined && out.length < COMBO_COUNT) {
     throw new Error(
       `classifyAll: out buffer holds ${out.length}, need ${COMBO_COUNT}`
@@ -364,7 +364,7 @@ export function bucketOfCards(
 /**
  * Collapse the ladder onto the three tiers the existing belief model speaks, so
  * a bucketed range can drive `BeliefDistribution` without either side changing.
- * Three even thirds of the ladder — the cut points are a convention, not a
+ * Three even thirds of the ladder, the cut points are a convention, not a
  * claim.
  */
 export function tierFromBucket(bucket: HandBucket): StrengthTier {
@@ -403,7 +403,7 @@ function classifyPostflop(
   // six-card one, so they never compare equal. Every combo makes the board's
   // quads and nothing better, so without this a 7-7-7-7 turn reads Monster for
   // all 1326. On the river the equality does fire, and the one combo that beats
-  // the board there — a better kicker — must keep its Monster.
+  // the board there, a better kicker, must keep its Monster.
   if (ctx.needed > 0 && ctx.boardCat === HandCategory.FourOfAKind) {
     return HandBucket.Air;
   }
@@ -428,7 +428,7 @@ function madeBucket(
 
   if (cat >= HandCategory.Straight) {
     // Below five board cards the board cannot make a five-card hand on its own,
-    // and at five the "plays the board" check already fired — so a straight or
+    // and at five the "plays the board" check already fired, so a straight or
     // better here is always at least partly the hole cards' doing.
     return HandBucket.Monster;
   }
@@ -443,12 +443,12 @@ function madeBucket(
   if (cat === HandCategory.TwoPair) {
     // Only two pair made with BOTH hole cards is really two pair. A pocket pair
     // beside a paired board, or one hole card pairing a paired board, is a
-    // one-pair hand wearing the board's pair as a hat — rank it by its own pair.
+    // one-pair hand wearing the board's pair as a hat, rank it by its own pair.
     //
     // A paired board is the same story a rung up: the board's own pair already
     // occupies one of the two pair slots, so the lower of our two paired ranks
     // is a kicker rather than a pair. On As-Ah-Kd-7c-2s, K-7 and K-Q both play
-    // A-A-K-K plus a kicker, and K-Q's is the better one — so requiring `lo` to
+    // A-A-K-K plus a kicker, and K-Q's is the better one, so requiring `lo` to
     // beat the board's pair is what keeps the ladder pointing the right way.
     if (
       hi !== lo &&
@@ -473,7 +473,7 @@ function madeBucket(
  * board's (A-K on 7-7-2 has a pair of sevens and nothing else).
  *
  * A five-card hand shows at most two pairs, so on a board that already shows
- * two of its own — K-K-J-J-6 — our pair only reaches the hand if it outranks
+ * two of its own. K-K-J-J-6, our pair only reaches the hand if it outranks
  * the lower of them. A pair of sixes there is not bottom pair, it is nothing:
  * the hand is K-K-J-J plus a kicker either way. That is `boardPair2Rank`, and
  * it is deliberately NOT `boardPairRank`: on a singly-paired board like
@@ -541,7 +541,7 @@ function drawBucket(
     let outs = 0;
     for (let r = 2; r <= 14; r++) {
       const bit = 1 << (r - 2);
-      // A rank already present cannot be an out — a second copy changes nothing.
+      // A rank already present cannot be an out, a second copy changes nothing.
       if (handMask & bit) continue;
       // ...and neither can one that completes the board's own straight, which
       // every opponent would make too.

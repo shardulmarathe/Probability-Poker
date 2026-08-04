@@ -21,12 +21,12 @@
  *
  * Mobile: the grid fits its container rather than scrolling.
  * -------------------------------------------------------
- * A hand chart's first job on a phone is shape recognition — is the read a
+ * A hand chart's first job on a phone is shape recognition, is the read a
  * tight cluster in the top-left corner or a wash across the whole square? Put
  * it in a horizontal scroller and that read is gone: the viewer never sees the
  * whole chart at once, which is the one thing the chart exists for. So the
- * default is fit-to-width, ~24px cells at 390px, and the cost of that choice —
- * labels too small to read comfortably — is paid back two ways. Touching or
+ * default is fit-to-width, ~24px cells at 390px, and the cost of that choice -
+ * labels too small to read comfortably, is paid back two ways. Touching or
  * hovering a cell pops it to 2.6x with its label, combo count and weight at
  * full size, and a Zoom control switches the whole grid to 35px cells inside
  * its own horizontal scroller for anyone who wants to read it cell by cell.

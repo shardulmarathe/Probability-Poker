@@ -38,7 +38,7 @@ const MASKS = 1 << 13;
 const HIGH = new Uint8Array(MASKS);
 /** The same card as a one-bit mask, so it can be cleared without a shift. */
 const HIGH_BIT = new Uint16Array(MASKS);
-/** Number of distinct ranks in the mask — flush detection reads this. */
+/** Number of distinct ranks in the mask, flush detection reads this. */
 const POP = new Uint8Array(MASKS);
 /** High card of the best straight in the mask, 0 if none. Includes the wheel. */
 const STRAIGHT = new Uint8Array(MASKS);

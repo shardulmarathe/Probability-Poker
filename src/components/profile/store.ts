@@ -8,13 +8,13 @@
  * Everything read back out is untrusted, and the normalisation below is not
  * defensive programming for its own sake. A stored report drives `createTable`
  * (through the replay) and `positionOf` (through the tracker), and both throw
- * on out-of-range input — a seat count of 9, a button that is not a seat. A
+ * on out-of-range input, a seat count of 9, a button that is not a seat. A
  * throw there is a white screen on a page that reloads into the same stored
  * value, so the bad hand would brick the profile permanently. Anything that
  * does not normalise cleanly is dropped, and the rest of the archive survives.
  *
  * Bot decisions are deliberately not persisted. They are the largest part of a
- * report by an order of magnitude — a Monte Carlo audit trail per move — and
+ * report by an order of magnitude, a Monte Carlo audit trail per move, and
  * nothing the profile computes reads them: `computeStats`, `classifyStats` and
  * `analyzeHands` all work from `actions`, `seats`, `pots` and the board.
  */
@@ -43,7 +43,7 @@ export const MAX_STORED_HANDS = 400;
 export interface ProfileArchive {
   /** Finished hands, oldest first. */
   hands: TableHandReport[];
-  /** Blinds the hands were played at — the report does not carry them. */
+  /** Blinds the hands were played at, the report does not carry them. */
   smallBlind: number;
   bigBlind: number;
   /** The seat the player occupied. Null while watching the bots. */
@@ -351,15 +351,15 @@ export function saveArchive(archive: ProfileArchive): void {
       })
     );
   } catch {
-    /* private browsing / quota — the archive just will not persist */
+    /* private browsing / quota, the archive just will not persist */
   }
 
   // Mirror upward, after the local write and never instead of it.
   //
   // This is the one seam where a finished hand can be seen without the table
   // having to know an account exists: every path that archives a hand comes
-  // through here. `syncArchive` enqueues and returns — it does not await the
-  // network, does not throw, and does nothing at all when signed out — so the
+  // through here. `syncArchive` enqueues and returns, it does not await the
+  // network, does not throw, and does nothing at all when signed out, so the
   // line above remains the whole story for a player who never signs in.
   syncArchive(archive);
 }
@@ -370,7 +370,7 @@ export function saveArchive(archive: ProfileArchive): void {
  * The merge is a union keyed by deal seed, and the local copy wins a collision:
  * it is the one the replay and what-if pages were built against, and the server
  * round-trip cannot restore a showdown category the archive never stored. The
- * server side is not modified here at all — reconciling two devices never
+ * server side is not modified here at all, reconciling two devices never
  * deletes a hand from either.
  */
 export function mergeSyncedHands(incoming: TableHandReport[]): ProfileArchive {
@@ -406,8 +406,8 @@ export function mergeHands(
 }
 
 /**
- * A live report needs the same shape check as a stored one — it is the same
- * data — but keeps its decisions, which have not been through storage.
+ * A live report needs the same shape check as a stored one, it is the same
+ * data, but keeps its decisions, which have not been through storage.
  */
 function normalizeReportLive(report: TableHandReport): TableHandReport | null {
   const clean = normalizeReport(report);

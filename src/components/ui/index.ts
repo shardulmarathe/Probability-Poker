@@ -2,13 +2,13 @@
  * The design system.
  *
  * One definition of each primitive, so a chip, a stat or a tab looks the same
- * on every screen it appears on. Import from here — `import { Stat, Tabs } from
- * "../ui"` — never from the individual files, so a component can be split or
+ * on every screen it appears on. Import from here, `import { Stat, Tabs } from
+ * "../ui"`, never from the individual files, so a component can be split or
  * merged without touching its callers.
  *
  * Every surface now imports from here; `report/ui.tsx`, which briefly carried a
  * second copy of a dozen of these, is gone. If a primitive is needed in two
- * places, it belongs in this directory rather than being copied — the copies
+ * places, it belongs in this directory rather than being copied, the copies
  * drifted within days last time (`Rail` rendered visibly differently in two
  * adjacent page headers, and three `Stat`s had incompatible props).
  */

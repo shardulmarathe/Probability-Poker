@@ -29,7 +29,7 @@ describe("fitLineup", () => {
     const grown = fitLineup(kept, 4, 1);
     expect(grown).toHaveLength(4);
     expect(grown.slice(0, 2)).toEqual(kept);
-    // Distinctness is the point of the roster — filler must not repeat a pick.
+    // Distinctness is the point of the roster, filler must not repeat a pick.
     expect(new Set(grown).size).toBe(grown.length);
   });
 
@@ -118,7 +118,7 @@ describe("normalizeSetup", () => {
 
   it("never lets the big blind fall below the small blind", () => {
     // createTable throws on bigBlind < smallBlind, and because the bad value is
-    // persisted that throw survives a reload — it bricks the app, not one hand.
+    // persisted that throw survives a reload, it bricks the app, not one hand.
     const s = normalizeSetup(base({ smallBlind: 50, bigBlind: 10 }));
     expect(s.bigBlind).toBeGreaterThanOrEqual(s.smallBlind);
   });
@@ -132,7 +132,7 @@ describe("normalizeSetup", () => {
   });
 
   it("coerces blinds arriving as strings", () => {
-    // JSON can yield strings, and "10" < "5" compares lexicographically — the
+    // JSON can yield strings, and "10" < "5" compares lexicographically, the
     // engine's own validation would then reject a valid 5/10 table.
     const s = normalizeSetup(
       base({ smallBlind: "5" as never, bigBlind: "10" as never })
@@ -148,7 +148,7 @@ describe("normalizeSetup", () => {
 
   it("does not seat prototype keys as bots", () => {
     // `id in BOT_PROFILES` matches Object.prototype members, seating a "bot"
-    // whose every parameter is undefined — it would fold aces forever.
+    // whose every parameter is undefined, it would fold aces forever.
     const s = normalizeSetup(
       base({ lineup: ["toString", "constructor", "valueOf"] as never })
     );

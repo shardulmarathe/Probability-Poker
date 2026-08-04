@@ -1,22 +1,22 @@
 /**
- * What each decision cost — the two numbers, and why there are two.
+ * What each decision cost, the two numbers, and why there are two.
  *
  * Every action a seat takes is scored against the alternatives it could have
  * taken instead. The score is reported twice, and the distinction between the
  * two is the pedagogical core of this whole layer:
  *
- *   modelEv     — priced against the range inferred from the PUBLIC action so
+ *   modelEv, priced against the range inferred from the PUBLIC action so
  *                 far. Nothing but what the seat could have known at the moment
  *                 it acted. This is the honest metric and the only one a
  *                 decision should be judged by.
  *
- *   hindsightEv — priced against the opponents' ACTUAL cards and the board that
+ *   hindsightEv, priced against the opponents' ACTUAL cards and the board that
  *                 actually came. Omniscient, and therefore results-oriented: a
  *                 correct call that got outdrawn shows a loss here, and a
  *                 reckless call that spiked shows a gain.
  *
- * A player who conflates them learns exactly the wrong lesson — "I lost, so it
- * was wrong" — which is why the two are never merged into one field, never
+ * A player who conflates them learns exactly the wrong lesson, "I lost, so it
+ * was wrong", which is why the two are never merged into one field, never
  * averaged, and never share a name. `modelEvLoss` is the coaching number.
  * `hindsightEvLoss` exists to be shown *next to* it, so the gap between them can
  * be named out loud as variance rather than mistaken for skill.
@@ -32,8 +32,8 @@
  * Scope, stated because the input contract genuinely limits it:
  *
  *  - This compares ACTION CLASSES (fold / check / call / bet / raise), not bet
- *    sizes. The project's forward-looking EV model has no fold equity — the
- *    opponent is assumed to call — so `d(EV)/d(cost) = 2·equity − 1`, and any
+ *    sizes. The project's forward-looking EV model has no fold equity, the
+ *    opponent is assumed to call, so `d(EV)/d(cost) = 2·equity − 1`, and any
  *    holding above 50% equity would be told to jam every time. A sizing
  *    critique from that model would be noise dressed up as advice, so the
  *    aggressive alternative is priced at exactly one canonical size (the ½-pot
@@ -47,8 +47,8 @@
  *
  * Everything here reads only the long-standing fields of `TableHandReport`
  * (`seats`, `board`, `actions`, `button`, `seatCount`, `seed`) and rebuilds the
- * opponent read itself, so it works identically for a human seat — which has no
- * `BotDecision` and no recorded equity — and for a bot.
+ * opponent read itself, so it works identically for a human seat, which has no
+ * `BotDecision` and no recorded equity, and for a bot.
  */
 
 import { INITIAL_BELIEF } from "../../data/constants";
@@ -87,7 +87,7 @@ const BOARD_CARDS_AT: Record<Street, number> = {
  * Sims behind each decision's model equity.
  *
  * 2000 puts the standard error on a coin-flip spot at ~1.1%, which moves a
- * pot-sized EV by about a hundredth of a pot — well under the gaps this module
+ * pot-sized EV by about a hundredth of a pot, well under the gaps this module
  * is asked to report on, and cheap enough to score a whole session in a beat.
  */
 export const DEFAULT_MODEL_SIMS = 2000;
@@ -97,7 +97,7 @@ export const DEFAULT_MODEL_SIMS = 2000;
  *
  * Only reachable for hands that ended before the river with cards still to come
  * (everyone folded preflop, say). Two board cards or fewer are enumerated
- * exactly instead — see `hindsightEquity` — so this is the preflop-fold case and
+ * exactly instead, see `hindsightEquity`, so this is the preflop-fold case and
  * nothing else, and `DecisionEvLoss.hindsightExact` says which one happened.
  */
 export const DEFAULT_HINDSIGHT_RUNOUTS = 4000;
@@ -123,9 +123,9 @@ export interface AlternativeEv {
   action: ActionType;
   /** Chips this line would have added now. */
   cost: number;
-  /** Priced against the inferred range — what was knowable. */
+  /** Priced against the inferred range, what was knowable. */
   modelEv: number;
-  /** Priced against the actual cards — what happened. */
+  /** Priced against the actual cards, what happened. */
   hindsightEv: number;
   /** True for the line the seat actually took. */
   chosen: boolean;
@@ -238,7 +238,7 @@ function alternativesFor(
 ): { action: ActionType; cost: number }[] {
   const facing = record.toCall > 0;
   const aggressive: ActionType = facing ? "raise" : "bet";
-  // The seat's own size when it was the seat that raised — never a rounded
+  // The seat's own size when it was the seat that raised, never a rounded
   // stand-in for it, so the chosen line is a member of this set exactly and the
   // loss cannot come out positive by a rounding step.
   const aggressiveCost =
@@ -273,7 +273,7 @@ function alternativesFor(
 // Reading the hand
 // ---------------------------------------------------------------------------
 
-/** Seats dealt in — a seat with no hole cards never had a hand to analyse. */
+/** Seats dealt in, a seat with no hole cards never had a hand to analyse. */
 function dealtSeats(report: TableHandReport): number[] {
   return report.seats.filter((s) => s.hole.length === 2).map((s) => s.seat);
 }
@@ -368,7 +368,7 @@ function shareOf(heroScore: number, oppScores: number[]): number {
  * Pot share with every live seat's cards face up.
  *
  * The board used is the one that ACTUALLY came, not the prefix visible at the
- * decision — that is what makes this the hindsight lens rather than a
+ * decision, that is what makes this the hindsight lens rather than a
  * cards-known-but-runout-fair one. When the hand ended before the board
  * completed those cards were never dealt, so they are enumerated exactly (one or
  * two to come) or sampled from the stub (a hand that ended preflop); `exact`
@@ -452,7 +452,7 @@ function hindsightEquity(
 
   // Three or more to come only happens when a hand ended preflop. Enumerating
   // C(44,5) ≈ 1.1M runouts per decision is not worth it for a lens nobody should
-  // be coaching from, so sample — seeded, so a replay reproduces the number.
+  // be coaching from, so sample, seeded, so a replay reproduces the number.
   const rng = makeRng(seed);
   const deck = stub.slice();
   let sum = 0;

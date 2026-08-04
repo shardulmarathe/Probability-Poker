@@ -2,14 +2,14 @@
  * The same hand, dealt to a different table.
  *
  * A seed fixes the deal and nothing else, so re-running a hand with different
- * archetypes in the seats holds the cards constant and varies the opposition —
+ * archetypes in the seats holds the cards constant and varies the opposition -
  * which is the only way to separate the two things a player usually credits to
  * one. A pot lost with the second-best hand was lost to the deck. A pot lost
  * because three maniacs would not fold is a different lesson, and the same hand
  * against three nits shows which one it was.
  *
- * Every move here is re-derived. Not one of the recorded actions is replayed —
- * they were answers to a different table and would mostly not even be legal —
+ * Every move here is re-derived. Not one of the recorded actions is replayed -
+ * they were answers to a different table and would mostly not even be legal -
  * so the whole hand carries `simulated: true`, including the seat the player
  * occupied, which a bot now plays. What is *not* simulated is the deal, and
  * `sameCards` proves it hand by hand rather than asserting it in a comment.
@@ -45,7 +45,7 @@ export interface LineupReplay {
    * The claim the whole comparison rests on, checked rather than assumed.
    */
   sameCards: boolean;
-  /** Moves the bots supplied — always the whole hand. */
+  /** Moves the bots supplied, always the whole hand. */
   rederived: number;
   bySeat: SeatOutcome[];
 }

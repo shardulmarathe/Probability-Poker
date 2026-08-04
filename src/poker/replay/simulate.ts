@@ -1,7 +1,7 @@
 /**
  * Shared plumbing for the two replays that invent something.
  *
- * `reconstruct.ts` never asks anybody to decide anything — it has the moves.
+ * `reconstruct.ts` never asks anybody to decide anything, it has the moves.
  * The counterfactual and the alternative lineup both do, and this is the only
  * file in the replay that reaches for a bot. Keeping it to one file is
  * deliberate: the decider's own module is under active change, and a single
@@ -19,7 +19,7 @@ import type { ReplayTableOptions } from "./table";
  * Monte Carlo budget for a re-derived move.
  *
  * Below the live game's per-street budget because a replay runs the whole
- * remainder of a hand synchronously on whatever thread asked for it — in the
+ * remainder of a hand synchronously on whatever thread asked for it, in the
  * browser, the one painting the page. Measured, a full simulated hand costs
  * about 35ms here against roughly 15ms at 400 sims: the Monte Carlo is not what
  * dominates, so there is no reason to economise further. The standard error at

@@ -3,7 +3,7 @@
  *
  * Deliberately *not* a route, and deliberately dismissible with Escape, a
  * backdrop click, and a "Keep playing locally" button that is as prominent as
- * the submit. There is no login wall anywhere in this product — the dialog is
+ * the submit. There is no login wall anywhere in this product, the dialog is
  * an offer, and it says out loud what accepting it changes and what it does
  * not.
  */

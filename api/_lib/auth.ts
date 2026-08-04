@@ -36,7 +36,7 @@ export function methodNotAllowed(res: VercelResponse, allow: string[]): void {
  *
  * Every id from a request is interpolated as `${id}::uuid`, and Postgres raises
  * `invalid input syntax for type uuid` on anything that is not one. That threw
- * past the `HttpError` branch below and answered 500 — a server error, for a
+ * past the `HttpError` branch below and answered 500, a server error, for a
  * request the client got wrong. It never leaked (the generic handler saw to
  * that), but it told the caller to retry something that can never succeed and
  * paged whoever watches the 5xx rate. Malformed input is a 400.

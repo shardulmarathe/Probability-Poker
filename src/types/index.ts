@@ -202,7 +202,7 @@ export interface HandReport {
   /**
    * The seed this hand was dealt from. Every card and every bot decision is a
    * deterministic function of it, so a hand can be replayed exactly from this
-   * number alone — which is what makes hands shareable and analysis
+   * number alone, which is what makes hands shareable and analysis
    * reproducible.
    */
   seed: number;
@@ -263,7 +263,7 @@ export interface GameState {
   beliefEvolution: BeliefSnapshot[];
   /**
    * Cumulative learned model of the player's behavior. Persists across hands
-   * for the whole session — startHand never resets it; only a new game does.
+   * for the whole session, startHand never resets it; only a new game does.
    */
   opponentModel: OpponentModel;
   decisions: BotDecision[];

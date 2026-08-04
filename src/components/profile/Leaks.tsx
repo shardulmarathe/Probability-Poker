@@ -5,7 +5,7 @@
  * the hand priced against the range the opponents' actions implied, which is
  * the only lens that can tell you whether a decision was right. The hindsight
  * loss is priced against the cards they actually held, which is knowable only
- * afterwards — it says what the decision cost, not whether it was wrong.
+ * afterwards, it says what the decision cost, not whether it was wrong.
  *
  * Summing them, or ranking by their total, would teach precisely the habit the
  * split exists to break: judging a fold by whether it would have won. So they
@@ -127,7 +127,7 @@ const H = 40;
  * Chips given away, accumulating over the session.
  *
  * Two lines, drawn in one box because they share an axis, kept apart by weight
- * and dash rather than by stacking — stacking them would be the sum this whole
+ * and dash rather than by stacking, stacking them would be the sum this whole
  * panel refuses to compute.
  */
 export function LossCurve({ session }: { session: SessionEvLoss }) {

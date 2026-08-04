@@ -3,7 +3,7 @@
  *
  * A counterfactual holds the cards fixed and changes one decision. A lineup
  * replay holds the cards fixed and changes the opposition. In both, everything
- * that happens after the change is the bots' answer *now* — not a record of
+ * that happens after the change is the bots' answer *now*, not a record of
  * anything, and in the counterfactual's case not even the opponents' real
  * strategy, since they were answering a different question at the time.
  *
@@ -40,7 +40,7 @@ const SIM_BORDER = "rgba(176,127,212,0.5)";
 /**
  * The banner. Deliberately a colour used nowhere else on the site, so a
  * screenshot of a simulated result cannot be mistaken for a screenshot of a
- * hand — including by the person who took it.
+ * hand, including by the person who took it.
  */
 export function SimulatedBanner({
   rederived,

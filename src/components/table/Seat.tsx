@@ -3,14 +3,14 @@
  *
  * The same component draws all of them, at three densities: the hero's seat
  * (cards big enough to read at a glance), a full opponent card on a wide
- * screen, and a compact one on a phone — where six seats have to share 390
+ * screen, and a compact one on a phone, where six seats have to share 390
  * pixels and anything more than an avatar and a stack does not fit.
  *
  * A seat has four states and they are told apart by *elevation*, not by colour
  * alone. Live seats sit slightly proud of the cloth. The seat on the clock is
  * lifted further and lit gold. An all-in seat keeps its height but is ringed in
  * oxblood, because its chips are already in the middle. A folded seat lies flat
- * — no lift, no shadow, no colour in the face, no cards — which is what a
+ *, no lift, no shadow, no colour in the face, no cards, which is what a
  * player who is out of the hand looks like from across a table.
  */
 
@@ -81,7 +81,7 @@ export function SeatView(props: SeatViewProps) {
   const state = seatState(seat, active);
   const folded = state === "folded";
 
-  // Seat 0 owns the bottom chair — the human's, or in observer mode a bot's —
+  // Seat 0 owns the bottom chair, the human's, or in observer mode a bot's -
   // and is centred on its anchor so it cannot hang off the bottom rail. Every
   // other seat hangs from its anchor instead, so a seat that grows (a read, a
   // style tag, a bet chip) grows downward into the felt rather than upward off
@@ -118,8 +118,8 @@ export function SeatView(props: SeatViewProps) {
       {/*
        * While a bot is deciding, its chair carries the transcript of the
        * decision rather than a one-line thought bubble. `Thinking` narrates the
-       * real pipeline — range construction, shard counts, the sizes actually
-       * priced — and it is mounted exactly where the bubble was, hanging off
+       * real pipeline, range construction, shard counts, the sizes actually
+       * priced, and it is mounted exactly where the bubble was, hanging off
        * the seat that is thinking, so the narration stays attached to the
        * player it belongs to. `ThoughtPocket` supplies only the placement.
        */}
@@ -238,7 +238,7 @@ function Commit({
 }
 
 /**
- * All-in is a state, not a stack size — $0 behind says nothing on its own.
+ * All-in is a state, not a stack size, $0 behind says nothing on its own.
  *
  * `tight` is the phone's six-handed case, where a chair is 3.5rem wide: at the
  * desktop's tracking "ALL IN" is wider than the seat and two neighbouring
@@ -246,7 +246,7 @@ function Commit({
  */
 /**
  * The signed result of the finished hand. Gold for a profit, muted red for a
- * loss — the same two colours the felt already uses for a win and for an
+ * loss, the same two colours the felt already uses for a win and for an
  * all-in, so it needs no legend.
  */
 function Net({ net, className }: { net: number | null; className?: string }) {
@@ -286,7 +286,7 @@ function Stack({
 }
 
 // ---------------------------------------------------------------------------
-// Hero — bottom centre, cards readable
+// Hero, bottom centre, cards readable
 // ---------------------------------------------------------------------------
 
 function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, settled }: Skinned) {
@@ -354,7 +354,7 @@ function HeroCommit({ amount, bigBlind }: { amount: number; bigBlind: number }) 
 }
 
 // ---------------------------------------------------------------------------
-// Full opponent — wide screens
+// Full opponent, wide screens
 // ---------------------------------------------------------------------------
 
 function FullSeat({
@@ -431,7 +431,7 @@ function FullSeat({
 }
 
 // ---------------------------------------------------------------------------
-// Compact opponent — phones
+// Compact opponent, phones
 //
 // Everything below the avatar and the stack is dropped: at six seats on a
 // 390px screen the arc gives each chair about 46px, and a name or a blurb

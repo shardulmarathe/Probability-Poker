@@ -1,17 +1,17 @@
 /**
- * Tab 2 — what the table thought each opponent held.
+ * Tab 2, what the table thought each opponent held.
  *
  * The centrepiece. Each opponent gets the 13x13 chart of the distribution the
  * equity estimate was actually sampled from, at the street you pick, with the
  * dead cards already taken out of it. The charts are not an illustration of the
- * model; they are the model — `derive.rangeView` rebuilds the same per-combo
+ * model; they are the model, `derive.rangeView` rebuilds the same per-combo
  * range `decider.opponentRanges` handed the sampler, and the grid is its
  * projection onto the only 169 classes a poker player thinks in.
  *
  * That claim is load-bearing, so it is worth saying what it costs: the grid can
  * only be a *projection*, never the thing itself. A cell holds up to 12 combos
- * that a board splits — on K-7-2 the 7-2 cell contains twelve two-pair hands,
- * but on K-Q-J it contains twelve pieces of air with different backdoors — so
+ * that a board splits, on K-7-2 the 7-2 cell contains twelve two-pair hands,
+ * but on K-Q-J it contains twelve pieces of air with different backdoors, so
  * the cell number is their total weight and the chart cannot show the spread
  * inside it. The bucket meters beside each chart are there for exactly that
  * reason: they read the same range through the classifier the engine used.
@@ -81,7 +81,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
     [report, street, opponents, heroHole]
   );
 
-  /** The read on every seat at every street — the narrowing strip. */
+  /** The read on every seat at every street, the narrowing strip. */
   const narrowing = useMemo(
     () =>
       streets.map((s) => ({

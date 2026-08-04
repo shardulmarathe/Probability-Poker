@@ -216,7 +216,7 @@ describe("evInput", () => {
   it("prices from the pot share, not the outright-win rate", () => {
     // The regression this file exists for: a hand that wins 20% outright and
     // chops the other 80% four ways collects 40% of the pot, and EV must see
-    // 0.40 — not 0.20, and not 0.20 + 0.80.
+    // 0.40, not 0.20, and not 0.20 + 0.80.
     const mc = evInput(equityOf({ pWin: 0.2, pTie: 0.8, equity: 0.4 }));
     expect(mc.pWin).toBe(0.4);
     expect(mc.pLoss).toBeCloseTo(0.6, 12);
@@ -391,7 +391,7 @@ describe("tableDecider", () => {
   });
 
   it("routes the acting seat's own profile into the choice", () => {
-    // K4o scores 3 on the Chen scale — outside a nit's 4% entry range and
+    // K4o scores 3 on the Chen scale, outside a nit's 4% entry range and
     // inside a maniac's 96%. Identical cards and identical price, so any
     // difference in the decision can only have come from the profile.
     const hole: [Card, Card] = [makeCard(13, "c"), makeCard(4, "d")];
@@ -472,7 +472,7 @@ describe("driving the engine", () => {
 
   it("makes a table of maniacs measurably more aggressive than a table of nits", () => {
     // The personality parameters have to survive the trip through equity and EV
-    // and still be visible in the chips. Same seed, same cards, same seats —
+    // and still be visible in the chips. Same seed, same cards, same seats -
     // only the profiles differ.
     const aggressionRate = (profile: string) => {
       const table = seatedTable(Array(4).fill(profile), 8675309);
@@ -587,8 +587,8 @@ describe("foldByBucket", () => {
     // measures. Against a half-pot bet the minimum defence frequency is
     // 1 − alpha = 2/3, i.e. an opponent that folds more than 1/3 of its range
     // is beatable by betting *any* two cards. This assertion used to read
-    // `toBeGreaterThan` and the prior folded 46.4% here — 13 points past the
-    // bound — which was a standing subsidy on aggression that the EV maximiser
+    // `toBeGreaterThan` and the prior folded 46.4% here, 13 points past the
+    // bound, which was a standing subsidy on aggression that the EV maximiser
     // correctly collected by betting almost everything. `likelihood.ts`'s
     // MDF_FOLD_SCALE removes it; the bound is asserted range-weighted and at
     // every size in `likelihood.test.ts`, and this is the per-bucket mean at
@@ -605,7 +605,7 @@ describe("foldByBucket", () => {
 
   it("says a river bet is read more sharply than a preflop one", () => {
     // The hand is complete on the river, so what a player holds and what they
-    // do with it are at their most correlated — the model's own claim, and the
+    // do with it are at their most correlated, the model's own claim, and the
     // continuing range is sharper for it.
     const river = foldByBucket(model, "river", "BTN", "facing-bet");
     const preflop = foldByBucket(model, "preflop", "BTN", "facing-bet");
@@ -765,7 +765,7 @@ describe("opponentRanges", () => {
 
   it("puts the hero's blocker into the equity number", () => {
     // Three hearts on board and the hero holds one ace or another. Identical in
-    // every way except which ace, so the whole difference is the blocker — and
+    // every way except which ace, so the whole difference is the blocker, and
     // unlike a tier-normalised read, a per-combo range lets it reach the equity
     // instead of handing the missing mass back to the same tier.
     const board = [
@@ -950,7 +950,7 @@ describe("bluffing, end to end", () => {
   });
 
   it("bets strong hands more often than air", () => {
-    // Fold equity must not flatten the strength gradient — a bot that bluffs as
+    // Fold equity must not flatten the strength gradient, a bot that bluffs as
     // often as it value bets is as unreadable as one that never bluffs, and
     // just as wrong. Two pair or better is ~4% of random flops, hence the
     // larger sweep for the same number of measurements.
@@ -1104,8 +1104,8 @@ describe("pricing sizes", () => {
 //
 // The whole risk in re-pricing calls is that it leaks into the calls that were
 // already right. A closing call must come out of the decider bit-for-bit
-// unchanged — not close, not within the sampling error of a second Monte Carlo,
-// identical — or the fix has traded a correct number for a noisier one.
+// unchanged, not close, not within the sampling error of a second Monte Carlo,
+// identical, or the fix has traded a correct number for a noisier one.
 
 /**
  * A flop spot where a bet of `bet` stands and the hero must call it.
@@ -1176,7 +1176,7 @@ describe("pricing a call", () => {
       99
     )!;
     expect(priced).not.toBeNull();
-    // No fold equity, and a pot bigger than the one standing — the two halves
+    // No fold equity, and a pot bigger than the one standing, the two halves
     // of what `ev.callEv` is for.
     expect(priced.pFold).toBe(0);
     expect(priced.foldEv).toBe(0);
@@ -1223,7 +1223,7 @@ describe("pricing a call", () => {
 
   it("declines to price a call that costs nothing", () => {
     // The big blind's option is a check, not a call, and there is no such
-    // action — but a scripted state can still ask, and a zero-cost call has no
+    // action, but a scripted state can still ask, and a zero-cost call has no
     // pot to correct.
     const { table, seat } = callSpot({ seats: 3, behind: 1 });
     const free = { ...callOf(table, seat), cost: 0 };
@@ -1254,7 +1254,7 @@ describe("actionContexts", () => {
   ): ActionRecord => ({ seat, street, action, cost: 0, potBefore: 0, toCall });
 
   it("counts the big blind as the preflop open", () => {
-    // A caller preflop is answering a bet, not acting into an unopened pot —
+    // A caller preflop is answering a bet, not acting into an unopened pot -
     // somebody already put chips in, by force.
     expect(actionContexts([at(0, "preflop", "call", 10)])).toEqual([
       { street: "preflop", facing: "facing-bet" },
@@ -1333,7 +1333,7 @@ describe("injecting a learned model", () => {
     // decision, so the only thing that makes it safe to add is that an empty
     // one is exactly the identity: `betaMean(0, 0, m)` is `m` at every level of
     // the backoff, so a model with no cells cannot move a single lookup. Not
-    // "within the sampling error" — the same bits.
+    // "within the sampling error", the same bits.
     const play = (models?: Parameters<typeof tableDecider>[0]) => {
       const table = seatedTable(["tag", "station", "maniac", "rock"], 99);
       const decide = tableDecider({ simulations: 400, ...models });

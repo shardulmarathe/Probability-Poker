@@ -9,7 +9,7 @@
  * `ThinkStep`, it cannot be rendered.
  *
  * It is drawn as a transcript rather than a spinner. A spinner says "wait"; the
- * point of this panel is that the waiting *is* the content — five or six named
+ * point of this panel is that the waiting *is* the content, five or six named
  * stages, each with the real count it is working on, arriving in the order the
  * decider runs them. Finished stages stay above the current one so the shape of
  * the pipeline accumulates as it runs, which is the thing being taught.
@@ -29,7 +29,7 @@ const HISTORY = 3;
 export interface ThinkingProps {
   /**
    * The seat's current frame, straight from `fx.seats[id].thinking`. Null when
-   * that seat is not deciding — the component renders nothing.
+   * that seat is not deciding, the component renders nothing.
    */
   step: ThinkStep | null;
   /** Placement, for whatever mounts it. */
@@ -41,7 +41,7 @@ export interface ThinkingProps {
    *
    * Pass `0` where the panel sits in the page flow rather than floating: there,
    * every finished stage pushes the *running* one further down, and by stage
-   * five it is below the fold on a phone — the one line that is actually live
+   * five it is below the fold on a phone, the one line that is actually live
    * is the one you cannot see. Zero holds the height constant instead.
    */
   history?: number;
@@ -67,7 +67,7 @@ export function Thinking({ step, className, history = HISTORY }: ThinkingProps) 
         // The panel gradient over a near-opaque base rather than straight on
         // top of it: `SURFACE.panel` is translucent by design, which is right
         // for a panel sitting *in* a page and wrong for one floating over the
-        // felt — the cards and chips underneath read straight through the text.
+        // felt, the cards and chips underneath read straight through the text.
         backgroundColor: "rgba(8,25,18,0.96)",
         backgroundImage: SURFACE.panel,
         backdropFilter: "blur(8px)",
@@ -124,8 +124,8 @@ export function Thinking({ step, className, history = HISTORY }: ThinkingProps) 
 // ---------------------------------------------------------------------------
 
 /**
- * A stage that has already run. Its title stays fully legible — it is the shape
- * of the pipeline — while its detail is held to one line, because three past
+ * A stage that has already run. Its title stays fully legible, it is the shape
+ * of the pipeline, while its detail is held to one line, because three past
  * stages at full height would push the current one off a phone.
  */
 function Done({ line }: { line: ThinkLine }) {
@@ -138,7 +138,7 @@ function Done({ line }: { line: ThinkLine }) {
       </p>
       {/*
        * The detail wraps rather than truncating. These lines are the counts the
-       * narration exists to show — a clipped "1,225 of 1,326 combos surv…" is
+       * narration exists to show, a clipped "1,225 of 1,326 combos surv…" is
        * worse than one that takes a second line.
        */}
       {line.detail && (
@@ -198,7 +198,7 @@ function Current({ step }: { step: ThinkStep }) {
   );
 }
 
-/** The hairline the beads sit on — the pipeline, running top to bottom. */
+/** The hairline the beads sit on, the pipeline, running top to bottom. */
 function Rail() {
   return (
     <span

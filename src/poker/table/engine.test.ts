@@ -32,7 +32,7 @@ function table(overrides: Partial<TableSetup> & { seatCount: number }): Table {
 // ---------------------------------------------------------------------------
 // Scripted deciders
 //
-// None of these consult equity or a bot profile — the whole point of the
+// None of these consult equity or a bot profile, the whole point of the
 // injected decider is that the lifecycle can be driven by rules alone.
 // ---------------------------------------------------------------------------
 
@@ -84,7 +84,7 @@ const callDown: SyncBotDecider = (state, seat, config) =>
 const foldToBets: SyncBotDecider = (state, seat, config) =>
   decision(state, seat, pick(legalActions(state, seat, config), "check", "fold"));
 
-/** Shoves at every opportunity — manufactures all-ins and side pots. */
+/** Shoves at every opportunity, manufactures all-ins and side pots. */
 const jam: SyncBotDecider = (state, seat, config) => {
   const legal = legalActions(state, seat, config);
   const aggressive = legal.find((a) => a.type === "bet" || a.type === "raise");
@@ -94,7 +94,7 @@ const jam: SyncBotDecider = (state, seat, config) => {
   return decision(state, seat, pick(legal, "check", "call"));
 };
 
-/** Raises the minimum every time — the longest legal betting rounds there are. */
+/** Raises the minimum every time, the longest legal betting rounds there are. */
 const grind: SyncBotDecider = (state, seat, config) => {
   const legal = legalActions(state, seat, config);
   const aggressive = legal.find((a) => a.type === "bet" || a.type === "raise");
@@ -149,7 +149,7 @@ function offered(legal: TableAction[], action: TableAction): boolean {
 
 /**
  * Play `hands` and check invariants 1-3 (conservation, termination, legality)
- * before every single action rather than once per hand — a mid-hand accounting
+ * before every single action rather than once per hand, a mid-hand accounting
  * slip that the payout happens to cancel out would otherwise go unseen.
  *
  * Failures are collected instead of asserted in place: at ~100k actions per run
@@ -211,7 +211,7 @@ function auditRun(
     const net = report.seats.reduce((n, s) => n + s.net, 0);
     if (net !== 0) note(`seat nets sum to ${net}, not 0`);
     for (const seat of report.seats) {
-      // Ties the report to the stacks it claims to describe — a busted seat is
+      // Ties the report to the stacks it claims to describe, a busted seat is
       // back on the starting stack, everyone else is up or down by their net.
       const after = before[seat.seat] + seat.net;
       const expected = after === 0 ? t.startingStack : after;

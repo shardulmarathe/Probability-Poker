@@ -102,14 +102,14 @@ function hand(spec: HandSpec): TableHandReport {
 }
 
 // ---------------------------------------------------------------------------
-// VPIP — the traps
+// VPIP, the traps
 // ---------------------------------------------------------------------------
 
 describe("VPIP", () => {
   it("does not count a posted blind", () => {
     // 3-handed, button 0: SB is seat 1, BB is seat 2. Both put chips in before
     // acting, and neither did so voluntarily. Seats 0 and 1 fold; seat 2 never
-    // acts at all — the classic walk.
+    // acts at all, the classic walk.
     const report = hand({
       seatCount: 3,
       button: 0,
@@ -242,7 +242,7 @@ describe("3-bet", () => {
   it("gives the opener no opportunity, and never counts a 4-bet spot", () => {
     // UTG's only action facing one raise would be facing its own.
     expect(scanHand(threeBetPot, 3)!.threeBet).toEqual({ n: 0, d: 0 });
-    // BTN/SB/BB all acted with two raises standing — that is a 4-bet spot.
+    // BTN/SB/BB all acted with two raises standing, that is a 4-bet spot.
     for (const seat of [0, 1, 2]) {
       expect(scanHand(threeBetPot, seat)!.threeBet).toEqual({ n: 0, d: 0 });
     }
@@ -496,7 +496,7 @@ describe("WTSD and W$SD", () => {
       folded: [1],
       winners: [0],
     });
-    // No postflop actions at all — both seats were all-in preflop.
+    // No postflop actions at all, both seats were all-in preflop.
     expect(scanHand(jammed, 2)!.wtsd).toEqual({ n: 1, d: 1 });
     expect(scanHand(jammed, 0)!.wsd).toEqual({ n: 1, d: 1 });
   });
@@ -609,7 +609,7 @@ describe("c-bet and fold to c-bet", () => {
 
   it("does not score a fold to a RAISE of the c-bet as a fold to the c-bet", () => {
     // Check, check, c-bet, raise, fold. Seat 3's fold faces the raise, not the
-    // continuation bet — `toCall > 0` alone cannot tell the two apart, and the
+    // continuation bet, `toCall > 0` alone cannot tell the two apart, and the
     // difference is the whole meaning of the stat.
     const report = hand({
       seatCount: 4,
@@ -698,7 +698,7 @@ describe("position slicing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Merging — the reason counters are pairs
+// Merging, the reason counters are pairs
 // ---------------------------------------------------------------------------
 
 describe("merging", () => {

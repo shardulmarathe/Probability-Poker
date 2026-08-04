@@ -2,7 +2,7 @@
  * Hand generators for the replay tests.
  *
  * These drive the engine through `applyAction` directly rather than through
- * `playHandHeadless`, so no `BotDecision` has to be fabricated — the replay
+ * `playHandHeadless`, so no `BotDecision` has to be fabricated, the replay
  * tests care about chips and cards, and the bots' audit trail is the one part
  * of a report a replay deliberately does not reproduce.
  *

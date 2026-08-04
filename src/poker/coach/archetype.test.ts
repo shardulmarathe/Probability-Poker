@@ -187,7 +187,7 @@ describe("confidence", () => {
 // validation is: drive `chooseAction` over a spread of ordinary spots, count
 // what it did with `stats.ts`'s definitions, and ask whether `classify` gets the
 // roster's own labels back. Ground truth comes from outside this module, and no
-// step invents a parameters-to-statistics formula — the profile module's own
+// step invents a parameters-to-statistics formula, the profile module's own
 // code does the interpreting.
 //
 // The spots are deliberately plain and symmetric so that what varies between
@@ -221,11 +221,11 @@ const PREFLOP_EV = [2, 6, 10, 14, 18, 22, 26, 30];
 const PREFLOP_STRENGTHS = [0.3, 0.8];
 
 /**
- * Postflop prices — the same set for the call and the raise, diagonal skipped,
+ * Postflop prices, the same set for the call and the raise, diagonal skipped,
  * and spanning zero so that folding is a live option. Symmetric for the same
  * reason: a seat that treats a bet and a call alike measures AF exactly 1.
  *
- * Spaced finely (-25, -23, … -1, 1, … 25 — odd, so no price is ever exactly
+ * Spaced finely (-25, -23, … -1, 1, … 25, odd, so no price is ever exactly
  * zero), because the tilt is a multiplier: a coarse grid would leave every
  * decision on the same side of the comparison and report every profile neutral.
  */
@@ -249,8 +249,8 @@ const RAISE = action("raise", "Raise", PREFLOP_TO_CALL * 3);
 /**
  * A profile's style, measured by counting what `chooseAction` does.
  *
- * The counts go through exactly the definitions in stats.ts — VPIP is a
- * non-fold, PFR is a raise, AF is (bets+raises)/calls — so what is validated is
+ * The counts go through exactly the definitions in stats.ts. VPIP is a
+ * non-fold, PFR is a raise, AF is (bets+raises)/calls, so what is validated is
  * the whole chain from parameter to label, not the classifier in isolation.
  */
 function measureProfile(id: BuiltArchetype): StyleVector {
@@ -389,8 +389,8 @@ describe("recovering the bot roster's styles", () => {
   it("recovers the aggression multiplier itself, not merely its order", () => {
     // The neutral profile is defined by `aggression === 1`, and the symmetric
     // grid is built so a seat that treats a raise and a call alike measures AF
-    // exactly 1. That the other six then land in `aggression` order — and, at
-    // the aggressive end, land almost exactly ON their multiplier — is the
+    // exactly 1. That the other six then land in `aggression` order, and, at
+    // the aggressive end, land almost exactly ON their multiplier, is the
     // strongest evidence available that the AF axis reads what it claims to.
     expect(measured.get("professor")!.af).toBe(1);
     const byParameter: BuiltArchetype[] = [
@@ -417,7 +417,7 @@ describe("recovering the bot roster's styles", () => {
   });
 
   it("separates the tight-passive pair from the tight-aggressive one", () => {
-    // Same side of the width axis, opposite sides of the aggression one — the
+    // Same side of the width axis, opposite sides of the aggression one, the
     // distinction profiles.ts says its `aggression` multiplier encodes.
     const rock = measured.get("rock")!;
     const tag = measured.get("tag")!;
@@ -435,7 +435,7 @@ describe("recovering the bot roster's styles", () => {
 
 /**
  * A decider assembled from `profiles.chooseAction`, multiway equity and this
- * layer's own `priceAction` — the same three ingredients `model/decider.ts`
+ * layer's own `priceAction`, the same three ingredients `model/decider.ts`
  * uses, wired here directly so this test depends on none of it.
  */
 function profileDecider(simulations: number): SyncBotDecider {
@@ -567,7 +567,7 @@ describe("through hands the engine actually dealt", () => {
     // waives the gate whenever a line makes more than a quarter of what it
     // risks, and completing a $5 small blind into a $15 pot clears that with
     // almost any two cards. So the honest label from PLAY is the passive one
-    // rather than the tight one — a fact about the bot, not about the
+    // rather than the tight one, a fact about the bot, not about the
     // classifier, and exactly why the parameter-level recovery above is measured
     // in spots priced so the gate is never waived.
     const verdict = classifyStats(rock);
@@ -588,7 +588,7 @@ describe("through hands the engine actually dealt", () => {
     expect(short.hands).toBe(12);
     expect(short.provisional).toBe(true);
     expect(short.confidence).toBeLessThan(0.15);
-    // The label may well be right — it is the certainty that is not earned.
+    // The label may well be right, it is the certainty that is not earned.
     expect(short.confidence).toBeLessThan(classifyStats(maniac).confidence);
   });
 

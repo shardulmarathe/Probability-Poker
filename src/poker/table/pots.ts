@@ -3,7 +3,7 @@
  *
  * Heads-up needs none of this: the current engine settles with
  * `matched = min(invested); pot = matched * 2` and refunds the difference. With
- * three or more seats and unequal stacks that breaks down — a short stack that
+ * three or more seats and unequal stacks that breaks down, a short stack that
  * is all-in for less can only win the portion every caller matched, and the
  * remainder forms a side pot contested by the deeper seats alone.
  *
@@ -30,7 +30,7 @@ export interface Pot {
 export interface PotLayout {
   pots: Pot[];
   /**
-   * Chips returned to a seat because nobody matched them — an uncalled bet is
+   * Chips returned to a seat because nobody matched them, an uncalled bet is
    * never part of a pot. Keyed by seat id.
    */
   refunds: Record<number, number>;
@@ -70,7 +70,7 @@ export function buildPots(contributions: SeatContribution[]): PotLayout {
       .map((c) => c.id)
       .sort((a, b) => a - b);
 
-    // No live seat reached this level, so no live seat covered it either —
+    // No live seat reached this level, so no live seat covered it either -
     // eligibility only shrinks as the level rises. Handing these chips to a
     // lower pot would pay a seat more than it could ever win (a seat all-in for
     // X can win at most Σ min(X, invested_j)), so they return to the seats that
@@ -90,7 +90,7 @@ export function buildPots(contributions: SeatContribution[]): PotLayout {
 
 /**
  * Consecutive layers contested by exactly the same seats are indistinguishable,
- * so present them as one pot. Purely cosmetic — the totals are unchanged.
+ * so present them as one pot. Purely cosmetic, the totals are unchanged.
  */
 function mergeAdjacent(pots: Pot[]): Pot[] {
   const out: Pot[] = [];
@@ -114,7 +114,7 @@ function sameSeats(a: number[], b: number[]): boolean {
  *
  * `score` is the seat's hand strength (higher wins); seats missing from the map
  * cannot win. Split pots divide evenly, and any indivisible remainder goes to
- * the earliest seat in `oddChipOrder` — conventionally the first seat left of
+ * the earliest seat in `oddChipOrder`, conventionally the first seat left of
  * the button. Chips are integers here, so dropping the remainder would quietly
  * destroy money and break the conservation invariant the engine tests assert.
  */
@@ -128,7 +128,7 @@ export function awardPots(
   for (const pot of pots) {
     const contenders = pot.eligible.filter((id) => score[id] !== undefined);
     // Every eligible seat is by construction unfolded, and every unfolded seat
-    // is scored at showdown — so this cannot happen unless a caller is wrong.
+    // is scored at showdown, so this cannot happen unless a caller is wrong.
     // Skipping the pot would silently destroy its chips, so say so instead.
     if (contenders.length === 0) {
       throw new Error(

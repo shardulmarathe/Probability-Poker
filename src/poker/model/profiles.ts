@@ -1,7 +1,7 @@
 /**
  * The bot roster.
  *
- * A seat's playing style lives here as *data* — four numbers per archetype —
+ * A seat's playing style lives here as *data*, four numbers per archetype -
  * rather than as a subclass with an overridden `decide()`. That is a deliberate
  * choice: the whole point of this project is to report honestly on what the
  * opponents are doing ("this seat enters 11% of pots and bluffs 3% of the time
@@ -29,7 +29,7 @@ import type { SizingOption, TableAction } from "../table/rules";
  *
  * `mirror` is excluded on purpose: it copies a *learned* profile of the human
  * player, so it has no parameters until a session has been observed and cannot
- * be written down here. Deleting it from this `Exclude` is all Phase 2 needs —
+ * be written down here. Deleting it from this `Exclude` is all Phase 2 needs -
  * the compiler will then demand the missing `BOT_PROFILES` entry rather than
  * letting a half-built archetype ship silently.
  */
@@ -48,7 +48,7 @@ export const BOT_ARCHETYPES: readonly BuiltArchetype[] = [
 
 /**
  * The lowest score `holeScore` can return (72o). A threshold here admits every
- * hand, which is how the professor's entry gate is switched off — see below.
+ * hand, which is how the professor's entry gate is switched off, see below.
  */
 export const MIN_HOLE_SCORE = -1;
 
@@ -81,7 +81,7 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // Also tight-passive, but the axis that separates it from the nit is width,
   // not temperament: a rock plays a genuine (if narrow) range, and is the more
   // reluctant to build a pot with it (lower `aggression`) while firing at air
-  // marginally more often — an 11% range actually misses sometimes, a 4% one
+  // marginally more often, an 11% range actually misses sometimes, a 4% one
   // barely does. The two parameters are not the same axis.
   rock: {
     id: "rock",
@@ -96,7 +96,7 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
 
   // Tight-aggressive: the textbook winning style. Barely wider than a rock, but
   // the aggression multiplier is on the other side of 1, which is the entire
-  // difference — same cards, opposite chips.
+  // difference, same cards, opposite chips.
   tag: {
     id: "tag",
     name: "Textbook Tara",
@@ -109,7 +109,7 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   },
 
   // The neutral baseline: aggression 1 and bluffRate 0 make `chooseAction`
-  // collapse to a plain argmax over unmodified EV — exactly the old heads-up
+  // collapse to a plain argmax over unmodified EV, exactly the old heads-up
   // bot. The threshold sits at the minimum possible holeScore, which is a
   // *disabled gate* rather than a claim about looseness: this seat folds when
   // the EV says fold and for no other reason, so it can be tighter than a nit
@@ -127,7 +127,7 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   },
 
   // Loose-aggressive: a much wider range than the TAG plus more of everything
-  // after the flop. Wide *and* aggressive is what makes it hard to read — the
+  // after the flop. Wide *and* aggressive is what makes it hard to read, the
   // same bet covers far more hands.
   lag: {
     id: "lag",
@@ -143,7 +143,7 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // Loose-passive: the classic losing style. Enters two thirds of pots and then
   // almost never takes the betting lead, so it realises none of the equity its
   // wide range picks up. Small preferred sizing on the rare bet, and a bluff
-  // rate near zero — a station's chips go in by calling, never by representing.
+  // rate near zero, a station's chips go in by calling, never by representing.
   station: {
     id: "station",
     name: "Callin' Carla",
@@ -229,7 +229,7 @@ export interface ActionChoiceInput {
   profile: BotProfile;
   /** From `legalActions`. */
   actions: TableAction[];
-  /** EV of each action, keyed by `TableAction.label` — `BotDecision`'s shape. */
+  /** EV of each action, keyed by `TableAction.label`, `BotDecision`'s shape. */
   evByAction: Record<string, number>;
   street: Street;
   /** The seat's hole cards; only the preflop entry gate reads them. */
@@ -239,7 +239,7 @@ export interface ActionChoiceInput {
   potBefore: number;
   toCall: number;
   /**
-   * Whether calling would CLOSE the action — no seat behind still has a live
+   * Whether calling would CLOSE the action, no seat behind still has a live
    * decision, so the pot the call is priced against is the final one.
    *
    * Read by the entry-gate override and by nothing else; see
@@ -262,7 +262,7 @@ export type ChoiceReason = "argmax" | "entry-fold" | "bluff" | "passive";
 
 export interface ActionChoice {
   action: TableAction;
-  /** Which of the three rules produced it — the seat's commentary line. */
+  /** Which of the three rules produced it, the seat's commentary line. */
   reason: ChoiceReason;
   /** EVs after the aggression tilt, keyed by label, for the audit trail. */
   tiltedEv: Record<string, number>;
@@ -276,8 +276,8 @@ const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
  * The obvious `ev * aggression` is wrong the moment EV goes negative: it would
  * make a maniac *less* willing to fire a -$3 bluff than a rock, inverting the
  * whole parameter. Dividing on the negative side keeps the multiplier monotone
- * across zero — above 1 always makes betting look better, below 1 always worse
- * — while staying continuous at 0 and exactly the identity at 1, which is what
+ * across zero, above 1 always makes betting look better, below 1 always worse
+ *, while staying continuous at 0 and exactly the identity at 1, which is what
  * lets the professor be a genuine no-op rather than an approximate one.
  */
 export function tiltEv(ev: number, aggression: number): number {
@@ -297,7 +297,7 @@ export function meetsEntry(profile: BotProfile, hole: Card[]): boolean {
  * on the same side of zero for every `a > 0`. That is fine while the two actions
  * being compared are on the same side of zero themselves, and it is what the
  * measured "AF lands on the multiplier" property rests on. It is useless the
- * moment they are not — and preflop multiway they never are.
+ * moment they are not, and preflop multiway they never are.
  *
  * The reason is in how the two prices are formed. A call is priced by
  * `ev.actionEv` against the pot *as it stands*, because a call is assumed to
@@ -320,12 +320,12 @@ export function meetsEntry(profile: BotProfile, hole: Card[]): boolean {
  * rate at which each profile fires there (`bluffRate`). Below the floor every
  * aggressive action is a bluff *by this module's own definition*, so letting the
  * argmax take one whenever a one-street EV model likes the price made the
- * declared `bluffRate` a fiction — a station with `bluffRate: 0.01` was firing
+ * declared `bluffRate` a fiction, a station with `bluffRate: 0.01` was firing
  * at air in roughly half its spots. Rule 2 below therefore decides both ways for
  * a profile that is passive by parameter: it fires at `bluffRate` and declines
  * otherwise. Aggressive profiles keep the maximiser's freedom, so `aggression`
- * still has exactly one mechanism on each side of 1 — `tiltEv` promotes above
- * it, this rule demotes below it — and the professor at exactly 1 is untouched.
+ * still has exactly one mechanism on each side of 1, `tiltEv` promotes above
+ * it, this rule demotes below it, and the professor at exactly 1 is untouched.
  */
 
 /** Whether a profile is passive by parameter. The professor sits exactly at 1. */
@@ -335,7 +335,7 @@ const isPassive = (profile: BotProfile) => profile.aggression < 1;
  * Pick an action for a seat with this personality.
  *
  * Three rules, in order, because each is allowed to veto the next:
- *   1. Preflop discipline — below the entry threshold, fold rather than pay to
+ *   1. Preflop discipline, below the entry threshold, fold rather than pay to
  *      see a flop, unless the price makes it clearly profitable anyway.
  *   2. Bluff, or decline to. With a hand too weak to value bet, fire anyway at
  *      `bluffRate`; a passive profile that does not fire declines the aggressive
@@ -362,7 +362,7 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
       : ev;
   }
 
-  // 1. Entry gate. Only reachable when folding is legal, i.e. someone has bet —
+  // 1. Entry gate. Only reachable when folding is legal, i.e. someone has bet -
   //    the big blind checking its option is never a "decision to enter".
   const fold = actions.find((a) => a.type === "fold");
   if (
@@ -380,7 +380,7 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
   }
 
   // 2. Bluff. Nothing worth betting for value, so the only reason to bet is to
-  //    make someone fold — which is exactly what `bluffRate` measures.
+  //    make someone fold, which is exactly what `bluffRate` measures.
   const aggressive = actions.find(isAggressive);
   if (aggressive && input.strength < VALUE_BET_FLOOR) {
     if (profile.bluffRate > 0 && rng.next() < profile.bluffRate) {
@@ -421,8 +421,8 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
  * call negative (see the note above) in 63% of the spots the entry gate admits.
  * Width belongs to `entryThreshold` and to nothing else.
  *
- * Returns undefined when there is no passive continuation — an all-in to answer,
- * where the only moves are call-or-fold with no rung in between — and rule 3
+ * Returns undefined when there is no passive continuation, an all-in to answer,
+ * where the only moves are call-or-fold with no rung in between, and rule 3
  * then decides normally.
  */
 function bestPassive(
@@ -441,8 +441,8 @@ function bestPassive(
  * Is calling so obviously profitable that the style's entry gate should yield?
  *
  * Only *passive* actions can waive the gate, and deliberately so. The override
- * exists for the case its constant documents — a nit in the big blind getting
- * 6-to-1 — which is a call: cheap, priced entirely by this street, and wrong to
+ * exists for the case its constant documents, a nit in the big blind getting
+ * 6-to-1, which is a call: cheap, priced entirely by this street, and wrong to
  * fold. A raise is different in kind. Its EV here is a single-street number, and
  * the chips it commits get contested on streets this model cannot see, so a
  * marginal steal showing a small edge is not evidence the hand is worth playing.

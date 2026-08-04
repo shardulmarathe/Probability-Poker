@@ -5,7 +5,7 @@
  *                    no account service, and an offer that cannot be accepted is
  *                    worse than no offer.
  *   signed out       A quiet gold "Sign in". Never a wall, never a modal on
- *                    load — the game is complete without it.
+ *                    load, the game is complete without it.
  *   signed in        Initial, name, and the sync dot; opens a small panel with
  *                    where the hands are and a way out.
  *

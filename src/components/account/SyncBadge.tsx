@@ -3,8 +3,8 @@
  *
  * Every state here is a *statement about where the hands are*, because that is
  * the only question the indicator exists to answer. "Error" is deliberately not
- * red-alarming: a failed flush costs nothing — the hands are on the device and
- * the queue is still retrying — so it reads as a warm amber note rather than a
+ * red-alarming: a failed flush costs nothing, the hands are on the device and
+ * the queue is still retrying, so it reads as a warm amber note rather than a
  * fault the player is being asked to fix.
  */
 
@@ -44,7 +44,7 @@ const COPY: Record<SyncState["status"], { dot: string; label: string; hint: stri
  *
  * `index.css` owns the app's animation vocabulary and none of it is a pulse.
  * Injecting the rule here rather than adding to that file keeps the account
- * components droppable into the shell as a unit — the same reason
+ * components droppable into the shell as a unit, the same reason
  * `table/chrome.tsx` ships its own `<style>`.
  */
 function BadgeStyles() {

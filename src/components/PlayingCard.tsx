@@ -14,7 +14,7 @@ const SIZES: Record<Size, string> = {
   xl: "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)] text-[clamp(1.5rem,5.6vw,3rem)] rounded-xl sm:rounded-2xl",
 };
 
-// The card size used for empty community-card placeholders on the table — kept
+// The card size used for empty community-card placeholders on the table, kept
 // in sync with the `xl` card footprint above so slots and cards line up.
 export const XL_CARD_BOX =
   "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)]";
@@ -32,7 +32,7 @@ interface PlayingCardProps {
   /**
    * Degrees of tilt. Cards pushed across cloth by a hand never land square, and
    * a pair that is exactly parallel is the quickest way to make a table look
-   * printed rather than played. Kept to about a degree — any more reads as a
+   * printed rather than played. Kept to about a degree, any more reads as a
    * bug.
    */
   tilt?: number;
@@ -41,7 +41,7 @@ interface PlayingCardProps {
 /**
  * The ink of a playing card.
  *
- * Was `#b91c1c` — Tailwind's red-700, which is a UI danger colour and reads
+ * Was `#b91c1c`. Tailwind's red-700, which is a UI danger colour and reads
  * orange next to this product's oxblood. Real card stock is printed in a
  * cooler, deeper red, and the black is not black either: it is a very dark
  * warm grey, because a press cannot lay pure black on absorbent stock.
@@ -61,7 +61,7 @@ function PlayingCardImpl({
 
   if (faceDown || !card) {
     // One element, not two. The back's border, its inner gold keyline and its
-    // lattice are all layers of the same box — a nested div for the keyline
+    // lattice are all layers of the same box, a nested div for the keyline
     // meant twelve extra nodes on a six-handed table for a 1px line.
     return <div className={`pp-card-back ${shape}`} style={tilted} />;
   }
@@ -105,7 +105,7 @@ function PlayingCardImpl({
 
 /**
  * Memoized by card identity (id) rather than object reference, so the engine's
- * per-action state cloning — which produces fresh card objects — does not force
+ * per-action state cloning, which produces fresh card objects, does not force
  * every card on the table to re-render.
  */
 export const PlayingCard = memo(PlayingCardImpl, (a, b) => {

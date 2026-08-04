@@ -3,16 +3,16 @@
  *
  * There were five idioms doing this job: the review's sticky tab bar, the
  * replay's near-byte-copy of it, the report's scrollable `ChipRow`, two
- * hand-rolled seat pickers, and the setup panel's `Pills` — which, along with
+ * hand-rolled seat pickers, and the setup panel's `Pills`, which, along with
  * the table's mode switch, used `aria-pressed` and declared no group role at
  * all. They differed in radius, in active background, in whether they scrolled,
  * and in what a screen reader was told they were.
  *
  * One component now. Three things vary, and each varies for a reason:
  *
- *   layout   "fill"   a fixed, small set that should divide the width — tabs
- *            "scroll" a set that can outgrow the width — seats, hands, streets
- *            "wrap"   a set that reads as a form field — seat count, depth
+ *   layout   "fill"   a fixed, small set that should divide the width, tabs
+ *            "scroll" a set that can outgrow the width, seats, hands, streets
+ *            "wrap"   a set that reads as a form field, seat count, depth
  *
  *   as       "tabs"    the choice swaps a panel        → tablist / tab
  *            "options" the choice sets a value         → radiogroup / radio
@@ -38,7 +38,7 @@ export interface TabOption<T extends string | number> {
   disabled?: boolean;
   /**
    * Overrides the `${testIdPrefix}-${value}` hook. Needed where the value is
-   * not the stable identity — bet sizings are keyed by cost, which moves with
+   * not the stable identity, bet sizings are keyed by cost, which moves with
    * the pot, but have always been addressed in tests by their label.
    */
   testId?: string;
@@ -48,7 +48,7 @@ export interface TabsProps<T extends string | number> {
   options: TabOption<T>[];
   value: T;
   onChange: (value: T) => void;
-  /** Names the group for assistive tech. Required — every group is about something. */
+  /** Names the group for assistive tech. Required, every group is about something. */
   label: string;
   layout?: "fill" | "scroll" | "wrap";
   as?: "tabs" | "options";
@@ -93,7 +93,7 @@ export function Tabs<T extends string | number>({
 
   // A "fill" row divides a fixed width between its labels, so on a phone the
   // type has to come down or "Step through" becomes "Step thro…". Everything
-  // else keeps its size — it can wrap or scroll instead.
+  // else keeps its size, it can wrap or scroll instead.
   const metrics =
     size === "sm"
       ? `min-h-[34px] py-1 text-[0.68rem] ${layout === "fill" ? "px-1.5 sm:px-2.5" : "px-2.5"}`
@@ -164,8 +164,8 @@ export function Tabs<T extends string | number>({
  * A tab row that stays put while its panel scrolls under it.
  *
  * The review and the replay each grew their own copy of this wrapper, gradient
- * and all. The gradient is doing real work — it fades the content out from
- * under the bar instead of chopping it — so it is kept, once.
+ * and all. The gradient is doing real work, it fades the content out from
+ * under the bar instead of chopping it, so it is kept, once.
  */
 export function StickyTabs({ children }: { children: ReactNode }) {
   return (

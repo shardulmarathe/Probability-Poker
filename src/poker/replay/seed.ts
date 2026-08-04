@@ -1,20 +1,20 @@
 /**
  * Recovering the session seed a recorded hand was dealt from.
  *
- * A `TableHandReport` stores the *hand* seed — `handSeed(sessionSeed, n)` — but
+ * A `TableHandReport` stores the *hand* seed, `handSeed(sessionSeed, n)`, but
  * `engine.deal` derives that value itself, from the table's session seed and
  * hand number. So to make the real engine deal a recorded hand, the session
  * seed has to be run backwards out of the recorded one.
  *
  * The alternative was to re-implement the deal inside the replay: shuffle from
  * `report.seed` directly and push the cards into a table. That works, and it is
- * why this file needs justifying — it buys one thing, which is that replay
+ * why this file needs justifying, it buys one thing, which is that replay
  * exercises `startHand` and `deal` unmodified. A replay that re-implements the
  * deal cannot detect a change in the deal, and detecting exactly that is what
  * the fidelity check is for.
  *
  * The inversion is available because `hashSeed` folds its parts through
- * SplitMix32's finalizer, and that finalizer is a bijection on uint32 — a
+ * SplitMix32's finalizer, and that finalizer is a bijection on uint32, a
  * property `rng.ts` already relies on for its seeding. `mix32` is not exported,
  * so it is restated here; `seed.test.ts` pins the pair against the exported
  * `hashSeed` over the whole construction, which is the only claim that matters.
@@ -22,7 +22,7 @@
 
 import { hashSeed } from "../core/rng";
 
-/** `hashSeed`'s starting accumulator — the golden-ratio constant it seeds with. */
+/** `hashSeed`'s starting accumulator, the golden-ratio constant it seeds with. */
 const GOLDEN = 0x9e3779b9;
 
 /** The two odd multipliers in SplitMix32's finalizer. */
@@ -80,7 +80,7 @@ export function unmix32(y: number): number {
 /**
  * A session seed `s` with `handSeed(s, handNumber) === handSeedValue`.
  *
- * Not *the* session seed the hand was originally dealt from — `hashSeed` is
+ * Not *the* session seed the hand was originally dealt from, `hashSeed` is
  * two-to-one in neither direction but the pair `(seed, handNumber)` is free, so
  * this fixes the hand number and solves for the seed. It deals the same cards,
  * which is the entire requirement, and it makes the replay reproducible from

@@ -1,7 +1,7 @@
 /**
  * Seeded, deterministic RNG (xoshiro128** with SplitMix32 seeding).
  *
- * Every generator is independent — no module-level state — so each Monte Carlo
+ * Every generator is independent, no module-level state, so each Monte Carlo
  * worker can own its own stream without coordinating with the others.
  */
 
@@ -35,7 +35,7 @@ export function hashSeed(...parts: number[]): number {
 
 export function makeRng(seed: number): Rng {
   // xoshiro's state must not be all-zero, and it mixes slowly out of a
-  // low-entropy start — so expand the seed through SplitMix32 rather than
+  // low-entropy start, so expand the seed through SplitMix32 rather than
   // dropping it into the state directly. Advancing the Weyl counter *before*
   // mixing means seed 0 still yields four distinct, well-spread words; since
   // mix32 is injective at most one of them can be zero.

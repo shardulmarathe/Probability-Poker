@@ -3,14 +3,14 @@
  *
  * Three variants, and the rule is about commitment rather than importance:
  *
- *   primary    puts chips in the pot or starts a session — red, the felt's
+ *   primary    puts chips in the pot or starts a session, red, the felt's
  *              one loud colour. At most one per screen.
- *   secondary  moves you somewhere useful — gold, the product's own colour.
+ *   secondary  moves you somewhere useful, gold, the product's own colour.
  *   quiet      reverses, clears, or steps back.
  *
  * `ActionButton` is the poker table's own vocabulary: fold, check, call, bet,
- * raise. Its colours were defined twice — `pages/Game.tsx` and `table/Actions.
- * tsx` — and had already drifted on the red's opacity, so a call button looked
+ * raise. Its colours were defined twice, `pages/Game.tsx` and `table/Actions.
+ * tsx`, and had already drifted on the red's opacity, so a call button looked
  * different depending on which table you were sitting at.
  */
 

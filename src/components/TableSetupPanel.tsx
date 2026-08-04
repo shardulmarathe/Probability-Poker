@@ -1,5 +1,5 @@
 /**
- * The table you are about to sit down at — and the only teaching surface the
+ * The table you are about to sit down at, and the only teaching surface the
  * product gets before the cards come out.
  *
  * Everything here edits one `TableSetup` and persists it, so the choice
@@ -10,8 +10,8 @@
  *
  * Two things that used to be invisible are now on the screen. The mode blurbs
  * ("Nothing revealed. Just poker") lived only in `title=` attributes, which no
- * touch device has ever shown to anyone. And what stack depth *means* — the
- * single choice here that changes correct strategy most — was a comment in
+ * touch device has ever shown to anyone. And what stack depth *means*, the
+ * single choice here that changes correct strategy most, was a comment in
  * `lib/tableOptions.ts` that only a developer could read. Both are printed
  * under the control that sets them, always visible, no modal and no tour.
  */
@@ -49,7 +49,7 @@ const SEAT_COUNTS = Array.from(
  * What a table of this size actually plays like.
  *
  * Table size and stack depth are the two settings a new player has no way to
- * evaluate — both look like preferences and both are strategy decisions.
+ * evaluate, both look like preferences and both are strategy decisions.
  */
 const SEAT_HINTS: Record<number, string> = {
   2: "Heads-up. Every hand is playable, and you are in the blinds every deal.",
@@ -275,7 +275,7 @@ function Field({
   children,
 }: {
   label: string;
-  /** A restatement of the current value in concrete terms — chips, not settings. */
+  /** A restatement of the current value in concrete terms, chips, not settings. */
   aside?: string;
   children: React.ReactNode;
 }) {

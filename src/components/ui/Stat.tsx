@@ -1,9 +1,9 @@
 /**
  * One metric, and the grid that holds several.
  *
- * There were three `Stat` components with three incompatible APIs — `note`/
+ * There were three `Stat` components with three incompatible APIs, `note`/
  * `tone` on the table's coach panel, `highlight`/`sub` on the report and on the
- * legacy analysis page — which meant a number could not be moved between two
+ * legacy analysis page, which meant a number could not be moved between two
  * screens without being rewritten. This is the union of all three, spelled once:
  *
  *   label   what the number is
@@ -16,7 +16,7 @@
  * says why, and gold is what "gold" looks like.
  *
  * A `Stat` draws no box. Six boxed metrics in a row is the cardification the
- * profile was full of — the grid's whitespace groups them, and the container
+ * profile was full of, the grid's whitespace groups them, and the container
  * they sit in (if any) carries the meaning.
  */
 
@@ -28,7 +28,7 @@ export interface StatProps {
   value: ReactNode;
   note?: ReactNode;
   tone?: Tone;
-  /** 0..1, or null when nothing was observed — a null meter draws an empty track. */
+  /** 0..1, or null when nothing was observed, a null meter draws an empty track. */
   meter?: number | null;
   /** Dim the meter when the sample behind it is too thin to trust. */
   meterThin?: boolean;

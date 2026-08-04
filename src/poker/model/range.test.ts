@@ -160,7 +160,7 @@ describe("removeCards (card removal, and blockers for free)", () => {
   });
 
   it("makes the nut flush impossible when we hold the ace of that suit", () => {
-    // Holding the A of hearts, no opponent combo can contain it — so every
+    // Holding the A of hearts, no opponent combo can contain it, so every
     // nut-heart-flush holding is gone without a blocker rule being written.
     const r = uniformRange();
     removeCards(r, [code("Ah")]);
@@ -196,7 +196,7 @@ describe("removeCards (card removal, and blockers for free)", () => {
       ).toThrow(/bad card code/);
     }
 
-    // Nothing is removed when the call throws — and in particular the ace of
+    // Nothing is removed when the call throws, and in particular the ace of
     // spades survives a `null`, which is the case that used to look like a
     // working blocker.
     const r = uniformRange();
@@ -293,7 +293,7 @@ describe("13x13 grid projection", () => {
 
   it("rejects an output buffer too small to hold the grid", () => {
     // Float64Array drops out-of-range stores, so a short buffer silently loses
-    // whole cells — and `toGrid` would stop conserving weight without saying so.
+    // whole cells, and `toGrid` would stop conserving weight without saying so.
     expect(() => toGrid(uniformRange(), new Float64Array(10))).toThrow(
       /out buffer/
     );
@@ -383,7 +383,7 @@ describe("sampleCombo", () => {
  *
  * A Vose draw picks a bucket uniformly and then keeps it with probability
  * `prob[i]` or follows `alias[i]`, so the marginal is a closed form. Checking it
- * needs no sampling, no chi-square and no tolerance for luck — every entry of
+ * needs no sampling, no chi-square and no tolerance for luck, every entry of
  * both arrays is read, and an error of 1e-12 is a failure rather than noise.
  */
 function aliasMarginals(sampler: {
@@ -436,7 +436,7 @@ describe("alias sampler", () => {
     // The old test here drew 200k samples from a UNIFORM range and ran a
     // chi-square. On a uniform range every scaled value is exactly 1, so every
     // bucket goes to `large`, the small/large pairing loop never executes and
-    // `prob` is all ones — the test exercised none of the alias construction.
+    // `prob` is all ones, the test exercised none of the alias construction.
     // (Mutating `prob[s] = scaled[s] * 0.97` left its error at exactly 0.)
     // This checks the table's own arithmetic instead, on ranges that do drive
     // the pairing loop.

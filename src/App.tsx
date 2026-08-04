@@ -25,7 +25,7 @@ export default function App() {
         {/*
          * Every route sits inside the shell, so the felt is painted once and
          * the wordmark and the Table / Review / Profile navigation are on the
-         * screen wherever you land — including on a mistyped URL.
+         * screen wherever you land, including on a mistyped URL.
          */}
         <Route element={<AppShell />}>
           <Route path="/" element={<Home />} />

@@ -1,7 +1,7 @@
 /**
  * Stepping through a hand, one action at a time.
  *
- * The frames come from `poker/replay` already built — this file decides what to
+ * The frames come from `poker/replay` already built, this file decides what to
  * show, never what happened. Frame 0 is the deal and frame `k` is the state
  * after the `k`th action, which is why the caption reads the engine's own log
  * lines for the step rather than describing the action itself: a single action

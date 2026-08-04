@@ -18,7 +18,7 @@ function expectConserved(contributions: SeatContribution[]) {
 
 /**
  * The side-pot cap: a seat that invested X can never win more than
- * Σ_j min(X, invested_j) — it only ever covered that much of each opponent.
+ * Σ_j min(X, invested_j), it only ever covered that much of each opponent.
  * Conservation alone does not imply this, which is exactly how an earlier bug
  * that over-paid a short all-in slipped through.
  */
@@ -96,7 +96,7 @@ describe("buildPots", () => {
 
   it("never pays a short all-in more than it covered", () => {
     // Seat 0 is all-in for 50; the two deep seats built a 300 side pot and then
-    // both folded. That side pot is not seat 0's to win — it only covered 50 of
+    // both folded. That side pot is not seat 0's to win, it only covered 50 of
     // each opponent, so its ceiling is 150.
     const { pots, refunds } = buildPots([
       seat(0, 50),
@@ -139,7 +139,7 @@ describe("buildPots", () => {
   });
 
   it("respects the cap exhaustively over small contribution shapes", () => {
-    // 4 seats x invested 0..4 x folded/not — small enough to enumerate, and it
+    // 4 seats x invested 0..4 x folded/not, small enough to enumerate, and it
     // is where the layered edge cases actually live.
     for (let mask = 0; mask < 5 ** 4 * 2 ** 4; mask++) {
       let m = mask;
@@ -201,7 +201,7 @@ describe("awardPots", () => {
 
   it("throws rather than silently destroying an unscored pot", () => {
     const { pots } = buildPots([seat(0, 50), seat(1, 200), seat(2, 200)]);
-    // Seats 1 and 2 are eligible for the side pot but unscored — a caller bug.
+    // Seats 1 and 2 are eligible for the side pot but unscored, a caller bug.
     // Skipping it would vaporize 300 chips, so it must be loud.
     expect(() => awardPots(pots, { 0: 9 }, [0, 1, 2])).toThrow(/no scored contender/);
   });

@@ -1,12 +1,12 @@
 # The Probability Behind Probability Poker
 
-This project is a heads-up Texas Hold'em game where I play against a bot that I built to make every decision using probability theory rather than hand-coded poker rules. I wanted the bot to actually *reason* under uncertainty: estimate its chances of winning, update beliefs about my hand as I act, learn my tendencies over time, and choose actions that maximize expected payoff. This writeup explains the four mathematical ideas that make that work — Monte Carlo simulation, Bayesian updating, a learned opponent model, and expected value — and how they fit together.
+This project is a heads-up Texas Hold'em game where I play against a bot that I built to make every decision using probability theory rather than hand-coded poker rules. I wanted the bot to actually *reason* under uncertainty: estimate its chances of winning, update beliefs about my hand as I act, learn my tendencies over time, and choose actions that maximize expected payoff. This writeup explains the four mathematical ideas that make that work. Monte Carlo simulation, Bayesian updating, a learned opponent model, and expected value, and how they fit together.
 
 Throughout, I write $\Pr(\cdot)$ for probability and $\mathbb{E}[\cdot]$ for expectation. The "hero" is whoever's perspective a calculation takes (usually the bot).
 
 ## 1. Monte Carlo Simulation: estimating equity
 
-The central quantity the bot needs is its **equity** — the probability it wins the hand. In principle this is just a big finite average over every way the hidden cards could come out, but that space is enormous. Before the flop the opponent could hold any of $\binom{50}{2} = 1225$ two-card hands, and for each of those the five board cards can fall $\binom{48}{5} = 1{,}712{,}304$ ways, which is around $2 \times 10^9$ joint outcomes. Computing the exact average on every turn is hopeless, so instead I estimate it.
+The central quantity the bot needs is its **equity**, the probability it wins the hand. In principle this is just a big finite average over every way the hidden cards could come out, but that space is enormous. Before the flop the opponent could hold any of $\binom{50}{2} = 1225$ two-card hands, and for each of those the five board cards can fall $\binom{48}{5} = 1{,}712{,}304$ ways, which is around $2 \times 10^9$ joint outcomes. Computing the exact average on every turn is hopeless, so instead I estimate it.
 
 The idea is the law of large numbers. If I want $p = \Pr(\text{win})$, I run $N$ independent simulated showdowns. In simulation $s$ I deal random cards into all the unknown slots (the opponent's hole cards and the undealt board), score both five-card hands, and record the indicator
 
@@ -36,7 +36,7 @@ One subtlety: I do **not** sample the opponent's hand uniformly. I sample it fro
 
 The bot can't see my cards, so it keeps a probability distribution over how strong my hand is, bucketed into three hypotheses $H \in \{\text{weak}, \text{medium}, \text{strong}\}$. Every time I take an action $A$ (check, call, bet, raise, fold), it revises that distribution with Bayes' rule.
 
-It starts from a **prior** $\Pr(H)$ — my preflop belief that a random starting hand is $(\text{weak}, \text{medium}, \text{strong}) = (0.40, 0.35, 0.25)$. It also has a **likelihood** table $\Pr(A \mid H)$, the probability of each action given each strength. These encode poker intuition: a raise is much more likely from a strong hand than a weak one. The default raise row, for instance, is $\Pr(\text{raise} \mid H) = (0.05, 0.25, 0.70)$.
+It starts from a **prior** $\Pr(H)$, my preflop belief that a random starting hand is $(\text{weak}, \text{medium}, \text{strong}) = (0.40, 0.35, 0.25)$. It also has a **likelihood** table $\Pr(A \mid H)$, the probability of each action given each strength. These encode poker intuition: a raise is much more likely from a strong hand than a weak one. The default raise row, for instance, is $\Pr(\text{raise} \mid H) = (0.05, 0.25, 0.70)$.
 
 When I act, the bot computes the **posterior** by Bayes' theorem:
 
@@ -59,13 +59,13 @@ $$
 \Pr(H \mid \text{raise}) \approx (0.071,\ 0.310,\ 0.620).
 $$
 
-So one raise pushes the bot's belief that I'm strong from $25\%$ up to about $62\%$, and collapses "weak" from $40\%$ to $7\%$. Each action's posterior becomes the prior for my next action, so the belief is a running product of likelihoods — a discrete Bayes filter that gets sharper as the hand goes on. This updated belief is exactly what re-weights the Monte Carlo hand sampling in Section 1, so a read that I'm strong lowers the bot's estimated equity.
+So one raise pushes the bot's belief that I'm strong from $25\%$ up to about $62\%$, and collapses "weak" from $40\%$ to $7\%$. Each action's posterior becomes the prior for my next action, so the belief is a running product of likelihoods, a discrete Bayes filter that gets sharper as the hand goes on. This updated belief is exactly what re-weights the Monte Carlo hand sampling in Section 1, so a read that I'm strong lowers the bot's estimated equity.
 
 ## 3. Learned Opponent Modeling: adapting across hands
 
 The likelihood table above is a fixed guess about how a *generic* player behaves. The more interesting part is that the bot **learns** my personal likelihoods from data. Whenever a hand reaches showdown my cards are revealed, so the bot can classify my true strength tier and record which actions I actually took with that tier. Over many hands it builds up counts: for each tier it tracks $n_T$, the number of revealed hands of that tier, and $k_{a,T}$, how many of those hands involved action $a$.
 
-I could just use the raw frequency $k_{a,T}/n_T$ as the likelihood, but that is terrible with little data — one observed hand would slam an estimate to $0$ or $1$. So I smooth with a **Beta prior**. Treating "did the player take action $a$ in a hand of tier $T$?" as a Bernoulli with rate $\theta$, I put a $\text{Beta}(\alpha, \beta)$ prior on $\theta$ with $\alpha = 2$ and $\alpha + \beta = 10$. Because the Beta is conjugate to the Bernoulli, after $n_T$ observations with $k_{a,T}$ successes the posterior is $\text{Beta}(k_{a,T} + 2,\ n_T - k_{a,T} + 8)$, whose mean is the likelihood I actually use:
+I could just use the raw frequency $k_{a,T}/n_T$ as the likelihood, but that is terrible with little data, one observed hand would slam an estimate to $0$ or $1$. So I smooth with a **Beta prior**. Treating "did the player take action $a$ in a hand of tier $T$?" as a Bernoulli with rate $\theta$, I put a $\text{Beta}(\alpha, \beta)$ prior on $\theta$ with $\alpha = 2$ and $\alpha + \beta = 10$. Because the Beta is conjugate to the Bernoulli, after $n_T$ observations with $k_{a,T}$ successes the posterior is $\text{Beta}(k_{a,T} + 2,\ n_T - k_{a,T} + 8)$, whose mean is the likelihood I actually use:
 
 $$
 \Pr(a \mid T) = \frac{k_{a,T} + \alpha}{n_T + (\alpha + \beta)} = \frac{k_{a,T} + 2}{n_T + 10}.
@@ -83,7 +83,7 @@ far above the $0.20$ default. Now when I raise, the Bayesian update of Section 2
 
 ## 4. Expected Value: turning probabilities into decisions
 
-Knowing the win probability isn't enough to decide — a $30\%$ call can be correct if the pot is big, and an $80\%$ call can be a mistake if the price is wrong. So the bot chooses by **expected value**, the average chip outcome of an action:
+Knowing the win probability isn't enough to decide, a $30\%$ call can be correct if the pot is big, and an $80\%$ call can be a mistake if the price is wrong. So the bot chooses by **expected value**, the average chip outcome of an action:
 
 $$
 \mathbb{E}[O] = \sum_i o_i \, \Pr(o_i).
@@ -120,4 +120,4 @@ Because the $p$ and $q$ in these formulas come from the belief-weighted Monte Ca
 
 ## Putting it together
 
-The whole bot is one pipeline of probability ideas: a prior over my hand, Bayesian updates from my actions using likelihoods that are themselves learned from past showdowns, Monte Carlo estimation of equity under that belief, and an expected-value argmax to act. It demonstrates conditional probability, Bayesian inference, conjugate priors, Monte Carlo estimation and its $1/\sqrt N$ error, and decision-making under uncertainty — all in service of a bot that plays better the more it watches me play.
+The whole bot is one pipeline of probability ideas: a prior over my hand, Bayesian updates from my actions using likelihoods that are themselves learned from past showdowns, Monte Carlo estimation of equity under that belief, and an expected-value argmax to act. It demonstrates conditional probability, Bayesian inference, conjugate priors, Monte Carlo estimation and its $1/\sqrt N$ error, and decision-making under uncertainty, all in service of a bot that plays better the more it watches me play.

@@ -2,7 +2,7 @@
  * The explanatory voice: leads, sub-headings, worked equations, asides.
  *
  * These are how the product teaches, and they were duplicated between the
- * report and the legacy analysis page — same job, different margins. One copy.
+ * report and the legacy analysis page, same job, different margins. One copy.
  */
 
 import { useState, type ReactNode } from "react";
@@ -16,7 +16,7 @@ export function Lead({ children }: { children: ReactNode }) {
 /**
  * A sub-heading inside an explanation.
  *
- * Uppercase and tracked out — which is the eyebrow treatment the section
+ * Uppercase and tracked out, which is the eyebrow treatment the section
  * headers deliberately avoid. It earns it here: these appear several to a
  * panel, marking steps in a derivation, where a run of small caps is a table of
  * contents rather than a tic.
@@ -57,7 +57,7 @@ export function Frac({ n, d }: { n: ReactNode; d: ReactNode }) {
 }
 
 /**
- * An aside that qualifies what is above it — why it mattered, what it does not
+ * An aside that qualifies what is above it, why it mattered, what it does not
  * mean, what the sample cannot support.
  */
 export function Note({

@@ -124,7 +124,7 @@ export function deriveStatsDelta(
     base.pfr_n = 1;
   }
 
-  // Opportunity heuristics — client may refine via statsDelta.
+  // Opportunity heuristics, client may refine via statsDelta.
   base.threebet_d = preflop.some((d) => d.to_call > 0) ? 1 : 0;
   if (
     base.threebet_d &&

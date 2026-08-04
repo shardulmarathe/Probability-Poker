@@ -1,7 +1,7 @@
 /**
  * The two stores the account UI reads: who you are, and whether the queue is
- * caught up. Both live outside React — `lib/auth.ts` and `lib/api.ts` are
- * imported by non-component code — so both are consumed through
+ * caught up. Both live outside React, `lib/auth.ts` and `lib/api.ts` are
+ * imported by non-component code, so both are consumed through
  * `useSyncExternalStore` rather than mirrored into state.
  */
 

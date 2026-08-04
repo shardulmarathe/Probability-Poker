@@ -157,8 +157,8 @@ describe("handObservations", () => {
         { seat: 0, street: "flop", action: "fold", cost: 0, potBefore: 120, toCall: 40 },
       ],
     });
-    // The cards are sitting right there in the report — the engine records every
-    // seat's hole cards — and they are still not used, because the hand was
+    // The cards are sitting right there in the report, the engine records every
+    // seat's hole cards, and they are still not used, because the hand was
     // mucked. See `wasRevealed`.
     expect(handObservations(hand, HERO_SEAT).map((o) => o.bucket)).toEqual([
       null,
@@ -323,7 +323,7 @@ describe("persistence", () => {
 
   it("refuses a model built on a different prior", () => {
     // The prior is the root of the backoff, so counts against a different one
-    // are corrections to a different quantity — not merely stale, meaningless.
+    // are corrections to a different quantity, not merely stale, meaningless.
     expect(
       normalizeMemory({
         version: MEMORY_VERSION,
@@ -399,7 +399,7 @@ describe("persistence", () => {
  * folds. Every claim below is about whether the bots can come to see that.
  *
  * Never folding is what puts hands in front of a showdown, which is what makes
- * the observations attributed — the difference this whole file turns on.
+ * the observations attributed, the difference this whole file turns on.
  */
 function bluffer(table: Table, seat: number): BotDecision {
   const actions = legalActions(table, seat, table.config);

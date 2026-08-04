@@ -3,7 +3,7 @@
  *
  * The small blind may only shove or fold; the big blind may only call or fold.
  * That is a tiny game, but it is the one poker game in here whose equilibrium
- * has been published and independently recomputed by many people — see the
+ * has been published and independently recomputed by many people, see the
  * HoldemResources HUNE tables, which `pushfold.test.ts` checks against hand by
  * hand. The river solver has no published answer to compare with, so if this
  * one disagrees with the charts, nothing else in the solver can be trusted
@@ -15,7 +15,7 @@
  *    Preflop the whole game is invariant under permuting suits, so equilibrium
  *    frequencies are constant within a class; solving at the combo level would
  *    multiply the work by 60 and produce the same numbers. Card removal is not
- *    dropped along with the combos — `classCompatibility` keeps the exact count
+ *    dropped along with the combos, `classCompatibility` keeps the exact count
  *    of disjoint combo pairs per class pair, so "AA blocks your aces" survives.
  *
  *  - Preflop all-in equity is estimated, not enumerated. An exact 169x169
@@ -23,7 +23,7 @@
  *    is off by many orders of magnitude from anything that can run in a test.
  *    Instead every matchup is scored on the *same* sampled boards (common
  *    random numbers), which is what makes the differences between neighbouring
- *    hands — the only thing a push/fold threshold depends on — far more
+ *    hands, the only thing a push/fold threshold depends on, far more
  *    accurate than the absolute equities. `equityStandardError` reports the
  *    residual, and the tests re-solve on a second seed to show what it moves.
  */
@@ -80,7 +80,7 @@ export function classSize(cls: number): number {
 
 /**
  * `out[X * 169 + Y]` = the fraction of (combo of X, combo of Y) pairs that hold
- * no card in common — the exact card-removal weight between two chart cells.
+ * no card in common, the exact card-removal weight between two chart cells.
  *
  * Counted in closed form rather than by a 1326x1326 scan: the only combo of Y
  * holding *both* of a given combo's cards is that combo itself, so inclusion-
@@ -154,14 +154,14 @@ const equityCache = new Map<string, EquityMatrix>();
  * dealing the hands first, and the difference is not small. A board with a king
  * on it leaves KK only three combos instead of six, so under uniform board
  * sampling every surviving KK combo stands in for half as many real deals as it
- * should — king-high boards get double weight, and AA vs KK comes out at 74.5%
+ * should, king-high boards get double weight, and AA vs KK comes out at 74.5%
  * instead of 82%. Each sample is therefore weighted by n_X * n_Y, the number of
  * live combos the board left the two classes, which is exactly the factor that
  * restores a uniform distribution over (hand, hand, board) triples.
  *
  * All 14k matchups share the board, which is deliberate: absolute equities move
- * together under a lucky board, so their *differences* — which is what decides
- * whether A5o shoves at 15bb — carry far less error than the per-matchup
+ * together under a lucky board, so their *differences*, which is what decides
+ * whether A5o shoves at 15bb, carry far less error than the per-matchup
  * standard error suggests.
  */
 export function preflopEquityMatrix(options: EquityOptions = {}): EquityMatrix {
@@ -190,7 +190,7 @@ export function preflopEquityMatrix(options: EquityOptions = {}): EquityMatrix {
   const maskLo = new Int32Array(CLASS_COUNT);
   const maskHi = new Int32Array(CLASS_COUNT);
   const score = new Float64Array(CLASS_COUNT);
-  /** Live combos of each class on this board — the importance weight. */
+  /** Live combos of each class on this board, the importance weight. */
   const liveCount = new Float64Array(CLASS_COUNT);
   const live = new Uint16Array(12);
 
@@ -250,7 +250,7 @@ export function preflopEquityMatrix(options: EquityOptions = {}): EquityMatrix {
 
   const equity = new Float64Array(CLASS_COUNT * CLASS_COUNT);
   for (let x = 0; x < CLASS_COUNT; x++) {
-    // A class against itself is exactly a coin flip by symmetry — no sampling
+    // A class against itself is exactly a coin flip by symmetry, no sampling
     // needed, and pretending otherwise would inject noise onto the diagonal.
     equity[x * CLASS_COUNT + x] = 0.5;
     for (let y = x + 1; y < CLASS_COUNT; y++) {

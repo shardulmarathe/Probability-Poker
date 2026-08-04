@@ -10,7 +10,7 @@ An educational, probability-focused **No-Limit Texas Hold'em** table for 2–6
 seats, built for a Stanford probability course. You play against bots that make
 every decision from a **Bayesian range model over all 1,326 hole-card
 combinations**, **multiway Monte Carlo equity**, and **expected value with fold
-equity** — then review the hand in a dashboard that shows the derivation of
+equity**, then review the hand in a dashboard that shows the derivation of
 every number.
 
 A separate module solves small games to Nash equilibrium with **Discounted CFR**
@@ -55,7 +55,7 @@ for bit.
 | Route | What it is |
 | --- | --- |
 | `/table` | The 2–6 seat No-Limit table |
-| `/review` | Hand review — timeline, ranges, EV table, the full derivation |
+| `/review` | Hand review, timeline, ranges, EV table, the full derivation |
 | `/replay/:seed` | Replay any hand from its deal seed, with counterfactuals |
 | `/profile` | Your archive and playing-style statistics |
 | `/learn` | The probability concepts, worked with live engine calls |
@@ -66,7 +66,7 @@ for bit.
 | --- | --- |
 | **Ranges & card removal** | `Float64Array(1326)` per opponent; blockers fall out of `removeCards` (`src/poker/model/range.ts`) |
 | **Board-relative hand classes** | 9 classes ordered by measured equity, audited with Earth Mover's Distance (`src/poker/model/buckets.ts`, `model/distribution.ts`) |
-| **Conditional probability** | `P(action \| bucket, street, position, facing)` — 648 cells (`src/poker/model/likelihood.ts`) |
+| **Conditional probability** | `P(action \| bucket, street, position, facing)`, 648 cells (`src/poker/model/likelihood.ts`) |
 | **Bayesian inference** | Belief updates and range reweighting (`src/poker/bayesian.ts`, `model/decider.ts`) |
 | **Hierarchical shrinkage** | Six-level backoff with inclusion–exclusion, so each observation counts once (`src/poker/model/likelihood.ts`) |
 | **Monte Carlo simulation** | Multiway equity by whole-tuple rejection sampling (`src/poker/equity/multiway.ts`) |
@@ -77,28 +77,28 @@ for bit.
 
 ## How the bots think
 
-1. **Build a range for every opponent.** Start flat — before anyone acts, every
-   combo the deck allows is equally likely — then multiply each combo by
+1. **Build a range for every opponent.** Start flat, before anyone acts, every
+   combo the deck allows is equally likely, then multiply each combo by
    `P(action | bucket(combo), street, position, facing)` for every action on the
    public record, with the hand class measured against the board *as it stood on
    that street*. Card removal is applied once up front, so blockers are free.
    The bots read only public information; no seat's cards are consulted.
 2. **Estimate equity against the whole field.** The hero must beat *every*
-   opponent, and a k-way chop is worth 1/k — so what drives EV is `equity`, not
+   opponent, and a k-way chop is worth 1/k, so what drives EV is `equity`, not
    `P(win)`. The field is drawn as one tuple and redrawn whole on a collision,
    which is what keeps the sampler symmetric in seat order.
 3. **Price every action, and every size.** Checks, folds and closing calls are
    priced on the pot as it stands. Bets and raises are priced with fold equity,
    once per rung of the sizing ladder, against the range that *continues* rather
    than the whole range. Calls that don't close the action are re-priced against
-   the pot the seats behind will build, on the same basis a raise is priced —
+   the pot the seats behind will build, on the same basis a raise is priced -
    otherwise the two aren't comparable.
-4. **argmax, then personality.** Seven archetypes — from Nickel Nate (nit) to
-   Wildfire Wes (maniac) — bend the pure-EV answer with entry discipline, bluff
+4. **argmax, then personality.** Seven archetypes, from Nickel Nate (nit) to
+   Wildfire Wes (maniac), bend the pure-EV answer with entry discipline, bluff
    frequency and an aggression tilt. The record shows both the EV table and what
    the profile actually did.
 5. **Learn from you.** Finished hands are folded into a likelihood model scoped
-   to your seat alone. Folded hands still teach — they write to the two hand-class-free
+   to your seat alone. Folded hands still teach, they write to the two hand-class-free
    levels of the backoff, which compresses the likelihood ratio between hand
    classes rather than sharpening it. Over 60 hands against a scripted bluffer,
    the bots' `P(bet | air)` moves 0.136 → 0.553 and the air share of their read
@@ -134,7 +134,7 @@ api/            serverless functions (accounts, saved hands)
 - Standard No-Limit raise sizing: a raise must increase the bet by at least as
   much as the last raise did, and preflop the big blind counts as the opening
   raise.
-- An all-in for **less than a full raise does not reopen the betting** — seats
+- An all-in for **less than a full raise does not reopen the betting**, seats
   that already acted owe the difference but may not re-raise.
 - **Side pots** are cut at each distinct all-in level, so a seat all-in for `X`
   can win at most `Σ min(X, invested_j)`. Odd chips go to the first seat left of
@@ -148,12 +148,12 @@ once per hand, across 5 table sizes × 5 scripted styles × 1,000 hands.
 
 Every finished hand opens into four tabs:
 
-- **Hand** — what happened, and what it cost each seat.
-- **Ranges** — the 13×13 chart of what the table thought everyone held,
+- **Hand**, what happened, and what it cost each seat.
+- **Ranges**, the 13×13 chart of what the table thought everyone held,
   rebuilt exactly the way the sampler built it, plus the blockers your cards
   removed.
-- **Your play** — every decision, re-priced two ways, with the EV loss attributed.
-- **Math** — where the numbers on the other tabs come from: the Wilson interval
+- **Your play**, every decision, re-priced two ways, with the EV loss attributed.
+- **Math**, where the numbers on the other tabs come from: the Wilson interval
   and why it isn't `p̂ ± 1.96·SE`, the street-by-street equity ladder and why the
   last rung is a fact rather than an estimate, the made-hand distribution, Bayes'
   rule on the actual likelihood rows used, the EV of every action *and every
@@ -162,7 +162,7 @@ Every finished hand opens into four tabs:
 
 The review reads the stored decision records rather than recomputing them, so the
 EV numbers on screen are literally the ones the bot decided with. The two things
-it *does* recompute — the street equities and the range charts — are recomputed
+it *does* recompute, the street equities and the range charts, are recomputed
 from the record's own contents, and it says so: if a number cannot be recovered
 from what the engine wrote down, the review does not invent it.
 

@@ -4,7 +4,7 @@
  * The four properties worth proving are the four the game depends on and cannot
  * check for itself: signed-out play writes nothing, an offline burst loses
  * nothing, a 500 backs off rather than gives up, and a reload mid-queue resumes
- * from storage — sending a duplicate that the server's `(session_id,
+ * from storage, sending a duplicate that the server's `(session_id,
  * hand_number)` uniqueness is expected to absorb.
  */
 
@@ -167,7 +167,7 @@ function archive(hands: TableHandReport[]): ArchiveSnapshot {
   return { hands, smallBlind: 5, bigBlind: 10, heroSeat: 0 };
 }
 
-/** Sign in, take the baseline, then play `hands` — the live path's real shape. */
+/** Sign in, take the baseline, then play `hands`, the live path's real shape. */
 function playFrom(client: SyncClient, base: TableHandReport[]) {
   client.setSession(USER);
   client.syncArchive(archive(base));
@@ -356,7 +356,7 @@ describe("retry with backoff", () => {
       await timers.advance(120_000);
     }
 
-    // Monotonic until the cap, then flat — never zero, never unbounded.
+    // Monotonic until the cap, then flat, never zero, never unbounded.
     expect(waits[0]).toBeGreaterThan(0);
     expect(waits[1]).toBeGreaterThan(waits[0]);
     expect(waits[2]).toBeGreaterThan(waits[1]);
@@ -393,7 +393,7 @@ describe("retry with backoff", () => {
     await client.flush();
 
     expect(client.queueLength()).toBe(2);
-    // One attempt only — a 401 is not something a retry loop can fix.
+    // One attempt only, a 401 is not something a retry loop can fix.
     expect(net.calls).toHaveLength(1);
   });
 
@@ -449,7 +449,7 @@ describe("surviving a reload", () => {
     const storage = new MemoryStorage();
     const timers = manualTimers();
 
-    // The request reaches the server and the answer never comes back — the
+    // The request reaches the server and the answer never comes back, the
     // classic mid-flight reload. The entry is persisted before the attempt, so
     // it is still queued afterwards.
     const first = fakeNetwork({ "/api/session/start": [200], "/api/hand/record": ["throw"] });
@@ -491,7 +491,7 @@ describe("surviving a reload", () => {
     await client.flush();
 
     // Replay the exact same enqueue by rewinding the client's memory of what it
-    // has sent — the situation an evicted queue entry recreates.
+    // has sent, the situation an evicted queue entry recreates.
     client.markSynced([]);
     (client as unknown as { doc: null }).doc = null;
     client.setSession(USER);

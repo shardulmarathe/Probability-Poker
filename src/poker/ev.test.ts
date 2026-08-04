@@ -42,7 +42,7 @@ function priorRange(hole: number[], board: number[]): Range {
 
 /**
  * A fold model that folds everything below `keep` and never folds at or above
- * it — the sharpest possible strength correlation, which makes the selection
+ * it, the sharpest possible strength correlation, which makes the selection
  * effect on `eContinue` unmistakable rather than merely detectable.
  */
 function foldBelow(board: number[], keep: HandBucket): Float64Array {
@@ -237,7 +237,7 @@ describe("foldEquityEv", () => {
 });
 
 // ---------------------------------------------------------------------------
-// E_continue vs E_range — the term that stops the bot over-bluffing
+// E_continue vs E_range, the term that stops the bot over-bluffing
 // ---------------------------------------------------------------------------
 
 describe("the continuing range", () => {
@@ -266,7 +266,7 @@ describe("the continuing range", () => {
     expect(priced.eContinue).toBeLessThan(whole);
     // Real numbers, not just an ordering. 7-2 has 0.184 against everything a
     // random hand can be on K-9-4; against only the hands that call a half-pot
-    // bet it has 0.047 — a quarter as much. Pricing the bet off 0.184 is what
+    // bet it has 0.047, a quarter as much. Pricing the bet off 0.184 is what
     // would make the bot bluff hands it should be checking.
     expect(whole).toBeGreaterThan(0.17);
     expect(whole).toBeLessThan(0.2);
@@ -303,7 +303,7 @@ describe("the continuing range", () => {
   });
 
   it("selects against both hands, and by the published amounts", () => {
-    // This used to be a bare console.log with no `expect` in it — a test that
+    // This used to be a bare console.log with no `expect` in it, a test that
     // could not fail. The numbers it printed are worth keeping, so they are
     // pinned instead: the selection effect costs air three-quarters of its
     // equity and top pair about a ninth of its own, and the fold rate barely
@@ -386,7 +386,7 @@ describe("bluffing", () => {
 
   it("loses to checking with the worst hand against a calling station", () => {
     // The asymmetry that proves the fold term is doing work rather than adding
-    // a constant: the same hand, the same pot, the same bet — only the model of
+    // a constant: the same hand, the same pot, the same bet, only the model of
     // what the opponent does with it has changed.
     const share = rangeEquity({
       heroHole: AIR,
@@ -412,7 +412,7 @@ describe("bluffing", () => {
 
   it("still bets top pair into a calling station", () => {
     // Value betting does not need fold equity, so removing it must not remove
-    // the bet — a station is who you want to bet your good hands into.
+    // the bet, a station is who you want to bet your good hands into.
     const share = rangeEquity({
       heroHole: VALUE,
       board: BOARD,
@@ -471,7 +471,7 @@ describe("bluffing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// alpha and MDF — the closed-form check
+// alpha and MDF, the closed-form check
 // ---------------------------------------------------------------------------
 //
 // Everything above is a behavioural claim: the bot bluffs here, not there,
@@ -499,7 +499,7 @@ const WORST = [makeCard(3, "c"), makeCard(5, "d")].map(encodeCard);
  * Every combo that STRICTLY beats the hero on a complete board.
  *
  * An opponent drawn from this range wins outright every time, so a bet into it
- * has exactly zero equity — not approximately zero, and not zero on average.
+ * has exactly zero equity, not approximately zero, and not zero on average.
  * The board is already five cards, so there is no runout to add variance
  * either: `eContinue` comes back as the integer 0 and the identity can be
  * checked to floating-point tolerance rather than to a confidence interval.
@@ -597,7 +597,7 @@ describe("alpha", () => {
 
   it("leaves the bot indifferent at alpha rather than enthusiastic", () => {
     // If a pure bluff were strongly +EV at exactly the break-even frequency,
-    // something would be counted twice — most likely the pot appearing in both
+    // something would be counted twice, most likely the pot appearing in both
     // branches. The bet must be worth neither more nor less than checking a
     // hand that cannot win, which is worth nothing.
     for (const [pot, bet, alpha] of TABLE) {
@@ -633,7 +633,7 @@ describe("alpha", () => {
 
 
 // ---------------------------------------------------------------------------
-// The multiway call term — an expectation of a product, not a product of means
+// The multiway call term, an expectation of a product, not a product of means
 // ---------------------------------------------------------------------------
 //
 // The call branch is worth E[ share · (Pot + Σ owes) − (1 − share) · cost ].
@@ -641,7 +641,7 @@ describe("alpha", () => {
 // those agree, because k is the constant 1 and there is nothing to correlate.
 // Multiway they do not: the hero takes a smaller fraction of the pot in exactly
 // the simulations where more opponents stayed in, so share and k are negatively
-// correlated and the product of the means is strictly the larger of the two —
+// correlated and the product of the means is strictly the larger of the two -
 // always in the direction that makes betting look better than it is.
 //
 // The fixtures below pin that difference against closed-form arithmetic rather
@@ -672,7 +672,7 @@ function fieldSizes(n: number, pFold: number): number[] {
 
 /**
  * An opponent that beats the hero with probability exactly `beat`, whatever the
- * board runs out — because there is no runout left.
+ * board runs out, because there is no runout left.
  *
  * Every combo that ties the hero is given zero weight, so the hero's share of
  * any pot is 0 or 1 and never a fraction. Against k such opponents the hero
@@ -699,8 +699,8 @@ function mixedRange(hole: number[], board: number[], beat: number): Range {
     if (sc > heroScore) better.push(c);
     else if (sc < heroScore) worse.push(c);
   }
-  // `WORST` has essentially nothing below it — that is what makes it a pure
-  // bluff — so a mixture built on it would be a beating range wearing a
+  // `WORST` has essentially nothing below it, that is what makes it a pure
+  // bluff, so a mixture built on it would be a beating range wearing a
   // disguise. Fail loudly rather than silently pricing `beat = 1`.
   if (better.length === 0 || worse.length === 0) {
     throw new Error(
@@ -776,7 +776,7 @@ function mixedTruth(spot: MixedSpot) {
  * The price the module WOULD report if it rebuilt the call term out of its two
  * reported means. Everything here comes off the breakdown, so it is measured on
  * the very same sample stream as `r.ev` and the gap between them is the
- * factorisation and nothing else — not seeds, not sampling noise.
+ * factorisation and nothing else, not seeds, not sampling noise.
  */
 function factorisedEv(
   r: ReturnType<typeof foldEquityEv>,
@@ -855,7 +855,7 @@ describe("the multiway call term", () => {
     expect(Math.abs(measured - truth.factorised)).toBeLessThan(6);
 
     // The gap between the two arrangements is what the correlation is worth,
-    // and the share bias cancels out of it — so this is the tight assertion.
+    // and the share bias cancels out of it, so this is the tight assertion.
     expect(truth.factorised - truth.exact).toBeCloseTo(24.5815, 3);
     expect(Math.abs(measured - r.ev - (truth.factorised - truth.exact)))
       .toBeLessThan(1);
@@ -894,14 +894,14 @@ describe("the multiway call term", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Raises — where `extra` and `cost` stop being the same number
+// Raises, where `extra` and `cost` stop being the same number
 // ---------------------------------------------------------------------------
 //
 // Every test above this line prices an opening bet, `toCall = 0`, and there
 // `extra = cost − toCall = cost`: the two are interchangeable and nothing can
 // tell them apart. A raise separates them, and they play different roles.
 //
-//   - the hero risks `cost` — the call and the raise on top of it;
+//   - the hero risks `cost`, the call and the raise on top of it;
 //   - a seat already at the current bet level owes only the increment `extra`;
 //   - a seat that has not matched `toCall` owes the whole `cost`.
 
@@ -932,7 +932,7 @@ function pureRaise(opts: {
 /**
  * A hero who cannot lose: opponents draw only from hands he beats, so his share
  * is the integer 1 in every simulation and the EV is pure chip arithmetic.
- * That makes the pot — who owes what — the only thing left to get wrong.
+ * That makes the pot, who owes what, the only thing left to get wrong.
  */
 function pricedRaise(opts: {
   pot: number;
@@ -979,7 +979,7 @@ describe("raises", () => {
   it("breaks even at cost / (pot + cost), not extra / (pot + extra)", () => {
     // The raise's alpha. Charging the increment instead of the cost would move
     // the crossing from 37.5% down to 28.6%, and a bluff-raise that needs 37.5%
-    // folds would be priced as break-even on 28.6% — a licence to bluff-raise
+    // folds would be priced as break-even on 28.6%, a licence to bluff-raise
     // roughly a third more often than the arithmetic allows.
     const alpha = COST / (POT + COST);
     const wrong = EXTRA / (POT + EXTRA);
@@ -1027,7 +1027,7 @@ describe("raises", () => {
     expect(matched.ev).toBeCloseTo(pFold ** 2 * POT + called * truePot, 0);
     expect(matched.ev).toBeCloseTo(200, 0);
 
-    // The default — charge everybody the increment — is what the module does
+    // The default, charge everybody the increment, is what the module does
     // when the caller does not say who has matched. It is the conservative
     // direction: it understates the pot, and so understates the raise.
     const assumed = pricedRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold });
@@ -1075,7 +1075,7 @@ describe("raises", () => {
       opponents: 2,
     });
     // A hero who always wins has no share/field correlation to lose, so here
-    // the two arrangements agree — the pot fix is visible on its own.
+    // the two arrangements agree, the pot fix is visible on its own.
     expect(r.eContinue).toBe(1);
     expect(r.ev).toBeGreaterThan(
       pricedRaise({ pot: POT, toCall: TO_CALL, cost: COST, pFold: 0.4 }).ev
@@ -1084,7 +1084,7 @@ describe("raises", () => {
 });
 
 // ---------------------------------------------------------------------------
-// callEv — a call that does not close the action
+// callEv, a call that does not close the action
 // ---------------------------------------------------------------------------
 //
 // The two things this has to get right are opposites, so both are pinned. It
@@ -1127,7 +1127,7 @@ describe("callEv", () => {
 
   it("gives a call no fold equity at all, however the caller models the field", () => {
     // The seat whose bet is being called cannot fold to the call, so the
-    // all-fold branch is unreachable and `pFold` is 0 by construction — not
+    // all-fold branch is unreachable and `pFold` is 0 by construction, not
     // small, not usually, exactly 0.
     const r = priceCall({
       matched: 1,
@@ -1143,7 +1143,7 @@ describe("callEv", () => {
 
   it("collapses onto actionEv's basis when nobody behind owes anything", () => {
     // Every opponent already matched: the pot cannot grow, so the priced pot is
-    // the pot as it stands and the payoff is `share·pot - (1-share)·toCall` —
+    // the pot as it stands and the payoff is `share·pot - (1-share)·toCall` -
     // exactly the arithmetic `actionEv` does. This is why `decider.priceCall`
     // can decline to re-price a closing call and leave the old number standing.
     const POT = 100;

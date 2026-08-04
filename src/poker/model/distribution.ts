@@ -1,5 +1,5 @@
 /**
- * Hand-strength *distributions* — what a combo's final equity looks like across
+ * Hand-strength *distributions*, what a combo's final equity looks like across
  * every way the board can still run out, not just its average.
  *
  * `buckets.ts` orders its classes by equity against a random hand: expected
@@ -8,7 +8,7 @@
  * Distance, AAAI-14, §1): EHS "fails to account for the entire probability
  * distribution of hand strength". Their example is KcQc against 6c6d, with
  * expected hand strengths of "0.634 and 0.633 respectively, which suggests that
- * they have very similar strength" — while the distributions behind those two
+ * they have very similar strength", while the distributions behind those two
  * numbers look nothing alike: "6c6d frequently has an equity between 0.5 and
  * 0.7 and rarely has an equity between 0.7 and 0.9, while the reverse is true
  * for KcQc." Johanson et al. (Evaluating State-Space Abstractions in
@@ -24,8 +24,8 @@
  * note on `allDistributions`).
  *
  * What this is NOT: potential-aware abstraction. Ganzfried & Sandholm draw the
- * line between "distribution aware" — histograms over strength at the *final*
- * round, which is what is built here — and "potential aware", which recurses
+ * line between "distribution aware", histograms over strength at the *final*
+ * round, which is what is built here, and "potential aware", which recurses
  * over histograms of next-round *clusters* so that two hands realizing the same
  * river distribution at different rates come apart. Doing that needs a cluster
  * assignment per round, which needs k-means with a free cluster count, which is
@@ -43,7 +43,7 @@ import { COMBO_COUNT, comboIndex } from "./range";
  * 50, because the literature is 50 and the point of this module is to be
  * comparable to it: "prior work has assumed that the equities are divided into
  * 50 regions of size 0.02" (Ganzfried & Sandholm, AAAI-14, §1), and Johanson et
- * al.'s published EMD table is quoted in those bin units — which is what lets
+ * al.'s published EMD table is quoted in those bin units, which is what lets
  * distribution.test.ts check this implementation against their numbers instead
  * of against itself. 0.02 is also finer than the sampling error of any runout
  * count that finishes in reasonable time, so the binning is never the limit on
@@ -67,7 +67,7 @@ export const EMD_MAX = DIST_BINS - 1;
  * distribution.test.ts prices this one against the exhaustive flop it can be
  * checked over: 500 runouts put a combo's histogram a mean 0.42 bins from its
  * exact one, worst case 1.4. That is small against the distances the taxonomy
- * questions turn on — adjacent bucket centroids sit 5 to 15 bins apart — and
+ * questions turn on, adjacent bucket centroids sit 5 to 15 bins apart, and
  * far too large to resolve the 0.001 of EHS between KcQc and 6c6d, which is
  * why `mean` is accumulated off the raw equities instead of the bins.
  */
@@ -103,8 +103,8 @@ export function binOfEquity(equity: number): number {
  * "Informally, EMD is the 'minimum cost of turning one pile into the other,
  * where the cost is assumed to be amount of dirt moved times the distance by
  * which it is moved'" (Ganzfried & Sandholm, AAAI-14, §1). For histograms on a
- * line that minimum has a closed form — the L1 distance between the cumulative
- * distributions — so the whole thing is one pass with a running carry, which is
+ * line that minimum has a closed form, the L1 distance between the cumulative
+ * distributions, so the whole thing is one pass with a running carry, which is
  * the "straightforward linear time procedure that scans the histogram and keeps
  * track of how much dirt needs to be transported between consecutive bins" the
  * same section describes. Multi-dimensional EMD is a transportation LP and is
@@ -112,14 +112,14 @@ export function binOfEquity(equity: number): number {
  *
  * Why EMD rather than L2 or Kolmogorov-Smirnov: those "measure not only the
  * difference in probability mass, but also how far that mass was moved"
- * (Johanson et al., AAMAS-13, §4) — or rather EMD does and they do not. L2 was
+ * (Johanson et al., AAMAS-13, §4), or rather EMD does and they do not. L2 was
  * tried first and "has been shown to be significantly less effective because it
  * does not properly account for how far the 'dirt' needs to be moved (only how
  * much needs to be moved)" (Ganzfried & Sandholm, §1). Two histograms with
  * disjoint support are equidistant under L2 whether the gap is one bin or
  * forty; under EMD they are not, and in poker that gap is the whole question.
  *
- * Units are bins, matching the published tables — multiply by BIN_WIDTH for
+ * Units are bins, matching the published tables, multiply by BIN_WIDTH for
  * equity. `emd(a, a) === 0`, and `emd >= |mean(a) - mean(b)| / BIN_WIDTH`
  * always, with equality exactly when one distribution stochastically dominates
  * the other. That inequality is the formal version of the claim this module
@@ -145,7 +145,7 @@ export function emd(a: ArrayLike<number>, b: ArrayLike<number>): number {
  *
  * Quantized: it can be off the true E[HS] by up to half a bin (0.01), which is
  * ten times the gap between KcQc and 6c6d. Anything comparing expectations
- * should read the unquantized `mean` off the distribution instead — this is for
+ * should read the unquantized `mean` off the distribution instead, this is for
  * describing a histogram that arrived without one.
  */
 export function histogramMean(h: ArrayLike<number>): number {
@@ -243,7 +243,7 @@ export interface HandStrengthDistribution {
   readonly histogram: Float64Array;
   /**
    * E[HS] over the same runouts, computed off the raw equities rather than the
-   * bins — so it is directly comparable to the published 0.634 / 0.633 without
+   * bins, so it is directly comparable to the published 0.634 / 0.633 without
    * a half-bin of quantization sitting on top of a 0.001 gap.
    */
   readonly mean: number;
@@ -360,7 +360,7 @@ export interface DistributionSet {
   /** Unquantized E[HS] per combo, over that combo's valid runouts. */
   readonly mean: Float64Array;
   /**
-   * Runouts that were valid for each combo — a runout containing one of a
+   * Runouts that were valid for each combo, a runout containing one of a
    * combo's own cards is not one that combo can see, so different combos see
    * different subsets of the same sample. Zero means the combo clashes with the
    * board and has no distribution at all; its histogram is all zeros and every
@@ -377,7 +377,7 @@ export interface DistributionSet {
  *
  * The sharing is the whole design. A runout fixes a five-card board, and on a
  * fixed board the C(47,2) = 1081 possible holdings can be evaluated once and
- * then ranked against each other — so one pass costs 1081 evaluator calls and
+ * then ranked against each other, so one pass costs 1081 evaluator calls and
  * yields a hand-strength value for all 1081 live combos, instead of 1081
  * separate passes of ~990 calls each. That is the difference between this being
  * a tool and being a weekend.
@@ -410,7 +410,7 @@ export function allDistributions(
     full[i] = board[i];
   }
 
-  // Runouts are drawn from everything not already on the board — hole cards
+  // Runouts are drawn from everything not already on the board, hole cards
   // cannot be excluded here because every combo is a hero in turn.
   const pool = new Uint8Array(52 - len);
   let poolSize = 0;
@@ -431,7 +431,7 @@ export function allDistributions(
   // below is a plain array load instead of 90 index lookups per combo.
   const byCards = new Float64Array(52 * 52);
   // Exactly C(47,2): `full` always holds five distinct cards, so `liveCount` is
-  // always 47 and this fills completely. It has to — `sorted.sort()` sorts the
+  // always 47 and this fills completely. It has to, `sorted.sort()` sorts the
   // whole buffer, so a short fill would leave zeros sorted to the front and
   // every rank below would be counted against them.
   const sorted = new Float64Array(1081);
@@ -543,7 +543,7 @@ function upperBound(sorted: Float64Array, n: number, s: number): number {
 }
 
 /**
- * A view on one combo's histogram. A view, not a copy — writing through it
+ * A view on one combo's histogram. A view, not a copy, writing through it
  * writes into the set.
  */
 export function histogramOf(set: DistributionSet, combo: number): Float64Array {
@@ -555,7 +555,7 @@ export function histogramOf(set: DistributionSet, combo: number): Float64Array {
 
 /**
  * EMD between two combos of the same set, without materializing either
- * histogram — the pairwise sweeps in the tests run this ~1e6 times.
+ * histogram, the pairwise sweeps in the tests run this ~1e6 times.
  */
 export function emdOf(set: DistributionSet, i: number, j: number): number {
   if (i < 0 || i >= COMBO_COUNT || j < 0 || j >= COMBO_COUNT) {

@@ -42,7 +42,7 @@ export interface Observation {
   action: PlayerActionType;
   /**
    * The hand class the player turned out to hold, or `null` when it was never
-   * revealed. See "Learning from folds" below — `null` is not a bucket, and it
+   * revealed. See "Learning from folds" below, `null` is not a bucket, and it
    * is never replaced by a guess.
    */
   bucket: Bucket | null;
@@ -51,7 +51,7 @@ export interface Observation {
   facing: Facing;
 }
 
-/** A decision without the hand class — what a hand log gives you directly. */
+/** A decision without the hand class, what a hand log gives you directly. */
 export type DecisionContext = Omit<Observation, "bucket">;
 
 export interface HandObservation {
@@ -61,7 +61,7 @@ export interface HandObservation {
 }
 
 /**
- * LEARNING FROM FOLDS — WHAT IS AND IS NOT LEARNABLE
+ * LEARNING FROM FOLDS. WHAT IS AND IS NOT LEARNABLE
  *
  * `bayesian.recordShowdownHand` only learns at showdown, which throws away the
  * large majority of decisions: most hands end in a fold, and a player who folds
@@ -82,7 +82,7 @@ export interface HandObservation {
  * So an unattributed observation writes to the two bucket-free levels and stops.
  * That is not a consolation prize. Those levels are the shrinkage target for the
  * bucket-conditioned ones, so unattributed data still moves every bucket's
- * estimate — it moves them all *together*, compressing the likelihood ratio
+ * estimate, it moves them all *together*, compressing the likelihood ratio
  * between buckets. Which is precisely correct: learning that a player raises
  * constantly, without ever seeing what they raise with, should make a raise mean
  * less, not make it mean "strong". That single mechanism is where the bluffer
@@ -135,7 +135,7 @@ function bump(model: LikelihoodModel, key: string, action: PlayerActionType): vo
  *
  * Writes every backoff level the observation is entitled to: all six when the
  * hand was revealed, the two bucket-free ones when it was not. Validation is
- * strict rather than forgiving because this data is persisted — a bad street
+ * strict rather than forgiving because this data is persisted, a bad street
  * string would sit in the database creating a cell nothing ever reads.
  */
 export function observe(model: LikelihoodModel, obs: Observation): void {
@@ -175,7 +175,7 @@ export function observeMany(model: LikelihoodModel, observations: Observation[])
  * cards are Air on the flop and TwoPair by the river, and the model conditions
  * on which. A caller recording a real hand off a board therefore has to bucket
  * each decision against the board as it stood on that street and pass the
- * results to `observeMany` — see `lib/opponentMemory.handObservations`, which is
+ * results to `observeMany`, see `lib/opponentMemory.handObservations`, which is
  * the engine-facing writer in practice. This entry point stays because it is the
  * honest shape for a preflop-only or already-collapsed hand, and because it is
  * the direct like-for-like replacement for `recordShowdownHand`.
@@ -201,7 +201,7 @@ function addCells(a: CellCounts | undefined, b: CellCounts | undefined): CellCou
 
 /**
  * Combine two models into a new one. Counts add, so this is exactly commutative
- * and associative — merging session order can never change a number.
+ * and associative, merging session order can never change a number.
  *
  * Keys are emitted sorted so two merges of the same data serialise to byte
  * identical JSON, which matters once these rows are diffed or checksummed in a
@@ -315,7 +315,7 @@ export interface NodeMix {
   street: LearnStreet;
   facing: Facing;
   observations: number;
-  /** Raw empirical frequencies — unsmoothed, for display next to the counts. */
+  /** Raw empirical frequencies, unsmoothed, for display next to the counts. */
   frequencies: ActionWeights;
 }
 
@@ -347,7 +347,7 @@ export interface ModelStats {
   attributed: number;
   /** Decisions from hands that were never revealed. */
   unattributed: number;
-  /** Non-empty cells across all six levels — how much of the space is covered. */
+  /** Non-empty cells across all six levels, how much of the space is covered. */
   cells: number;
 }
 

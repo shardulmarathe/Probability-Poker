@@ -18,7 +18,7 @@ import { MAX_SEATS, MIN_SEATS } from "../poker/table/position";
 /**
  * How much the interface reveals while a hand is live.
  *
- * This gates rendering only — never the engine. The bots' information set is
+ * This gates rendering only, never the engine. The bots' information set is
  * identical in all three modes, so switching to Study cannot change how they
  * play, and a hand studied is the same hand as a hand played.
  */
@@ -43,7 +43,7 @@ export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
 ];
 
 /** Stack depths in big blinds. Depth changes correct strategy more than
- *  almost anything else — 20bb is nearly all preflop, 200bb is all postflop. */
+ *  almost anything else, 20bb is nearly all preflop, 200bb is all postflop. */
 export const STACK_DEPTHS = [20, 50, 100, 200] as const;
 export type StackDepth = (typeof STACK_DEPTHS)[number];
 
@@ -61,7 +61,7 @@ export interface TableSetup {
   /** Bot archetypes filling every seat except the human's. */
   lineup: BuiltArchetype[];
   mode: TableMode;
-  /** No human seat — watch the bots play each other with cards face up. */
+  /** No human seat, watch the bots play each other with cards face up. */
   observer: boolean;
 }
 
@@ -131,7 +131,7 @@ export function saveSetup(setup: TableSetup): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(setup));
   } catch {
-    /* private browsing / quota — the setup just will not persist */
+    /* private browsing / quota, the setup just will not persist */
   }
 }
 

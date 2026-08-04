@@ -1,8 +1,8 @@
 /**
  * Things you read but never press.
  *
- * `Rail` existed twice — a gold Cinzel chip with an 8px radius in the table's
- * header, an ivory monospace capsule in the report's — and the two appeared in
+ * `Rail` existed twice, a gold Cinzel chip with an 8px radius in the table's
+ * header, an ivory monospace capsule in the report's, and the two appeared in
  * adjacent page headers, one hop apart, so the drift was visible without
  * leaving the flow. This is the report's version (monospace reads better for
  * counts and blind levels) at the marker radius, in one file.

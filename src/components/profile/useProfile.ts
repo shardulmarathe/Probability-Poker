@@ -3,7 +3,7 @@
  *
  * Two hooks, split by who needs them. `useHandRecorder` writes and is mounted
  * for the whole table route group, so hands are archived as they finish no
- * matter which page in that group is open — a session played and then reloaded
+ * matter which page in that group is open, a session played and then reloaded
  * from `/table` has to survive, and it would not if only the profile page
  * persisted what it happened to see. `useProfileArchive` reads.
  *
@@ -27,7 +27,7 @@ import {
 /**
  * This session's finished hands.
  *
- * `history` lags by a render — the store appends to it in an effect — so the
+ * `history` lags by a render, the store appends to it in an effect, so the
  * hand that just ended is in `lastReport` and not yet in `history`. The review
  * page stitches the same two together for the same reason.
  */
@@ -65,7 +65,7 @@ export function useHandRecorder(): void {
 
 export interface ProfileView extends ProfileArchive {
   /**
-   * Archived hands this session did not play — the ones that survived a reload.
+   * Archived hands this session did not play, the ones that survived a reload.
    * Not the raw stored count: the recorder writes as it goes, so by the time
    * the page reads storage this session's hands are already in it.
    */
@@ -73,7 +73,7 @@ export interface ProfileView extends ProfileArchive {
   /** Seat the profile is written from. */
   seat: number;
   setSeat: (seat: number) => void;
-  /** Widest table in the archive — how many seats the picker offers. */
+  /** Widest table in the archive, how many seats the picker offers. */
   seatCount: number;
   seatName: (seat: number) => string;
   reset: () => void;

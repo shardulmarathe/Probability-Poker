@@ -7,7 +7,7 @@
  * opponent, a street ends when action returns to the last aggressor rather than
  * when both sides have acted, and unequal stacks split the pot into layers.
  *
- * Everything here is mechanics — seats, chips, whose turn it is, when a betting
+ * Everything here is mechanics, seats, chips, whose turn it is, when a betting
  * round closes. Legal action sets live in `rules/`, pot layout in `pots.ts`,
  * and the hand lifecycle on top of both.
  */
@@ -28,7 +28,7 @@ export interface TableSeat {
   status: SeatStatus;
   /** Chips committed on the current street. */
   streetCommit: number;
-  /** Chips committed across the whole hand — drives the side-pot layers. */
+  /** Chips committed across the whole hand, drives the side-pot layers. */
   invested: number;
   /**
    * Whether this seat has acted since the last aggression. Posting a blind does
@@ -40,7 +40,7 @@ export interface TableSeat {
    *
    * These come apart in No-Limit: an all-in for *less than a full raise* does
    * not reopen the betting. Seats that already acted still owe the extra chips,
-   * so they must act again — but they are not allowed to re-raise. `hasActed`
+   * so they must act again, but they are not allowed to re-raise. `hasActed`
    * alone cannot express that, because it would either skip them (wrong, they
    * owe chips) or hand them a raise they are not entitled to.
    */
@@ -82,7 +82,7 @@ export function actingSeats(state: TableState): TableSeat[] {
   return state.seats.filter((s) => s.status === "active");
 }
 
-/** Seats that can still win a pot — active or all-in, but not folded or out. */
+/** Seats that can still win a pot, active or all-in, but not folded or out. */
 export function contestingSeats(state: TableState): TableSeat[] {
   return state.seats.filter((s) => s.status === "active" || s.status === "allin");
 }
@@ -161,7 +161,7 @@ export function openingActor(state: TableState): number | null {
  * blind still owes a decision. It closes only once that seat has acted and
  * matched, like any other. The "everyone else is all-in, run the board out"
  * shortcut belongs to the caller, after `resetStreetBetting` has cleared the
- * debts — not here.
+ * debts, not here.
  */
 export function bettingClosed(state: TableState): boolean {
   return actingSeats(state).every(
@@ -169,7 +169,7 @@ export function bettingClosed(state: TableState): boolean {
   );
 }
 
-/** True when everyone but one seat has folded — the hand ends without showdown. */
+/** True when everyone but one seat has folded, the hand ends without showdown. */
 export function onlyOneLeft(state: TableState): boolean {
   return contestingSeats(state).length <= 1;
 }
@@ -197,7 +197,7 @@ export function resetStreetBetting(state: TableState): void {
  * Mark a seat as having acted.
  *
  * `increment` is how much the bet level went up (null for a check, call, or
- * fold). A bet or raise puts everyone else back in the decision — but it only
+ * fold). A bet or raise puts everyone else back in the decision, but it only
  * *reopens* their right to raise if it was a full-sized raise. A short all-in
  * that raises by less than the last raise leaves already-acted seats owing the
  * difference with no option to re-raise, which is the standard rule.
@@ -221,7 +221,7 @@ export function recordAction(
     } else if (hadActed) {
       // Already acted at the old level, and this jam was undersized: they owe
       // the difference but have lost the right to raise. A seat that had not
-      // acted yet is unaffected — its first action can still be a raise.
+      // acted yet is unaffected, its first action can still be a raise.
       other.mayRaise = false;
     }
   }
@@ -259,7 +259,7 @@ export function postBlinds(
   state.toAct = openingActor(state);
 }
 
-/** Total chips on the table — the invariant every engine test asserts. */
+/** Total chips on the table, the invariant every engine test asserts. */
 export function totalChips(state: TableState): number {
   return state.seats.reduce((n, s) => n + s.stack, 0) + state.pot;
 }

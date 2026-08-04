@@ -1,8 +1,8 @@
 /**
  * The one place the look of this product is defined.
  *
- * Everything here existed already — deep green felt, gold hairlines, Cinzel
- * display type, ivory text — but five times over, and the five copies had
+ * Everything here existed already, deep green felt, gold hairlines, Cinzel
+ * display type, ivory text, but five times over, and the five copies had
  * drifted: two felt backgrounds at different texture opacities, two "good"
  * greens (one of them left over from a blue theme that no longer exists), chips
  * that were gold pills on one page and ivory capsules on the next. This module
@@ -12,8 +12,8 @@
  *
  * Shape carries meaning here, so it follows a rule rather than a mood:
  *
- *   marker    fully round   a thing you read, never press — badges, rails, bars
- *   control   8px           a thing you press — buttons, tabs, inputs
+ *   marker    fully round   a thing you read, never press, badges, rails, bars
+ *   control   8px           a thing you press, buttons, tabs, inputs
  *   action    12px          the primary commitment on a screen
  *   surface   16px          a panel that groups other things
  *   felt      32px          the table itself, the one physical object on screen
@@ -59,7 +59,7 @@ export const SURFACE = {
  * Semantic ink.
  *
  * `good` and `bad` are the warm pair the report already used. The table's coach
- * panel was still printing `#34d399` / `#f87171` — Tailwind's default emerald
+ * panel was still printing `#34d399` / `#f87171`. Tailwind's default emerald
  * and rose, inherited from the blue theme this app abandoned. They read as a
  * different product's success colours against felt, which is exactly what a
  * player noticed without being able to name it.

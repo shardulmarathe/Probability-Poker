@@ -13,11 +13,11 @@ import {
 
 /**
  * Forward-looking (pot-odds) expected value of an action, measured from the
- * decision point. Sunk chips already in the pot are ignored — only the chips
+ * decision point. Sunk chips already in the pot are ignored, only the chips
  * risked *now* and the pot that can be won matter. This is what makes folding
  * correct: the bot folds whenever calling is a losing proposition.
  *
- *   - Fold:  EV = 0                      (baseline — risk nothing, win nothing)
+ *   - Fold:  EV = 0                      (baseline, risk nothing, win nothing)
  *   - Check: EV = pWin · pot             (no chips risked)
  *   - Call:  EV = pWin · pot − pLoss · cost
  *   - Bet/Raise: opponent is assumed to match the extra, so the pot you can win
@@ -35,7 +35,7 @@ import {
  *
  * NOTE a second assumption, in the `pot` argument: the pot is taken to be final.
  * That is exact for a call that CLOSES the action and wrong for one that does
- * not — see `callEv` below, which is the version that does not assume the call
+ * not, see `callEv` below, which is the version that does not assume the call
  * is the last word. This one remains correct, and remains the price used, for
  * every closing call.
  */
@@ -65,7 +65,7 @@ export function actionEv(
 // strength-correlated: the hands that fold are the weak ones, so what is left
 // facing the bet is the strong tail. Pricing a bluff against equity-vs-range
 // instead of equity-vs-callers systematically overvalues betting, which is a
-// worse failure than never bluffing at all — it turns every missed draw into a
+// worse failure than never bluffing at all, it turns every missed draw into a
 // "profitable" bet against a range that has already folded its air.
 //
 // The continuing range is derived here by weighting each combo by
@@ -80,7 +80,7 @@ export function actionEv(
 // It does NOT generalise to k callers as E·(Pot + k·s) − (1 − E)·cost. That
 // form factorises an expectation of a product. Heads-up it is exact because k
 // is the constant 1; multiway both the hero's share and the field size are
-// random, and they are *negatively correlated* — the hero takes a smaller
+// random, and they are *negatively correlated*, the hero takes a smaller
 // fraction of the pot in exactly the simulations where more opponents stayed
 // to contest it. By that correlation
 //
@@ -93,7 +93,7 @@ export function actionEv(
 // simulation's own share and its own field, and never reassembled out of the
 // two marginal means. `eContinue` and `callers` survive only as reporting.
 //
-// ALPHA. Setting E_continue = 0 — a pure bluff, no equity at all — collapses
+// ALPHA. Setting E_continue = 0, a pure bluff, no equity at all, collapses
 // the formula to
 //
 //     EV = P(fold)·Pot − (1 − P(fold))·s
@@ -105,9 +105,9 @@ export function actionEv(
 // the standard break-even bluffing frequency, and its complement
 // MDF = 1 − alpha = Pot / (Pot + s) is the minimum defence frequency: the
 // fraction of range an opponent must continue with to stop a pure bluff being
-// automatically profitable. The published values fall straight out —
+// automatically profitable. The published values fall straight out -
 // half pot 33.3% / 66.7%, three-quarter pot 42.9% / 57.1%, pot 50% / 50%,
-// twice pot 66.7% / 33.3% — and `ev.test.ts` pins all four against this
+// twice pot 66.7% / 33.3%, and `ev.test.ts` pins all four against this
 // implementation to floating-point tolerance. That identity is the external
 // check on the whole module: it is a closed-form result from the literature
 // rather than a property of this code, so if the two disagree, this code is
@@ -122,7 +122,7 @@ export interface FoldingOpponent {
   range: Range;
   /**
    * P(fold | combo) at the size being priced, same indexing as `range`. An
-   * opponent that cannot fold — already all-in — is modelled with zeros.
+   * opponent that cannot fold, already all-in, is modelled with zeros.
    */
   foldByCombo: Float64Array;
   /**
@@ -131,8 +131,8 @@ export interface FoldingOpponent {
    *
    *   - facing an opening bet (`toCall = 0`): everybody owes `cost`, and
    *     `extra = cost`, so the distinction is empty;
-   *   - facing a raise: a seat already at the current bet level — the player
-   *     whose bet the hero is raising — owes only the increment `extra`, while
+   *   - facing a raise: a seat already at the current bet level, the player
+   *     whose bet the hero is raising, owes only the increment `extra`, while
    *     a seat that has not yet matched `toCall` owes the whole `cost`.
    *
    * Charging `extra` to a seat that owes `cost` under-counts the pot the hero
@@ -140,7 +140,7 @@ export interface FoldingOpponent {
    *
    * Defaults to `extra = max(0, cost − toCall)` when omitted, which is exact
    * heads-up and exact for any opening bet, and understates the pot (so it
-   * understates the EV of a raise — the safe direction) for a multiway raise
+   * understates the EV of a raise, the safe direction) for a multiway raise
    * whose callers have not yet matched.
    */
   owes?: number;
@@ -156,7 +156,7 @@ export interface FoldEquityInput {
   pot: number;
   /** Chips the hero owes before acting; 0 for an opening bet. */
   toCall: number;
-  /** Chips the hero adds now, call included — `TableAction.cost`. */
+  /** Chips the hero adds now, call included, `TableAction.cost`. */
   cost: number;
   simulations: number;
   seed: number;
@@ -168,7 +168,7 @@ export interface FoldEquityInput {
  * show the whole derivation rather than a single number.
  */
 export interface FoldEquityBreakdown {
-  /** P(every opponent folds) — see the independence note on `foldEquityEv`. */
+  /** P(every opponent folds), see the independence note on `foldEquityEv`. */
   pFold: number;
   /** P(fold) per opponent, in input order. */
   pFoldEach: number[];
@@ -177,7 +177,7 @@ export interface FoldEquityBreakdown {
    * does. Compare against equity-vs-range (`rangeEquity`): the gap between them
    * is the whole reason this module exists.
    *
-   * REPORTING ONLY. `callEv` is not built from this mean — see `callEv`.
+   * REPORTING ONLY. `callEv` is not built from this mean, see `callEv`.
    */
   eContinue: number;
   /**
@@ -193,7 +193,7 @@ export interface FoldEquityBreakdown {
    * is the mean of the per-simulation sums. REPORTING ONLY.
    */
   potIfCalled: number;
-  /** `pFold · pot` — the chips the bet wins uncontested. */
+  /** `pFold · pot`, the chips the bet wins uncontested. */
   foldEv: number;
   /**
    * `(1 − pFold) · E[ share · (pot + Σ_continuing owes) − (1 − share) · cost ]`,
@@ -215,20 +215,20 @@ export interface FoldEquityBreakdown {
  *
  * MULTIWAY INDEPENDENCE ASSUMPTION. With N opponents the bet only wins
  * uncontested if *every* one of them folds, and that probability is taken here
- * to be Π P(fold_i) — the product of the per-opponent marginals. That is not
+ * to be Π P(fold_i), the product of the per-opponent marginals. That is not
  * strictly true: the opponents' ranges are coupled by card removal (a card in
  * one hand is not in another), so their folding decisions are weakly dependent,
  * and the same coupling is ignored again when the continuing field is drawn.
- * The error runs one way — the product overstates how often the whole field
- * folds — so the bot is slightly over-optimistic about bluffing into a field.
+ * The error runs one way, the product overstates how often the whole field
+ * folds, so the bot is slightly over-optimistic about bluffing into a field.
  *
  * The decay itself is not an artifact of that assumption, and it is the real
  * lesson: a 55% fold rate is 55% heads-up, 30% against two, 9% against four.
  * Fold equity dies exponentially in the field size, which is why bluffing
  * multiway is bad long before any second-order dependence matters.
  *
- * This function used to carry a second multiway error next to that one — the
- * call term was assembled as `E[share] · (pot + E[k] · extra)` — and the note
+ * This function used to carry a second multiway error next to that one, the
+ * call term was assembled as `E[share] · (pot + E[k] · extra)`, and the note
  * excusing it claimed the Π decay dominated. It did not. The factorisation
  * error *grows* with the field exactly as the decay does, because it is driven
  * by the variance of k, and it pointed the same way as the independence error:
@@ -330,8 +330,8 @@ export function foldEquityEv(input: FoldEquityInput): FoldEquityBreakdown {
 // ---------------------------------------------------------------------------
 //
 // `actionEv` prices a call against the pot AS IT STANDS. That is exact when the
-// call closes the action — heads-up, or last to act with everybody else already
-// matched — because every chip that will ever enter the pot is already in it.
+// call closes the action, heads-up, or last to act with everybody else already
+// matched, because every chip that will ever enter the pot is already in it.
 // For any other call it is wrong, and wrong on both legs of one expression.
 //
 // The equity a call is priced with is the hero's share against the WHOLE field
@@ -355,7 +355,7 @@ export function foldEquityEv(input: FoldEquityInput): FoldEquityBreakdown {
 // REACH, with the same field simulation a raise is priced with: each seat that
 // still owes chips continues at its own P(continue), and the hero's share is
 // taken against the field that actually shows up, one simulation at a time.
-// That is a common basis, not parity — the two prices are still free to differ,
+// That is a common basis, not parity, the two prices are still free to differ,
 // and now the difference means something.
 //
 // WHAT MUST NOT COME WITH IT IS FOLD EQUITY. Nobody folds to a call. The seat
@@ -372,7 +372,7 @@ export interface CallEvInput {
   heroHole: readonly number[];
   board: readonly number[];
   /**
-   * EVERY opponent still contesting, the already-matched ones included — they
+   * EVERY opponent still contesting, the already-matched ones included, they
    * are in the showdown whatever the seats behind do, so leaving them out would
    * price the hero's share against the wrong field.
    *
@@ -402,12 +402,12 @@ const NEVER_FOLDS = new Float64Array(COMBO_COUNT);
  * Returns the same breakdown, whose `foldEv` is 0 and whose `callEv` is
  * therefore the whole of `ev`.
  *
- * PRECONDITION: at least one opponent owes nothing — the seat whose bet is
+ * PRECONDITION: at least one opponent owes nothing, the seat whose bet is
  * being called. It always holds for a real call, because a seat cannot bet and
  * then not be at its own bet, and it is what makes `pFold === 0` structural
  * rather than incidental. `ev.test.ts` pins it. Handed a field where every seat
  * could still fold, this returns `foldEquityEv`'s answer, which awards the pot
- * on the all-fold branch — correct arithmetic for a state that cannot arise.
+ * on the all-fold branch, correct arithmetic for a state that cannot arise.
  */
 export function callEv(input: CallEvInput): FoldEquityBreakdown {
   const opponents = input.opponents.map((o) => {
@@ -429,7 +429,7 @@ export interface RangeEquityInput {
 }
 
 /**
- * Hero's pot share against the opponents' *whole* ranges — the number
+ * Hero's pot share against the opponents' *whole* ranges, the number
  * `eContinue` has to be compared against.
  *
  * Same sampler and same scoring as the continuing-range run, so the two are
@@ -454,8 +454,8 @@ export function rangeEquity(input: RangeEquityInput): number {
 // The kernel
 // ---------------------------------------------------------------------------
 //
-// `equity/multiway.ts` samples a seat's hand from a `Range` — an arbitrary
-// weight per combo — which is exactly what a continuing range is, so that part
+// `equity/multiway.ts` samples a seat's hand from a `Range`, an arbitrary
+// weight per combo, which is exactly what a continuing range is, so that part
 // is not the reason this module has its own kernel. (It once was: multiway
 // sampled the three-tier `BeliefDistribution` and could not express a per-combo
 // weight. `beliefRange` is now only an adapter for callers that still hold a
@@ -464,7 +464,7 @@ export function rangeEquity(input: RangeEquityInput): number {
 // The reason is the coin. Fold equity needs each seat to *sit the hand out*
 // with its own probability before the field is dealt, so the number of live
 // opponents is itself random. `runMultiway` deals a fixed field. Everything
-// else here — the `ComboSampler`, the whole-tuple redraw — is shared in spirit
+// else here, the `ComboSampler`, the whole-tuple redraw, is shared in spirit
 // with that module and duplicated only because the fold coin sits inside the
 // same inner loop.
 
@@ -476,8 +476,8 @@ const MAX_SUBSET_ATTEMPTS = 64;
 /**
  * What a simulated field is worth to the hero, priced per simulation.
  *
- * Kept here rather than applied by the caller because the two random pieces —
- * the hero's share and which seats stayed in — have to meet inside the same
+ * Kept here rather than applied by the caller because the two random pieces -
+ * the hero's share and which seats stayed in, have to meet inside the same
  * simulation. Multiplying their averages afterwards is the bug this exists to
  * make impossible.
  */
@@ -561,7 +561,7 @@ function runField(
 
   for (let s = 0; s < sims; s++) {
     // 1. Who is still in. With no fold model everybody is; with one, each seat
-    //    flips its own coin and the all-fold outcome is rejected — that is what
+    //    flips its own coin and the all-fold outcome is rejected, that is what
     //    makes this the distribution *conditioned on the bet being called*,
     //    which is the only branch the continue term prices.
     let k = 0;

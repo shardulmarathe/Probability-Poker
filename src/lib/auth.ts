@@ -9,8 +9,8 @@ import { setSession, type SessionInfo } from "./api";
  * **Signing in is optional and always has been.** The game is complete without
  * an account: `components/profile/store.ts` keeps the hand archive in
  * localStorage and that remains the source of truth whether or not anyone ever
- * signs in. An account adds one thing — the same archive, reachable from
- * another device — and removes nothing.
+ * signs in. An account adds one thing, the same archive, reachable from
+ * another device, and removes nothing.
  *
  * When `VITE_NEON_AUTH_URL` is unset the client is still constructed against a
  * placeholder so `NeonAuthUIProvider` can mount, but every call below
@@ -43,7 +43,7 @@ export interface AuthUser {
 export type AuthPhase =
   /** Auth exists but we have not asked it yet. Render nothing decisive. */
   | "loading"
-  /** Confirmed signed out — the normal state, not a failure. */
+  /** Confirmed signed out, the normal state, not a failure. */
   | "anonymous"
   | "authenticated";
 
@@ -177,7 +177,7 @@ export async function signUp(
  * Sign out.
  *
  * The local archive is deliberately left alone. Signing out is not a request to
- * forget how you play — it is a request to stop syncing — and wiping the device
+ * forget how you play, it is a request to stop syncing, and wiping the device
  * on the way out would make signing in a destructive thing to try.
  */
 export async function signOut(): Promise<AuthResult> {

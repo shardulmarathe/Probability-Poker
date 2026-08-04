@@ -1,7 +1,7 @@
 /**
  * The player profile.
  *
- * Everything on this page is derived from the hand archive and nothing else —
+ * Everything on this page is derived from the hand archive and nothing else -
  * `computeStats` for the tracker line, `classifyStats` for the style read,
  * `analyzeHands` for the leaks. No number here is stored; storing a derived
  * figure is how a profile ends up disagreeing with the hands it was computed
@@ -13,7 +13,7 @@
  * in, rather than blocking on a second of arithmetic.
  *
  * Presentation note: this page used to put every one of those numbers in its
- * own rounded box inside another rounded box — six panels, each a grid of six
+ * own rounded box inside another rounded box, six panels, each a grid of six
  * bordered tiles. The boxes were doing no work, so they are gone. Sections are
  * a heading, a hairline and content; metrics are grouped by whitespace. The
  * only remaining surfaces are the ones where the container is genuinely the
@@ -44,7 +44,7 @@ import { useProfileArchive } from "./useProfile";
  * Hands the leak analysis prices.
  *
  * Each decision costs two Monte Carlo runs, so the work grows with the archive
- * while the lesson does not — the leaks that matter are the recent ones. 120
+ * while the lesson does not, the leaks that matter are the recent ones. 120
  * hands is roughly a second of arithmetic on a laptop, and the window is stated
  * on the page rather than applied quietly.
  */
@@ -198,7 +198,7 @@ export default function Profile() {
              * No lede here, and none on "How you play" either. Six sections
              * each opening heading-then-explanatory-sentence is the templated
              * rhythm the failure catalog calls out; a lede earns its place only
-             * where the heading genuinely cannot say the thing — the pricing
+             * where the heading genuinely cannot say the thing, the pricing
              * window, the ranking basis, what a sample can support.
              */}
             <Group title="This session">

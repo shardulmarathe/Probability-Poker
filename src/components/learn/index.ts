@@ -6,7 +6,7 @@
  *     <Route path="/learn" element={<LearnPage />} />
  *
  * inside the `AppShell` group, beside `/table` and `/review`. It needs no
- * provider — every number on it is computed from `poker/*` on the spot — so it
+ * provider, every number on it is computed from `poker/*` on the spot, so it
  * can sit outside the `TableProvider` group.
  *
  * `engine.ts` is the adapter layer between those modules and both explanatory

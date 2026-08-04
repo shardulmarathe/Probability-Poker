@@ -2,7 +2,7 @@
  * The felt. One definition, mounted once, by the shell.
  *
  * There were five of these. Two differed only in texture opacity (.04 vs .05),
- * two more in whether they were `absolute` or `fixed` — which is why overscroll
+ * two more in whether they were `absolute` or `fixed`, which is why overscroll
  * on some routes revealed the page behind and on others did not. This one is
  * `fixed`, so the felt is the floor of the application rather than the
  * background of whichever page happens to be mounted.

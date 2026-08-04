@@ -60,7 +60,7 @@ function job(seed: number, boardCards = 3, sims = 4000) {
 /**
  * Replay a job the way the worker path does: encode the cards, hand each shard
  * to `runShard`, and push both the job and the reply through `structuredClone`
- * — the one thing `postMessage` does that an in-process call does not.
+ *, the one thing `postMessage` does that an in-process call does not.
  */
 function viaWorkerTransport(j: ReturnType<typeof job>) {
   const wire = {
@@ -117,7 +117,7 @@ function multiwayJob(
 
 /**
  * The same field, but with an explicit `Range` per seat instead of a three-tier
- * read — the shape `decider.ts` actually builds. Seat i tilts toward combos
+ * read, the shape `decider.ts` actually builds. Seat i tilts toward combos
  * whose low card code is congruent to i, which is arbitrary but distinguishable:
  * a bug that shared one range across the field, or shuffled the seat order,
  * changes the answer.
@@ -197,7 +197,7 @@ describe("equity pool — determinism", () => {
   });
 
   it("gives different seeds different estimates", () => {
-    // Same deal both times — `job(seed)` picks the cards from the seed too, so
+    // Same deal both times, `job(seed)` picks the cards from the seed too, so
     // varying it would compare two different scenarios and would still pass if
     // `job.seed` never reached the Monte Carlo stream at all.
     const deal = job(0xd1ce);
@@ -241,7 +241,7 @@ describe("equity pool — worker and in-process paths agree", () => {
 
 describe("equity pool — sharding vs a single stream", () => {
   it("agrees with an unsharded run to within sampling error", () => {
-    // Different streams, so not identical — but four shards of one estimator
+    // Different streams, so not identical, but four shards of one estimator
     // must still estimate the same quantity.
     const j = job(0xbeef, 3, 40000);
     const sharded = runEquitySync(j);
@@ -254,7 +254,7 @@ describe("equity pool — sharding vs a single stream", () => {
       makeRng(j.seed)
     );
     // Two independent 40k estimates: the SE of their difference is ~0.0035, so
-    // `toBeCloseTo(x, 2)` (±0.005) is only 1.4 SE — a coin flip on the tail.
+    // `toBeCloseTo(x, 2)` (±0.005) is only 1.4 SE, a coin flip on the tail.
     // 4 SE is a real assertion; the CI brackets below are the sharp ones.
     expect(Math.abs(sharded.pWin - single.pWin)).toBeLessThan(0.014);
     expect(sharded.ciWin.lo).toBeLessThan(single.pWin);
@@ -265,7 +265,7 @@ describe("equity pool — sharding vs a single stream", () => {
 describe("equity pool — multiway", () => {
   it("routes a multiway job through the same shard plan as a heads-up one", () => {
     // The split must stay a function of (seed, sims) only. A multiway job that
-    // planned its own shards — by field size, say — would make the answer
+    // planned its own shards, by field size, say, would make the answer
     // depend on the table, and a 2-core machine disagree with a 16-core one.
     const req = multiwayJob(0x5a1, 4, 3, 4001);
     const plan = planShards(req.simulations, req.seed);
@@ -340,7 +340,7 @@ describe("equity pool — multiway", () => {
   });
 
   it("agrees with an unsharded run to within sampling error", () => {
-    // Four shards of one estimator draw different streams, so not identical —
+    // Four shards of one estimator draw different streams, so not identical -
     // but they must still be estimating the same quantity.
     const req = multiwayJob(0xbee5, 3, 3, 40_000);
     const sharded = runMultiwayEquitySync(req);
@@ -407,8 +407,8 @@ function resetFake(): void {
 }
 
 /**
- * Speaks the real worker's protocol — a `ShardJob` in, a structured-cloned
- * `ShardResult` back on `onmessage` — but answers on a timer so shards land in
+ * Speaks the real worker's protocol, a `ShardJob` in, a structured-cloned
+ * `ShardResult` back on `onmessage`, but answers on a timer so shards land in
  * an order the pool did not choose. It can also be told to stay silent or to
  * die, the two failure modes the pool has to survive.
  */
@@ -444,7 +444,7 @@ class FakeWorker {
     const reply = structuredClone(runAnyShard(structuredClone(job)));
     if (fake.behavior === "reverse") {
       // Dispatch is synchronous, so the whole batch is in hand before this
-      // timer fires — and every reply comes back newest-first.
+      // timer fires, and every reply comes back newest-first.
       this.held.push(reply);
       setTimeout(() => {
         const batch = this.held.reverse();
@@ -458,7 +458,7 @@ class FakeWorker {
     }, Math.random() * 6);
   }
 
-  /** A terminated worker delivers nothing more — not a reply, not an error. */
+  /** A terminated worker delivers nothing more, not a reply, not an error. */
   terminate(): void {
     if (this.dead) return;
     this.dead = true;
@@ -498,7 +498,7 @@ describe("equity pool — worker path", () => {
   beforeEach(() => {
     warnings.length = 0;
   });
-  // Leave `Worker`/`navigator` undefined again — other tests assert on that.
+  // Leave `Worker`/`navigator` undefined again, other tests assert on that.
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -560,7 +560,7 @@ describe("equity pool — worker path", () => {
     expect(fake.built).toBe(2);
     expect(fake.live).toBe(0); // the two that were built got terminated
 
-    // A CSP verdict does not change, so no retry — and with no half-filled
+    // A CSP verdict does not change, so no retry, and with no half-filled
     // `workers` array left behind, the second call cannot accidentally succeed.
     fake.throwFrom = Infinity;
     await expect(pool.runEquity(j)).resolves.toEqual(runEquitySync(j));
@@ -574,7 +574,7 @@ describe("equity pool — worker path", () => {
     const pool = await freshPool(5);
     fake.behavior = "silent";
     const j = smallJob(0x51e7);
-    // `onerror` never fires here — only the per-shard deadline settles this.
+    // `onerror` never fires here, only the per-shard deadline settles this.
     await expect(pool.runEquity(j)).resolves.toEqual(runEquitySync(j));
     expect(fake.built).toBe(4); // the shards really were dispatched...
     expect(fake.routed.flat()).toHaveLength(4);

@@ -4,7 +4,7 @@
  * The module has one job that can fail silently: it turns a factual record into
  * the numbers a player will read as facts. A wrong equity here does not throw,
  * does not look wrong, and is exactly as authoritative on the page as a right
- * one — so the assertions below are mostly about *identity*: that a number is
+ * one, so the assertions below are mostly about *identity*: that a number is
  * the quantity its label claims, and not some other number that happens to sit
  * in the same range.
  *
@@ -140,8 +140,8 @@ function report(spec: ReportSpec): TableHandReport {
 }
 
 /**
- * The same hand as a live `TableState`, so `decider.opponentRanges` — the thing
- * that actually feeds the sampler — can be run against the review's rebuild of
+ * The same hand as a live `TableState`, so `decider.opponentRanges`, the thing
+ * that actually feeds the sampler, can be run against the review's rebuild of
  * it. Only the fields `opponentRanges` reads are meaningful; the rest is
  * scaffolding the type demands.
  */
@@ -224,7 +224,7 @@ describe("streetEquities: head-to-head", () => {
   });
 
   it("does not invert the opponent's estimate", () => {
-    // 1 - 0.727 = 0.273, which is 14 points too generous and — the real tell —
+    // 1 - 0.727 = 0.273, which is 14 points too generous and, the real tell -
     // does not depend on the human's cards at all.
     const [preflop] = streetEquities(humanVsKings(SEVEN_TWO, 0.727), 0);
     expect(preflop.vs[0].equity).not.toBeCloseTo(1 - 0.727, 2);
@@ -285,7 +285,7 @@ describe("streetEquities: head-to-head", () => {
 
   it("lists a matchup the reviewing seat itself priced", () => {
     // A bot review: seat 0 records its own perOpponent, so the panel is built
-    // from that side — and the equity still comes from the real cards.
+    // from that side, and the equity still comes from the real cards.
     const hand = humanVsKings(SEVEN_TWO, 0.727);
     hand.decisions.push(decision(0, "preflop", { 1: 0.4 }));
     const [preflop] = streetEquities(hand, 0);
@@ -402,7 +402,7 @@ describe("requiredEquity", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * K-7-2-9-4 — the board `equity/multiway.ts` names in its own header as the
+ * K-7-2-9-4, the board `equity/multiway.ts` names in its own header as the
  * case the preflop classifier gets wrong. 7-2 has flopped two pair here and
  * `bayesian.tierOf` still calls it the worst hand in poker.
  */
@@ -419,7 +419,7 @@ const BETTOR_ACTIONS: ActionRecord[] = [
   { seat: 1, street: "river", action: "bet", cost: 200, potBefore: 310, toCall: 0 },
 ];
 
-/** The `ReviewStreet` for the end of the hand — the whole record folded in. */
+/** The `ReviewStreet` for the end of the hand, the whole record folded in. */
 function finalStreet(hand: TableHandReport) {
   const streets = reviewStreets(hand);
   return streets[streets.length - 1];
@@ -481,8 +481,8 @@ describe("rangeView", () => {
   it("does not call 7-2 trash on a board where it is two pair", () => {
     // The defect this rebuild exists to remove. `tierOf` scores hole cards with
     // a preflop Chen formula on every street, so on K-7-2-9-4 it files 7-2
-    // under "weak" — the bin a seat that has bet three streets is least likely
-    // to be in — while the board says two pair.
+    // under "weak", the bin a seat that has bet three streets is least likely
+    // to be in, while the board says two pair.
     const holes = { 0: ACES, 1: [card(7, S), card(2, H)] };
     const hand = report({ holes, board: K72_BOARD, actions: BETTOR_ACTIONS });
     const dead = [...ACES, ...K72_BOARD];
@@ -498,7 +498,7 @@ describe("rangeView", () => {
     // Materially more, not marginally: the old chart put this cell in the bin
     // its own bets argue against.
     expect(after).toBeGreaterThan(before * 3);
-    // And it is not just "some weight" — per combo it beats the flat share the
+    // And it is not just "some weight", per combo it beats the flat share the
     // deck would give it, which is what "this seat can credibly hold it" means.
     expect(after / view.cellCombos[cell]).toBeGreaterThan(1 / view.liveCombos);
   });
@@ -516,7 +516,7 @@ describe("rangeView", () => {
 
     // The collapse is `tierFromBucket`: Overpair and up is strong, WeakPair
     // through TopPair medium, everything below weak. Same numbers, two
-    // resolutions — so the meters can never contradict the bars beside them.
+    // resolutions, so the meters can never contradict the bars beside them.
     const strong = view.buckets[6] + view.buckets[7] + view.buckets[8];
     const medium = view.buckets[3] + view.buckets[4] + view.buckets[5];
     expect(view.tierWeight[2]).toBeCloseTo(strong, 12);

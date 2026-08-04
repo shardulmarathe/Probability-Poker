@@ -1,8 +1,8 @@
 /**
  * Hand replay.
  *
- * The page opens on the reconstruction — the recorded hand, rebuilt from its
- * seed and stepped through action by action — and puts the fidelity check at
+ * The page opens on the reconstruction, the recorded hand, rebuilt from its
+ * seed and stepped through action by action, and puts the fidelity check at
  * the top rather than hiding it. That badge is the difference between a replay
  * and a story: it says the engine was handed the seed, dealt the hand again,
  * and produced a report that matched the recorded one in every field a chip
@@ -12,7 +12,7 @@
  * `WhatIf.tsx` for why they are so insistent about it.
  *
  * The tab bar used to be a near byte-for-byte copy of the hand review's,
- * inlined here — same gradient, same sticky wrapper, same active treatment
+ * inlined here, same gradient, same sticky wrapper, same active treatment
  * written out a second time. It is now `Tabs` + `StickyTabs` from the design
  * system, which also means the tab blurbs ("Change one decision") are printed
  * under the row instead of hidden in a `title=` attribute no phone shows.
@@ -234,7 +234,7 @@ export default function ReplayPage() {
 
         {/*
          * No heading here. The tab above is the heading, and its hint is the
-         * lede — printing "Step through / Rebuilt from the seed" underneath a
+         * lede, printing "Step through / Rebuilt from the seed" underneath a
          * tab reading "Step through" said the same thing three times.
          */}
         <div className="mt-5" data-testid="replay-panel" data-tab={tab}>

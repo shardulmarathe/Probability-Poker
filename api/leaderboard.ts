@@ -40,7 +40,7 @@ export default async function handler(
 
     const sql = getSql();
 
-    // Metric expressions — never select user_id into the response.
+    // Metric expressions, never select user_id into the response.
     let rows: Record<string, unknown>[];
     switch (metricRaw) {
       case "hands":

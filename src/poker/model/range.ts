@@ -6,7 +6,7 @@
  * ace of hearts sitting in our own hand makes the nut heart flush impossible for
  * him. A range over all C(52,2) = 1326 combos can: `removeCards` zeroes every
  * combo containing a known card, and blockers fall out of that single operation
- * for free — no special case, no separate blocker model.
+ * for free, no special case, no separate blocker model.
  *
  * Layout notes, because this feeds a Monte Carlo hot loop:
  *  - Cards are the 0..51 codes from `../core/card.ts` throughout.
@@ -36,7 +36,7 @@ export type Range = Float64Array;
 //
 // For a < b the index is the count of ordered-by-first-card pairs that precede
 // it: 51a - a(a-1)/2 + (b - a - 1). That closed form is never evaluated at call
-// time — it only builds the tables below, which make both directions a load.
+// time, it only builds the tables below, which make both directions a load.
 
 /** Low card code of combo i (the smaller of the two). */
 const COMBO_A = new Uint8Array(COMBO_COUNT);
@@ -44,7 +44,7 @@ const COMBO_A = new Uint8Array(COMBO_COUNT);
 const COMBO_B = new Uint8Array(COMBO_COUNT);
 /** `INDEX_OF[a * 52 + b]` for either order; NO_COMBO on the a === b diagonal. */
 const INDEX_OF = new Uint16Array(52 * 52);
-/** Sentinel for "not a combo" — 1326 indices fit well below it. */
+/** Sentinel for "not a combo", 1326 indices fit well below it. */
 const NO_COMBO = 0xffff;
 
 INDEX_OF.fill(NO_COMBO);
@@ -75,7 +75,7 @@ export function comboIndex(a: number, b: number): number {
 /**
  * The two card codes of combo i, ascending. Exact inverse of `comboIndex`.
  *
- * Allocates a tuple per call, which is why nothing on a hot path uses it — the
+ * Allocates a tuple per call, which is why nothing on a hot path uses it, the
  * per-combo loops read `comboCardA`/`comboCardB` instead. A table of 1326
  * frozen pairs used to live here to make this allocation-free; it cost 255 KB
  * resident to optimise a function with no caller outside the tests.
@@ -85,7 +85,7 @@ export function comboCards(i: number): readonly [number, number] {
   return [COMBO_A[i], COMBO_B[i]];
 }
 
-/** Lower card code of combo i. Unchecked — this is the per-combo loop form. */
+/** Lower card code of combo i. Unchecked, this is the per-combo loop form. */
 export function comboCardA(i: number): number {
   return COMBO_A[i];
 }
@@ -99,13 +99,13 @@ export function comboCardB(i: number): number {
 // Construction
 // ---------------------------------------------------------------------------
 
-/** All weight zero — the starting point for a range built combo by combo. */
+/** All weight zero, the starting point for a range built combo by combo. */
 export function emptyRange(): Range {
   return new Float64Array(COMBO_COUNT);
 }
 
 /**
- * Every combo weighted 1 — "no read at all".
+ * Every combo weighted 1, "no read at all".
  *
  * Weight 1 rather than 1/1326 so a range reads as a combo count: a grid cell of
  * a uniform range holds exactly the textbook 6 / 4 / 12 combos, and totals stay
@@ -155,7 +155,7 @@ export function normalizeRange(range: Range): Range {
 }
 
 /**
- * Zero every combo containing one of `cards` — the opponent cannot hold a card
+ * Zero every combo containing one of `cards`, the opponent cannot hold a card
  * that is in our hand or on the board.
  *
  * This is the whole blocker story. Removing k distinct cards zeroes exactly
@@ -191,7 +191,7 @@ export function removeCards(range: Range, cards: ArrayLike<number>): Range {
  *
  * O(1326) per draw, so this is for one-off draws and tests. A zero-weight combo
  * subtracts nothing from the running remainder and so can never be the one that
- * drives it negative — that is what makes "never returns an impossible hand" a
+ * drives it negative, that is what makes "never returns an impossible hand" a
  * property of the arithmetic rather than a check.
  */
 export function sampleCombo(range: Range, rng: Rng): number {
@@ -212,8 +212,8 @@ export function sampleCombo(range: Range, rng: Rng): number {
 /**
  * Vose alias table: O(1) per draw after an O(1326) build.
  *
- * The Monte Carlo draws an opponent hand every simulation — tens of thousands
- * per decision — off a range that changes only between decisions. Paying 1326
+ * The Monte Carlo draws an opponent hand every simulation, tens of thousands
+ * per decision, off a range that changes only between decisions. Paying 1326
  * operations once and 1 per draw is the whole point; `sampleCombo` above pays
  * 1326 per draw.
  */
@@ -267,7 +267,7 @@ export function makeComboSampler(range: Range): ComboSampler {
     alias[l] = l;
   }
   // `small` can only be left non-empty by float dust, and the straggler may be a
-  // zero-weight combo — giving it prob 1 would make an impossible hand drawable,
+  // zero-weight combo, giving it prob 1 would make an impossible hand drawable,
   // so send its mass away instead.
   while (ns > 0) {
     const s = small[--ns];
@@ -367,7 +367,7 @@ export function gridCellOf(combo: number): number {
  */
 export function toGrid(range: Range, out?: Float64Array): Float64Array {
   // Float64Array drops out-of-range stores silently, so a short buffer would
-  // lose whole cells rather than fail — and the total would stop conserving.
+  // lose whole cells rather than fail, and the total would stop conserving.
   if (out !== undefined && out.length < GRID_CELLS) {
     throw new Error(`toGrid: out buffer holds ${out.length}, need ${GRID_CELLS}`);
   }

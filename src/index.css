@@ -13,7 +13,7 @@
    * A slate `--color-ink-*` ramp and a sky-blue `--color-accent` used to live
    * here, left over from a theme this product no longer has. Nothing referenced
    * them except the `body` rule below, which painted a blue radial gradient
-   * under every page — invisible only because each route covered it with its
+   * under every page, invisible only because each route covered it with its
    * own felt, and visible at exactly two moments: the first paint, and every
    * overscroll bounce.
    */
@@ -263,7 +263,7 @@ body {
 }
 
 /*
- * Under the shell, a page is one viewport minus the header — otherwise every
+ * Under the shell, a page is one viewport minus the header, otherwise every
  * route carries a permanent scrollbar exactly one header tall.
  *
  * Deliberately an unlayered rule so it outranks the `min-h-[100svh]` utility
@@ -276,7 +276,7 @@ body {
 
 /*
  * The same measurement, available as a class, for the layouts that need it on
- * an element the rule above cannot reach — the table's inner flex column,
+ * an element the rule above cannot reach, the table's inner flex column,
  * which has to fill the screen exactly so the felt can flex into what is left.
  */
 .pp-screen {
@@ -296,13 +296,13 @@ body {
 /*                                                                           */
 /*   1. One light. It hangs above the bed and slightly in front of the        */
 /*      viewer. So the pool of light sits above centre (--pp-light-y), and    */
-/*      every shadow on the table — rail, card, chip, seat — falls straight   */
+/*      every shadow on the table, rail, card, chip, seat, falls straight   */
 /*      down with no horizontal offset. A shadow that leans, or two shadows   */
 /*      that lean different ways, is the strongest tell that a scene is fake. */
 /*                                                                           */
 /*   2. Felt is cloth, not a gradient. Warp and weft as two repeating         */
 /*      gradients at different periods, low-frequency mottle for unevenness,  */
-/*      and a tiled grain to break the regularity of the weave — composited   */
+/*      and a tiled grain to break the regularity of the weave, composited   */
 /*      with `background-blend-mode` on one element, so the browser paints    */
 /*      the whole material once and never again.                             */
 /*                                                                           */
@@ -344,7 +344,7 @@ body {
    * the floor here: `clamp()` never returns less. Above it the corners open
    * into ellipses, because the one physical object on the screen is an oval
    * table and no 32px rounded rectangle has ever looked like one. The phone
-   * uses a shallower pair — a tall narrow box taken to a true ellipse pushes
+   * uses a shallower pair, a tall narrow box taken to a true ellipse pushes
    * the outer seats off the cloth.
    */
   --pp-table-r: clamp(2rem, 16%, 13rem) / clamp(2rem, 34%, 13rem);
@@ -352,7 +352,7 @@ body {
   /*
    * A grain tile: fractal noise, desaturated, rasterised once by the browser
    * and then tiled like any other image. `filter` appears inside the SVG, so
-   * it is resolved at decode time — there is no CSS `filter` on any element.
+   * it is resolved at decode time, there is no CSS `filter` on any element.
    */
   --pp-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
 }
@@ -362,8 +362,8 @@ body {
     /*
      * Rounder than a card, shallower than an ellipse. A phone's bed is taller
      * than it is wide, and taking a box that shape to a true oval pushes the
-     * outer chairs of a six-handed table — and the corners of the hero's own
-     * plate — off the cloth. These two are the largest pair that keeps every
+     * outer chairs of a six-handed table, and the corners of the hero's own
+     * plate, off the cloth. These two are the largest pair that keeps every
      * seat inside the felt at every viewport height, checked at 6-handed,
      * which is the tightest case.
      */
@@ -393,7 +393,7 @@ body {
    * the pot and the hero without any two of them overlapping, and lands on
    * 25rem on a phone and 32rem on a wide screen. Those numbers are measured
    * against the *bed*. Adding a rail moved the bed inside it, so the same
-   * numbers on the outer box quietly took two rail-widths out of the budget —
+   * numbers on the outer box quietly took two rail-widths out of the budget -
    * and at 900px tall in Study mode the pot readout printed straight across the
    * hero's hole cards. The rail is added back on.
    */
@@ -436,13 +436,13 @@ body {
   min-width: 0;
   border-radius: var(--pp-table-r);
   background-image: var(--pp-grain),
-    /* warp — the nap, running across the table */
+    /* warp, the nap, running across the table */
       repeating-linear-gradient(
         90deg,
         rgba(255, 255, 255, 0.022) 0 1px,
         rgba(0, 0, 0, 0.03) 1px 2px
       ),
-    /* weft — coarser, so the cloth is woven and not graph paper */
+    /* weft, coarser, so the cloth is woven and not graph paper */
       repeating-linear-gradient(
         0deg,
         rgba(255, 255, 255, 0.014) 0 1px,
@@ -500,7 +500,7 @@ body {
 }
 
 /*
- * Where a community card will land. Not a dashed box — a shallow depression in
+ * Where a community card will land. Not a dashed box, a shallow depression in
  * the cloth, which is what an empty spot on a table actually looks like.
  */
 .pp-slot {
@@ -539,7 +539,7 @@ body {
       rgba(0, 0, 0, 0) 40% 64%,
       var(--pp-chip-body) 64%
     ),
-    /* Six spots, not eight. At the size a chip is actually drawn here — 12 to
+    /* Six spots, not eight. At the size a chip is actually drawn here, 12 to
        16 pixels — eight arcs on the rim fall below a pixel each and read as
        noise rather than as moulding. */
       repeating-conic-gradient(
@@ -576,7 +576,7 @@ body {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
-/* One shadow for the stack, not one per chip — the pile touches the cloth once. */
+/* One shadow for the stack, not one per chip, the pile touches the cloth once. */
 .pp-chip-stack {
   position: relative;
   display: inline-block;
@@ -645,7 +645,7 @@ body {
 
 /*
  * A player's plate: a dark plaque resting on the cloth. Three states, and they
- * differ in *elevation* rather than in colour alone — an active seat is lifted
+ * differ in *elevation* rather than in colour alone, an active seat is lifted
  * and lit, a folded seat lies flat and unlit, which is what "out of the hand"
  * looks like from across a table.
  */
@@ -697,7 +697,7 @@ body {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
-/* An avatar is 32-36px, so a `filter` on one is a rounding error — and it is
+/* An avatar is 32-36px, so a `filter` on one is a rounding error, and it is
    the only honest way to make a face read as "not in this hand". */
 .pp-seat-folded .pp-avatar {
   filter: grayscale(1) brightness(0.75);

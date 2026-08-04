@@ -2,9 +2,9 @@
  * What the table is allowed to tell you.
  *
  * Coach shows the price you are being offered and the equity you actually
- * hold — pot odds, required share, your share. Study adds the numbers the bots
+ * hold, pot odds, required share, your share. Study adds the numbers the bots
  * price from: equity against each opponent taken alone (which is the single
- * biggest way multiway differs from heads-up — you can beat every seat
+ * biggest way multiway differs from heads-up, you can beat every seat
  * one-on-one and still be an underdog to the field), and the EV of every legal
  * action.
  *
@@ -25,7 +25,7 @@ import { LINE, RADIUS, Stat, TONE } from "../ui";
 export interface CoachPanelProps {
   mode: TableMode;
   read: HeroRead | null;
-  /** True while the human is on the clock — the panel only speaks then. */
+  /** True while the human is on the clock, the panel only speaks then. */
   active: boolean;
   actions: TableAction[];
   seats: TableSeat[];

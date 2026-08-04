@@ -1,9 +1,9 @@
 /**
  * The application shell: the felt, the wordmark, and the navigation.
  *
- * Before this existed there was no persistent navigation at all. The profile —
+ * Before this existed there was no persistent navigation at all. The profile -
  * the tracker, the style read, the priced leaks, the most valuable thing the
- * product computes — was reachable only by going home, choosing a table,
+ * product computes, was reachable only by going home, choosing a table,
  * playing a hand to completion, opening the review, opening the replay, and
  * then following a link labelled "← Back to profile" from a page you had never
  * been to. Five hops, the last one signposted backwards.
@@ -16,7 +16,7 @@
  *     five copies that had already drifted apart;
  *   - back-links stop being navigation. A page adds one only when it returns
  *     you to a specific thing you came from, and it is spelled with the
- *     destination's nav name — `← Table`, never "← Back to table" on one page
+ *     destination's nav name, `← Table`, never "← Back to table" on one page
  *     and "← New table" on the next.
  *
  * The `pp-shell` class is what lets `index.css` shorten every page's
@@ -47,7 +47,7 @@ export default function AppShell() {
    * Keep the current page's tab visible in the nav.
    *
    * Four labels, the wordmark and the account control do not fit across 390px,
-   * so the list scrolls rather than overlapping — but nothing scrolled it, and
+   * so the list scrolls rather than overlapping, but nothing scrolled it, and
    * the last tab was the one that got cut. Landing on /learn from a phone
    * showed a gold-ringed "Lear" sliced off where the account button starts,
    * which reads as a layout bug rather than as "there is more this way".
@@ -56,8 +56,8 @@ export default function AppShell() {
     const active = navRef.current?.querySelector("[aria-current='page']");
     active?.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [pathname]);
-  // The landing page keeps the fuller felt — brighter centre, vignette, the
-  // four suit watermarks — because it is the only page that is a poster.
+  // The landing page keeps the fuller felt, brighter centre, vignette, the
+  // four suit watermarks, because it is the only page that is a poster.
   const flourish = pathname === "/";
 
   return (
@@ -88,7 +88,7 @@ export default function AppShell() {
         >
           {/*
            * Icon mark on a phone, full lockup from 640px up. Three nav labels
-           * and the account control do not fit beside the wordmark at 390px —
+           * and the account control do not fit beside the wordmark at 390px -
            * they used to overlap it, which made "Profile" unclickable on
            * exactly the device where the nav matters most. The `aria-label`
            * keeps the accessible name identical at every width.

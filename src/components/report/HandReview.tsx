@@ -3,7 +3,7 @@
  *
  * Four tabs, one question each: what happened, what they had, what you did, and
  * why the numbers are the numbers. Splitting it that way rather than by data
- * source is deliberate — the same equity estimate shows up on three of these
+ * source is deliberate, the same equity estimate shows up on three of these
  * pages, answering a different question every time.
  *
  * ## Where the hands come from
@@ -12,12 +12,12 @@
  * `TableContext`, which is component state: it dies with the tab. That was
  * survivable while `/review` was reachable only by playing a hand and clicking
  * through from the felt, and stopped being survivable the moment the shell put
- * Review in the navigation — a player with fifty archived hands could land here
+ * Review in the navigation, a player with fifty archived hands could land here
  * directly, or simply reload, and be told they had never played one while
  * `/profile` two tabs over listed all fifty.
  *
  * So the archive is the source of truth and the session is the part of it that
- * has not been written yet. The merge is `mergeHands` — the profile's own — so
+ * has not been written yet. The merge is `mergeHands`, the profile's own, so
  * the two pages cannot disagree about what was played, and it keeps the live
  * copy of a hand played this session on purpose: storage strips each report's
  * per-decision audit trail, and three of the four tabs read it. A hand restored
@@ -71,7 +71,7 @@ export default function HandReview() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabId>("hand");
 
-  // `history` lags a render behind — the store appends to it in an effect — so
+  // `history` lags a render behind, the store appends to it in an effect, so
   // the hand that just ended is still only in `lastReport`.
   const live = useMemo(() => {
     if (!lastReport) return history;
@@ -286,7 +286,7 @@ export default function HandReview() {
             )}
 
             {/*
-             * Storage keeps the hand and drops the audit trail — a Monte Carlo
+             * Storage keeps the hand and drops the audit trail, a Monte Carlo
              * record per bot move is an order of magnitude larger than the hand
              * itself. Everything derived from the action record still works; the
              * panels that read the trail would otherwise report "nothing was

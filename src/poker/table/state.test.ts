@@ -70,7 +70,7 @@ describe("commitChips", () => {
     resetStreetBetting(t);
     commitChips(t, 0, 25);
     expect(t.seats[0].streetCommit).toBe(25); // reset by the new street
-    expect(t.seats[0].invested).toBe(35); // survives — side pots need it
+    expect(t.seats[0].invested).toBe(35); // survives, side pots need it
   });
 
   it("does not resurrect a folded seat into all-in", () => {
@@ -224,7 +224,7 @@ describe("bettingClosed", () => {
       s.streetCommit = 100;
       s.hasActed = true;
     }
-    // Seat 2 jams for 130 total — only a 30-chip raise over the 100 standing.
+    // Seat 2 jams for 130 total, only a 30-chip raise over the 100 standing.
     t.seats[2].streetCommit = 130;
     t.currentBet = 130;
     recordAction(t, 2, 30);

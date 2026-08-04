@@ -1,10 +1,10 @@
 /**
- * Tab 3 — your decisions, and what each one cost.
+ * Tab 3, your decisions, and what each one cost.
  *
  * The one rule this tab exists to enforce: model EV and hindsight EV are never
  * shown as the same number, never averaged, and never placed in the same
  * column. They answer different questions and they disagree constantly, and a
- * review that blurs them teaches the opposite of the lesson — that a call was
+ * review that blurs them teaches the opposite of the lesson, that a call was
  * bad because the river bricked, or good because it hit.
  *
  *   Model EV     what the line was worth given what was *knowable* then, priced
@@ -15,8 +15,8 @@
  *                decisions is zero by construction.
  *
  * Both come from `poker/coach/evLoss.ts`, which rebuilds the read itself and so
- * works for a human seat — one that has no `BotDecision` and recorded no equity
- * of its own — exactly as it does for a bot. That analysis is a few thousand
+ * works for a human seat, one that has no `BotDecision` and recorded no equity
+ * of its own, exactly as it does for a bot. That analysis is a few thousand
  * simulations per decision, so it runs off the first paint rather than in
  * render, and every panel that depends on it degrades to a stated absence
  * rather than to an approximation made out of numbers that mean something else.
@@ -74,7 +74,7 @@ function buildMoves(report: TableHandReport, focus: number): Move[] {
     if (record.seat !== focus) return;
     // Decisions and actions are pushed in lockstep for a seat the engine
     // priced, so the nth action by this seat is the nth decision. A human seat
-    // has none, and a street mismatch means the pairing drifted — in either
+    // has none, and a street mismatch means the pairing drifted, in either
     // case the move carries no engine EV rather than the wrong engine EV.
     const candidate = decisions[taken] ?? null;
     const decision =
@@ -599,14 +599,14 @@ function signed(v: number): string {
  * What a bet had to buy, priced with no simulation at all.
  *
  * `s` is the increment risked beyond any call and `P` the pot as it stands once
- * that call is in — the same frame `model/decider.ts` sizes bets in (`extra`
+ * that call is in, the same frame `model/decider.ts` sizes bets in (`extra`
  * against `pot + toCall`), so this number and the engine's sizing ladder are
  * talking about the same fraction. `poker/ev.ts` derives both: a bluff with no
  * equity breaks even at α = s/(P+s), and its complement is the minimum defence
  * frequency.
  *
  * Where the seat was a bot, the engine's own recorded P(everyone folds) is
- * printed beside it — the estimate against the threshold it has to clear.
+ * printed beside it, the estimate against the threshold it has to clear.
  */
 function BluffPrice({ move, isHero }: { move: Move; isHero: boolean }) {
   const { record } = move;

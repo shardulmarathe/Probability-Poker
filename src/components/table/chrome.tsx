@@ -3,12 +3,12 @@
  * the chips, and the geometry that decides where a seat sits.
  *
  * Everything here is presentation. It reads the same vocabulary as the heads-up
- * table — deep green felt, gold rims, Cinzel display type, one soft animation
- * per event — and adds exactly one thing that table did not need: a seat's
+ * table, deep green felt, gold rims, Cinzel display type, one soft animation
+ * per event, and adds exactly one thing that table did not need: a seat's
  * position is now a number rather than "top" or "bottom".
  *
  * What is *not* here any more: `FeltBackground` and `Rail`. Both existed in
- * `components/ui` as well, and both had drifted — the felt in texture opacity,
+ * `components/ui` as well, and both had drifted, the felt in texture opacity,
  * the rail into a different font, colour and radius from the one used on the
  * review page one hop away. This file keeps only what is specific to a table
  * with seats around it.
@@ -24,8 +24,8 @@ import { useEffect, useState } from "react";
  * Whether the layout is running in its compact form.
  *
  * A media query rather than a breakpoint class because the seat geometry itself
- * changes — six seats on a 390px screen need a different ellipse, not a smaller
- * one — and that is arithmetic, not CSS.
+ * changes, six seats on a 390px screen need a different ellipse, not a smaller
+ * one, and that is arithmetic, not CSS.
  */
 export function useNarrow(query = "(max-width: 767px)"): boolean {
   const [narrow, setNarrow] = useState(() =>
@@ -51,7 +51,7 @@ export interface SeatPoint {
   y: number;
 }
 
-/** Middle of the board — the target every chip flies to. */
+/** Middle of the board, the target every chip flies to. */
 export const POT_CENTRE: SeatPoint = { x: 50, y: 48 };
 
 /**
@@ -63,7 +63,7 @@ export const POT_CENTRE: SeatPoint = { x: 50, y: 48 };
  *
  * These percentages and `MIN_FELT` below are one calculation, not two. At four
  * and six-handed a seat sits directly above the board, so the felt has to hold
- * a full stack — seat, board, pot, hero — without overlap:
+ * a full stack, seat, board, pot, hero, without overlap:
  *
  *   board top   0.40H  >=  0.02H + 177 (seat) + 10   ->  H >= 492
  *   hero top    0.84H - 56  >=  0.40H + 150 + 15     ->  H >= 502
@@ -83,7 +83,7 @@ export const boardTop = (narrow: boolean): number => (narrow ? 42 : 40);
 /**
  * Seat anchors for an `n`-handed table, seat 0 first.
  *
- * Seat 0 is pinned bottom-centre — the human's chair, and in observer mode it
+ * Seat 0 is pinned bottom-centre, the human's chair, and in observer mode it
  * stays there so one layout serves both. The rest are spread around the top arc
  * of an ellipse: for `k` opponents the arc from 180° to 0° is cut into `k + 1`
  * equal steps and the seats take the interior points, which comes out symmetric
@@ -179,8 +179,8 @@ export type BadgeTone = "dealer" | "blind" | "quiet";
  *
  * `dealer` is the one that exists as an object: at a real table the button is a
  * pressed ivory puck with the word engraved into it, and it is the single most
- * recognisable thing on the cloth after the cards. So it is drawn as one —
- * moulded edge, lit top, a shadow under it — rather than as a gold pill that
+ * recognisable thing on the cloth after the cards. So it is drawn as one -
+ * moulded edge, lit top, a shadow under it, rather than as a gold pill that
  * happens to say BTN. The other two are labels, and are drawn as labels.
  */
 export function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
@@ -228,7 +228,7 @@ const BUBBLE_SKIN = {
  *
  * A bubble centred on the seat that owns it hangs half its width past that
  * seat, and the seats at the ends of the arc sit within half a bubble of the
- * screen edge — so on a phone the rightmost bot's "Running simulations…" was
+ * screen edge, so on a phone the rightmost bot's "Running simulations…" was
  * sliced off by the viewport. Edge seats anchor their bubble to the inside
  * instead of centring it.
  */
@@ -251,7 +251,7 @@ const ALIGN: Record<BubbleAlign, string> = {
  * How far a bubble sits from the chair it belongs to.
  *
  * A seat on the top arc pushes its chips *downward*, toward the pot, and says
- * what it did in the same direction — so the bet pill and the bubble were
+ * what it did in the same direction, so the bet pill and the bubble were
  * landing in the same place and printing through each other. `clearance` is
  * "there is a bet pill in this slot": the bubble steps past it rather than over
  * it.
@@ -292,7 +292,7 @@ export function SpeechBubble({
 /**
  * Where a bot's thinking hangs off its chair.
  *
- * Placement only — no skin, no border, no background. What used to live here
+ * Placement only, no skin, no border, no background. What used to live here
  * was a cream speech bubble that paraphrased the decision in one line; the
  * transcript that replaced it (`Thinking`) brings its own surface and its own
  * account of the pipeline, and it is a panel rather than a bubble, so wrapping
@@ -328,8 +328,8 @@ export function ThoughtPocket({
 // A chip is a moulded clay disc, not a coloured circle: it has edge spots, a
 // recessed centre face, and enough thickness that a stack of them is visibly a
 // stack. All of that is `.pp-chip` in index.css; what lives here is only the
-// denomination ladder — which colours a table of this stake would actually be
-// racked with — and the arithmetic that turns an amount into chips.
+// denomination ladder, which colours a table of this stake would actually be
+// racked with, and the arithmetic that turns an amount into chips.
 // ---------------------------------------------------------------------------
 
 interface Denomination {
@@ -356,7 +356,7 @@ const DENOMINATIONS: Denomination[] = [
  * Break an amount into stacks, largest denomination first.
  *
  * Capped at three stacks of five, because past that the pile stops reading as
- * chips and starts reading as a bar chart — and the number is printed right
+ * chips and starts reading as a bar chart, and the number is printed right
  * beside it anyway. The cap is honest about itself: the tallest stack is drawn
  * tall, not accurate.
  */
@@ -377,7 +377,7 @@ export function chipStacks(
     out.push({ denomination, count: Math.min(n, maxHeight) });
     left -= n * unit;
   }
-  // Anything under one big blind still bought something — show a single chip
+  // Anything under one big blind still bought something, show a single chip
   // rather than nothing, or a min-raise looks like a check.
   if (out.length === 0) out.push({ denomination: DENOMINATIONS[3], count: 1 });
   return out;
@@ -495,7 +495,7 @@ export function BeliefBar({
   belief: { weak: number; medium: number; strong: number };
   width?: string;
 }) {
-  // `weak` used to be `#94a3b8` — Tailwind's slate-400, the last surviving
+  // `weak` used to be `#94a3b8`. Tailwind's slate-400, the last surviving
   // pixel of the blue theme this product dropped. It read as a fourth brand
   // colour on green cloth. Weak is now simply unlit ivory.
   const parts: [string, number][] = [

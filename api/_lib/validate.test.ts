@@ -1,7 +1,7 @@
 /**
  * Every id that arrives in a request is interpolated as `${id}::uuid`, and
  * Postgres raises `invalid input syntax for type uuid` on anything that is not
- * one. That threw past the `HttpError` branch in `sendError` and answered 500 —
+ * one. That threw past the `HttpError` branch in `sendError` and answered 500 -
  * a server error, for a request the client got wrong. It never leaked, but it
  * told the caller to retry something that can never succeed and would page
  * whoever watches the 5xx rate.
@@ -29,7 +29,7 @@ describe("requireUuid", () => {
       // One character short, which a truncating client produces.
       "3f2504e0-4f89-41d3-9a0c-0305e82c330",
       // A SQL fragment, which is the reason this is a whitelist and not a
-      // blacklist — the driver parameterises, but the cast still has to hold.
+      // blacklist, the driver parameterises, but the cast still has to hold.
       `${VALID}'; drop table hands; --`,
       undefined,
       null,

@@ -4,7 +4,7 @@
  * Algorithm: Discounted CFR (Brown & Sandholm, "Solving Imperfect-Information
  * Games via Discounted Regret Minimization", AAAI 2019, arXiv:1809.04040).
  * Every CFR variant carries the same worst-case O(T^-1/2) bound, so the choice
- * between them is entirely empirical — and the paper's measurement is that
+ * between them is entirely empirical, and the paper's measurement is that
  * DCFR(3/2, 0, 2) "matches or outperforms CFR+ across the board... usually a
  * factor of 2 or 3". Vanilla CFR is a full order of magnitude behind both. In a
  * browser that is the difference between a solve and a hang, so DCFR is the
@@ -16,7 +16,7 @@
  * t^b/(t^b+1), and contributions to the average strategy by (t/(t+1))^g on each
  * iteration t."
  *
- * Representation: a *public* tree — the betting sequence — carried in typed
+ * Representation: a *public* tree, the betting sequence, carried in typed
  * arrays, with every node holding a whole vector of private hands at once. That
  * is what makes the river tractable: the public tree has a few dozen nodes, and
  * a node's work is a handful of passes over a Float64Array of hands rather than
@@ -52,13 +52,13 @@ export interface DcfrParams {
  * gamma=2 led to performance that was consistently stronger than CFR+ ... when
  * we refer to DCFR with no parameters listed, we assume this set of parameters
  * are used." beta = 0 gives t^0/(t^0+1) = 1/2, i.e. negative regret is halved
- * every iteration — the paper contrasts this with DCFR(3/2,-1,2), which zeroes
+ * every iteration, the paper contrasts this with DCFR(3/2,-1,2), which zeroes
  * it, and recommends this one because zeroing "can produce a spike in
  * exploitability that takes many iterations to recover from".
  */
 export const DCFR: DcfrParams = { alpha: 1.5, beta: 0, gamma: 2 };
 
-/** "CFR+ ... is equivalent to DCFR_{inf,-inf,2}" — RM+ with quadratic averaging. */
+/** "CFR+ ... is equivalent to DCFR_{inf,-inf,2}". RM+ with quadratic averaging. */
 export const CFR_PLUS: DcfrParams = {
   alpha: Number.POSITIVE_INFINITY,
   beta: Number.NEGATIVE_INFINITY,
@@ -68,7 +68,7 @@ export const CFR_PLUS: DcfrParams = {
 /** "LCFR is equivalent to DCFR_{1,1,1}". */
 export const LINEAR_CFR: DcfrParams = { alpha: 1, beta: 1, gamma: 1 };
 
-/** No discounting, uniform averaging — the Zinkevich 2007 original. */
+/** No discounting, uniform averaging, the Zinkevich 2007 original. */
 export const VANILLA_CFR: DcfrParams = {
   alpha: Number.POSITIVE_INFINITY,
   beta: Number.POSITIVE_INFINITY,
@@ -197,7 +197,7 @@ export function flattenTree(root: TreeSpec): PublicTree {
  *
  * Both methods overwrite `out` and are indexed from the hero's point of view:
  * `out[i]` is a sum over the *villain's* hands j that are compatible with hero
- * hand i (no shared cards — card removal is the interaction's job, not the
+ * hand i (no shared cards, card removal is the interaction's job, not the
  * caller's).
  */
 export interface HandInteraction {
@@ -228,7 +228,7 @@ export interface Solver {
   step(count?: number): void;
   /**
    * Normalized average strategy per node: `s[node][action * handCount + hand]`.
-   * This — not the current regret-matching strategy — is the thing that
+   * This, not the current regret-matching strategy, is the thing that
    * converges to equilibrium (Eq. 5).
    */
   averageStrategy(): Float64Array[];
@@ -394,7 +394,7 @@ export function createSolver(
       }
     }
     // Eq. (1) with the DCFR discount, and Eq. (5)'s numerator with the gamma
-    // weight. Both multiply *after* the add — see `discount` for why that is
+    // weight. Both multiply *after* the add, see `discount` for why that is
     // what makes the paper's own equivalences hold.
     const r = regret[node];
     const acc = stratSum[node];
@@ -689,7 +689,7 @@ const DEFAULT_RAISE_FRACTIONS = [1] as const;
  * Payoffs are net chips *shifted so the game is zero-sum*: the pot that both
  * players brought into the river is dead money split evenly in the baseline, so
  * winning it is worth pot/2 rather than pot. Nothing about the strategies
- * changes — it is a constant shift — but exploitability is only meaningful as a
+ * changes, it is a constant shift, but exploitability is only meaningful as a
  * sum of two best-response values when those values sum to zero at equilibrium.
  */
 export function buildRiverTree(spec: RiverSpec): PublicTree {
@@ -811,7 +811,7 @@ export function buildRiverGame(
 }
 
 export interface RiverSolveOptions extends SolverOptions {
-  /** Default 500 — enough for sub-1% exploitability on realistic ranges. */
+  /** Default 500, enough for sub-1% exploitability on realistic ranges. */
   readonly iterations?: number;
 }
 

@@ -5,13 +5,13 @@
  * carries the seed, the button, the seat count and everything that happened,
  * but not the blinds and not the stacks anybody sat down with. Both are needed
  * before the engine can be asked to deal the hand again, so both are recovered
- * here — the blinds exactly (they are implied by the first preflop record), the
+ * here, the blinds exactly (they are implied by the first preflop record), the
  * stacks only as far as they matter.
  *
  * "As far as they matter" is the interesting half. Entry stacks are genuinely
  * not recoverable: a seat that finished with chips could have started with any
  * amount above what it put in. What *is* recoverable is the only thing the
- * lifecycle reads them for — whether a seat ran out. A seat recorded `allin`
+ * lifecycle reads them for, whether a seat ran out. A seat recorded `allin`
  * started with exactly its `invested`; every other seat started with strictly
  * more, and any such value replays identically, because each of its recorded
  * costs is then affordable and none of its legal actions is capped. So the
@@ -42,7 +42,7 @@ export interface ReplaySeatSetup {
 
 export interface ReplayTableOptions {
   /**
-   * The blinds the hand was played at. Supply them when known — the live table
+   * The blinds the hand was played at. Supply them when known, the live table
    * always is. Omitted, they are inferred from the first preflop record.
    */
   config?: TableConfig;
@@ -106,7 +106,7 @@ export function replayBlocker(report: TableHandReport): string | null {
  * equations instead.
  *
  * Returns the fallback rather than a wrong answer whenever the arithmetic does
- * not come out whole — a blind posted short by an already-crippled stack breaks
+ * not come out whole, a blind posted short by an already-crippled stack breaks
  * the premise, and a silently wrong blind would produce a hand that replays
  * *almost* correctly, which is worse than one that visibly does not.
  */
@@ -153,7 +153,7 @@ export function resolveConfig(
  *
  * The `+ 1` on the floor is load-bearing. A seat given exactly its `invested`
  * would be marked all-in the moment it finished paying, which changes both the
- * side-pot layout and whether the round is closed — so a seat that did *not*
+ * side-pot layout and whether the round is closed, so a seat that did *not*
  * bust must start with strictly more than it spent.
  */
 export function entryStacks(
@@ -178,7 +178,7 @@ export interface ReplayTable {
   config: TableConfig;
   /** Entry stack given to each seat. */
   stacks: number[];
-  /** Session seed the table was built on — see `seed.ts`. */
+  /** Session seed the table was built on, see `seed.ts`. */
   sessionSeed: number;
   handNumber: number;
 }

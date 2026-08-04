@@ -19,7 +19,7 @@ function emptyFreq(): number[] {
 }
 
 /**
- * Raw outcome counts from a run — the sufficient statistics for everything
+ * Raw outcome counts from a run, the sufficient statistics for everything
  * `MonteCarloResult` reports. A run split across workers is merged by summing
  * these and normalizing once, which is why they are handed back unnormalized;
  * the flat `freq` array also structured-clones across a worker boundary for
@@ -53,7 +53,7 @@ function weightedTier(b: BeliefDistribution, rng: Rng): StrengthTier {
  *    `Uint8Array`s through `scoreInts` and never touches a `Card` property.
  *  - Each roll-out reuses pre-allocated hand/scratch buffers (no per-sim
  *    `filter`/`concat`/`Set` allocation).
- *  - Evaluation is not memoized — the direct path costs less than the lookup
+ *  - Evaluation is not memoized, the direct path costs less than the lookup
  *    would. When the board is already complete the bot's hand is scored once.
  */
 export function runBeliefMonteCarlo(
@@ -70,7 +70,7 @@ export function runBeliefMonteCarlo(
 }
 
 /**
- * The same run, stopping at the raw counts — what a sharded run needs, since a
+ * The same run, stopping at the raw counts, what a sharded run needs, since a
  * partial run is only meaningful once summed with its siblings and normalizing
  * per shard would be wrong.
  */
@@ -94,7 +94,7 @@ export function runBeliefCounts(
 
 /**
  * The implementation, on 0..51 card codes (see core/card.ts). Split out so the
- * equity worker — which already receives codes on the wire — can hand them
+ * equity worker, which already receives codes on the wire, can hand them
  * straight through instead of decoding to `Card[]` for this to re-encode.
  */
 export function runBeliefCountsFromCodes(
@@ -128,7 +128,7 @@ export function runBeliefCountsFromCodes(
   );
 
   // Reusable code buffers: [hole, hole, ...community, ...drawn]. Always 7
-  // long — `needed` is exactly the board's shortfall — but spelled out so the
+  // long, `needed` is exactly the board's shortfall, but spelled out so the
   // indexing below reads the same as the fill above.
   const handSize = 2 + cc + needed;
   const botHand = new Uint8Array(handSize);

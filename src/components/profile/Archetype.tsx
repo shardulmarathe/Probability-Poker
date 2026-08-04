@@ -2,7 +2,7 @@
  * The style read, with its confidence shown as loudly as the label.
  *
  * A classifier that says "TAG" after twelve hands is not wrong so much as
- * meaningless — `sampleConfidence` puts twelve hands at about 0.11 — and a UI
+ * meaningless, `sampleConfidence` puts twelve hands at about 0.11, and a UI
  * that prints the label in large type and buries the number teaches the player
  * to believe it. So the confidence drives the presentation: below the sample
  * floor the label is explicitly a guess, the reasons stay open, and the meter

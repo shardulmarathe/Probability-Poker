@@ -138,7 +138,7 @@ describe("model EV vs hindsight EV", () => {
    *
    * Hero holds A♠A♥ on a 7♥7♦2♣5♠ turn and calls a bet. Against any range the
    * villain's line suggests, that is a large favourite and an easy call. The
-   * villain in fact holds 7♣2♦ — a flopped full house — so the call was drawing
+   * villain in fact holds 7♣2♦, a flopped full house, so the call was drawing
    * dead and the hand is lost.
    *
    * The model lens says the call made money. The hindsight lens says it lost the
@@ -182,7 +182,7 @@ describe("model EV vs hindsight EV", () => {
   });
 
   it("draws opposite lessons from the same call", () => {
-    // The two lenses do not merely differ in size — they point the other way.
+    // The two lenses do not merely differ in size, they point the other way.
     expect(call.modelEvChosen).toBeGreaterThan(0);
     expect(call.hindsightEvChosen).toBeLessThan(0);
 
@@ -243,7 +243,7 @@ describe("model EV vs hindsight EV", () => {
   });
 
   it("does not let the villain's actual cards leak into the model equity", () => {
-    // Same hero, same board, same action history — only the villain's hole
+    // Same hero, same board, same action history, only the villain's hole
     // cards change. The model lens is public information only, so it must not
     // move; the hindsight lens must.
     const swapped = hand({
@@ -337,7 +337,7 @@ describe("hindsight on a hand that ended early", () => {
 
 /**
  * A decider that picks uniformly among the legal actions. No equity, no
- * profile — the point is to generate a wide spread of action sequences,
+ * profile, the point is to generate a wide spread of action sequences,
  * including plenty of bad ones, so the sign property is tested against play the
  * bots would never produce.
  */

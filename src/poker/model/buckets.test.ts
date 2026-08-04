@@ -37,7 +37,7 @@ function bucketOf(hole: string, board: string): HandBucket {
 }
 
 /**
- * Score of the best five-card hand from these hole cards and this board — the
+ * Score of the best five-card hand from these hole cards and this board, the
  * showdown truth a bucket is supposed to be a summary of. Two holdings with the
  * same score are the same hand and must not land in different buckets.
  */
@@ -159,7 +159,7 @@ describe("the tierOf defect", () => {
     expect(preflop).toBeGreaterThan(0.8);
     expect(river).toBeLessThan(0.5);
 
-    // A ten does add something — the higher straight — and is priced as such.
+    // A ten does add something, the higher straight, and is priced as such.
     expect(bucketOf("Td 2c", board)).toBe(HandBucket.Monster);
     // Not 1.0: an opponent holding a ten chops back.
     expect(equityOf("Td 2c", board, makeRng(8), 20_000)).toBeGreaterThan(0.9);
@@ -268,7 +268,7 @@ describe("a hand the whole field also holds is not your hand", () => {
 
   it("gives no credit for board trips on the flop and turn either", () => {
     // The strip is not a river rule. With `boardScore` computed only at five
-    // cards, a 7-7-7 flop reads Monster for all 1326 combos instead of 123 —
+    // cards, a 7-7-7 flop reads Monster for all 1326 combos instead of 123 -
     // a mutant the river-only case above cannot see.
     for (const board of ["7s 7h 7d", "7s 7h 7d 2c", "7s 7h 7d 2c 4h"]) {
       const buckets = classifyAll(makeBoardContext(codes(board)));
@@ -366,7 +366,7 @@ describe("a paired board spends one of the two pair slots itself", () => {
     let compared = 0;
     for (const board of randomBoards(5, 40, rng)) {
       const ctx = makeBoardContext(board);
-      // Only paired boards — this is where the board eats a pair slot.
+      // Only paired boards, this is where the board eats a pair slot.
       const seen = new Uint8Array(15);
       let isPaired = false;
       for (const c of board) {
@@ -437,7 +437,7 @@ describe("draws", () => {
     expect(bucketOf("Ad Kc", "5h 6h 7h 8s")).toBe(HandBucket.WeakDraw);
     // Board is four to a flush. Without a heart there is no flush draw here.
     expect(bucketOf("Ad Kc", "2h 7h 9h Th")).toBe(HandBucket.WeakDraw);
-    // With a heart it is not a draw either — it is already a flush.
+    // With a heart it is not a draw either, it is already a flush.
     expect(bucketOf("Ah Kc", "2h 7h 9h Th")).toBe(HandBucket.Monster);
   });
 
@@ -717,7 +717,7 @@ describe("bucket order tracks equity", () => {
         if (lo === HandBucket.TopPair && hi === HandBucket.Overpair) {
           // These two measure the same strength to within noise: 0.776 vs
           // 0.796 on the flop, 0.773 vs 0.756 on the turn, 0.782 vs 0.791 on
-          // the river — the sign flips with the boards drawn. Asserting an
+          // the river, the sign flips with the boards drawn. Asserting an
           // order between them would be asserting sampling noise.
           //
           // But `Math.abs(gain) < 0.08` is not that claim: it passes just as
@@ -759,7 +759,7 @@ describe("cost", () => {
       `classifyAll: ${perBoardUs.toFixed(1)} us per board (1326 combos)`
     );
     // Loose enough not to flake on a busy CI box, tight enough to catch an
-    // accidental O(1326^2) — a decision runs this a handful of times.
+    // accidental O(1326^2), a decision runs this a handful of times.
     expect(perBoardUs).toBeLessThan(3000);
   });
 

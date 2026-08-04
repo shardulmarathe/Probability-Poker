@@ -3,7 +3,7 @@
  *
  * The old engine's fixed-limit rules had a closed action set: bet $10, raise to
  * $20, done. No-Limit replaces the size with a continuous range, which is what
- * makes the decision genuinely hard — the bot must now choose *how much*, and
+ * makes the decision genuinely hard, the bot must now choose *how much*, and
  * the size it picks changes how often opponents fold, so equity alone no longer
  * determines the play.
  *
@@ -45,7 +45,7 @@ const money = (n: number) => `$${n}`;
 /**
  * The smallest legal raise.
  *
- * A raise must increase the bet by at least as much as the last one did — so
+ * A raise must increase the bet by at least as much as the last one did, so
  * over a $20 bet the next raise is to $40, and over a raise from $20 to $60 the
  * next is to $100. Preflop the big blind counts as the opening raise, which is
  * why `lastRaiseSize` is seeded with it.
@@ -82,7 +82,7 @@ export function legalActions(
 
     if (seat.mayRaise && stack > 0 && opponentsLeft) {
       // An opening bet is at least one big blind, or the whole stack if that is
-      // less — a short stack can always jam.
+      // less, a short stack can always jam.
       const min = Math.min(config.bigBlind, stack);
       actions.push({
         type: "bet",
@@ -107,7 +107,7 @@ export function legalActions(
 
   if (seat.mayRaise && stack > toCall && opponentsLeft) {
     // Below the full minimum the only legal raise is a jam, which is allowed
-    // even though it is undersized — it just will not reopen the betting.
+    // even though it is undersized, it just will not reopen the betting.
     const min = Math.min(minRaiseTotal(state, config) - committed, stack);
     actions.push({
       type: "raise",
@@ -144,7 +144,7 @@ const LADDER: [string, number][] = [
  * Pot-fraction presets for a bet or raise, clamped to what is actually legal.
  *
  * The pot a sizing is measured against includes the chips the seat must first
- * put in to call — betting "pot" means matching the call and then raising by
+ * put in to call, betting "pot" means matching the call and then raising by
  * the resulting pot, which is why `toCall` appears twice below. Presets that
  * collapse onto the same number (common with short stacks) are deduped, and
  * an all-in is always offered last.

@@ -2,7 +2,7 @@
  * Engine adapters for the two explanatory surfaces.
  *
  * The review's Math tab and the concepts page both need to *run* the engine
- * rather than quote it — a break-even frequency worked at this hand's pot, the
+ * rather than quote it, a break-even frequency worked at this hand's pot, the
  * category distribution of a real holding, the model a session's own decisions
  * would build, an equilibrium for the river that was actually dealt. Every one
  * of those is a call into `poker/*`, and none of them belongs in a component.
@@ -10,8 +10,8 @@
  * The rule the whole file exists to keep: nothing here invents a number. Each
  * function either returns what the engine computed or returns null with a
  * reason, and the reasons are specific enough to print. Where the engine needs
- * an input the hand record does not carry — stack depth on the river is the one
- * real case — the assumption is a named field on the result so the UI is forced
+ * an input the hand record does not carry, stack depth on the river is the one
+ * real case, the assumption is a named field on the result so the UI is forced
  * to disclose it rather than able to quietly absorb it.
  */
 
@@ -115,7 +115,7 @@ export function priceLadder(pot: number): PriceRung[] {
 // Hand-category distribution
 // ---------------------------------------------------------------------------
 
-/** Categories in ladder order, weakest first — the axis of the shape chart. */
+/** Categories in ladder order, weakest first, the axis of the shape chart. */
 export const CATEGORY_ORDER: readonly HandCategory[] = [
   HandCategory.HighCard,
   HandCategory.Pair,
@@ -133,7 +133,7 @@ export interface CategoryShare {
   name: string;
   /** P(final hand is this category) for the hero. */
   p: number;
-  /** Trials that produced it — `p × simulations`, rounded. */
+  /** Trials that produced it, `p × simulations`, rounded. */
   hits: number;
 }
 
@@ -144,7 +144,7 @@ export interface CategoryRun {
   unknown: number;
   /** True when the board was already complete, so nothing was sampled. */
   settled: boolean;
-  /** Runouts the deck still allowed — `C(pool, unknown)`. */
+  /** Runouts the deck still allowed, `C(pool, unknown)`. */
   runouts: number;
 }
 
@@ -166,8 +166,8 @@ function choose(n: number, k: number): number {
 /**
  * The hero's final made-hand category distribution, both hole hands known.
  *
- * `runFullKnowledgeMonteCarlo` is the engine's own post-hand estimator — the one
- * the legacy analysis page used for its distribution chart — so the shape here
+ * `runFullKnowledgeMonteCarlo` is the engine's own post-hand estimator, the one
+ * the legacy analysis page used for its distribution chart, so the shape here
  * is the shape the engine reports, at the trial count asked for. With the board
  * complete it does not sample at all: the category is settled and the
  * distribution is a point mass, which is the information ladder's last rung
@@ -226,13 +226,13 @@ const BOARD_AT: Record<LearnStreet, number> = {
 export interface SessionModel {
   /** The model the session's decisions build, prior included. */
   model: LikelihoodModel;
-  /** The same prior with nothing observed — the before to the model's after. */
+  /** The same prior with nothing observed, the before to the model's after. */
   fresh: LikelihoodModel;
   hands: number;
   observations: number;
   /** Decisions from hands that were actually revealed at showdown. */
   attributed: number;
-  /** Decisions from hands that were mucked — bucket-free levels only. */
+  /** Decisions from hands that were mucked, bucket-free levels only. */
   unattributed: number;
   /** Distinct cells the observations touched, across all six levels. */
   cells: number;
@@ -254,7 +254,7 @@ export interface SessionModel {
  * fact the fold withheld.
  *
  * The class is measured against the board *as it stood on each decision's own
- * street*, not against the final board — a seat that check-called the flop with
+ * street*, not against the final board, a seat that check-called the flop with
  * a gutshot and rivered a straight took the flop decision with a draw, and the
  * taxonomy is board-relative precisely so it can say so.
  *
@@ -337,8 +337,8 @@ export function learnSeat(
 /**
  * Combos kept per side before solving.
  *
- * A reweighted range is dense — every likelihood is bounded below by the prior's
- * uniform mixture, so no combo is ever exactly zero — and the full 1081 x 1081
+ * A reweighted range is dense, every likelihood is bounded below by the prior's
+ * uniform mixture, so no combo is ever exactly zero, and the full 1081 x 1081
  * river measures ~2ms per iteration (`cfr.test.ts`, "holds its throughput on the
  * widest ranges"), which is a solve a browser tab cannot afford between two
  * paints. Keeping the heaviest 220 combos a side measures 60-90ms for the whole
@@ -362,7 +362,7 @@ export interface SolvedMove {
 }
 
 export interface RiverSolve {
-  /** Seat that is out of position — player 0, and the root's actor. */
+  /** Seat that is out of position, player 0, and the root's actor. */
   oop: number;
   ip: number;
   /** The seat the comparison is written for. */
@@ -379,7 +379,7 @@ export interface RiverSolve {
   stack: number;
   stackAssumed: boolean;
   iterations: number;
-  /** Milliseconds inside `solver.step` — what `solveRiver` reports as its own. */
+  /** Milliseconds inside `solver.step`, what `solveRiver` reports as its own. */
   solveMs: number;
   /** Milliseconds for everything: ranges, tree, solve, exploitability. */
   totalMs: number;
@@ -390,7 +390,7 @@ export interface RiverSolve {
   coverage: [number, number];
   /** Exploitability of the solved profile, in chips per hand. */
   exploitChips: number;
-  /** The same as a share of the river pot — the record carries no big blind. */
+  /** The same as a share of the river pot, the record carries no big blind. */
   exploitPotShare: number;
   /** The equilibrium mix for the hero's actual holding at its first decision. */
   mix: SolvedMove[];
@@ -455,8 +455,8 @@ function actionsAt(tree: PublicTree, node: number): { label: string; child: numb
  * The tree action that best stands for a real move.
  *
  * Exact for check, call and fold. A bet or raise is snapped to the nearest rung
- * of the size abstraction — the tree offers a third, two thirds, pot and all-in
- * — and the caller is told that a snap happened, because a solved strategy at
+ * of the size abstraction, the tree offers a third, two thirds, pot and all-in
+ *, and the caller is told that a snap happened, because a solved strategy at
  * two-thirds pot is not a claim about a bet of 0.7 pot without that caveat.
  */
 function matchMove(
@@ -516,7 +516,7 @@ export function solveReviewRiver(
 
   const live = new Set(river.map((a) => a.seat));
   // A seat that folded earlier never acts on the river, so the actors are the
-  // field — unless somebody was already all-in, in which case there is no river
+  // field, unless somebody was already all-in, in which case there is no river
   // decision for them to have and the two-player tree still describes what is
   // left.
   if (live.size !== 2) {
@@ -715,8 +715,8 @@ export interface ConvergencePoint {
  * The point it makes is the one every Monte Carlo rests on and no static figure
  * can: the interval narrows as 1/√n, so four times the trials buys half the
  * error, and the estimate itself wanders inside the interval rather than walking
- * steadily toward the answer. Each row is an independent run — a different seed
- * — because rows that shared one would be nested samples and would look far
+ * steadily toward the answer. Each row is an independent run, a different seed
+ *, because rows that shared one would be nested samples and would look far
  * better behaved than sampling actually is.
  */
 export function convergence(
@@ -763,8 +763,8 @@ export interface BoardClasses {
 /**
  * Every hole-card combination classified against one board.
  *
- * This is `classifyAll` — the same call a decision makes, and the reason a range
- * chart means anything — counted rather than weighted, so it answers "what does
+ * This is `classifyAll`, the same call a decision makes, and the reason a range
+ * chart means anything, counted rather than weighted, so it answers "what does
  * this board do to the deck" independently of what anyone is believed to hold.
  */
 export function boardClasses(board: number[]): BoardClasses {
@@ -814,8 +814,8 @@ export interface SolveDemo {
 /**
  * Solve a river spot from scratch, measuring exploitability as it goes.
  *
- * Unlike the review's solve this one owns its whole specification — pot, stacks,
- * blind level, both ranges — so exploitability can be quoted in the standard
+ * Unlike the review's solve this one owns its whole specification, pot, stacks,
+ * blind level, both ranges, so exploitability can be quoted in the standard
  * unit (mbb/h, thousandths of a big blind per hand) rather than in chips. The
  * shape of the returned curve is the deliverable: a solver that is doing
  * anything at all drives it down, and one that is not produces a flat or
@@ -873,7 +873,7 @@ export function solveDemo(
   };
 }
 
-/** Keep only the `keep` heaviest combos of a range — the concepts page's solve
+/** Keep only the `keep` heaviest combos of a range, the concepts page's solve
  *  is subject to the same budget the review's is, for the same reason. */
 export function trimRange(range: Range, keep: number): Range {
   return pruneRange(range, keep, []).range;

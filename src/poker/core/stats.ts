@@ -7,7 +7,7 @@
  * actual interval for the estimate that was measured.
  */
 
-/** z for a two-sided 95% interval — the only confidence level the UI reports. */
+/** z for a two-sided 95% interval, the only confidence level the UI reports. */
 const Z_95 = 1.959964;
 
 export interface Interval {
@@ -19,7 +19,7 @@ export interface Interval {
  * Standard error of a sample proportion: √(p(1-p)/n).
  *
  * This is the textbook (Wald) error. It is what §2 of TECHNICAL_WRITEUP.md
- * derives, and it is fine for reporting a ± on a mid-range estimate — but it
+ * derives, and it is fine for reporting a ± on a mid-range estimate, but it
  * collapses to 0 when p hits 0 or 1, which is why the interval below is not
  * built from it.
  */

@@ -4,7 +4,7 @@
  * A decision's Monte Carlo run is split into a fixed number of shards, each
  * with its own derived seed, and the shards are spread across a small set of
  * long-lived workers. Splitting the run is what buys the extra samples; keeping
- * the workers alive is what makes it worth doing at all — spawning a worker
+ * the workers alive is what makes it worth doing at all, spawning a worker
  * costs more than the whole run.
  */
 
@@ -69,7 +69,7 @@ export function planShards(sims: number, seed: number): Shard[] {
 
 /**
  * Sum shard counts and normalize once. Integer addition, taken in shard order
- * rather than completion order — the merged numbers must not depend on which
+ * rather than completion order, the merged numbers must not depend on which
  * worker happened to finish first.
  */
 export function mergeShards(parts: MonteCarloCounts[]): MonteCarloResult {
@@ -102,8 +102,8 @@ const pending = new Map<
 
 /**
  * How many times the pool may be built. Worker failures are not always
- * permanent — an OOM-killed worker, a `postMessage` dropped across a bfcache
- * restore — and latching on the first one would push every later decision onto
+ * permanent, an OOM-killed worker, a `postMessage` dropped across a bfcache
+ * restore, and latching on the first one would push every later decision onto
  * the main thread for the life of the page. One rebuild; a second failure is
  * treated as real and the downgrade becomes permanent.
  */
@@ -112,7 +112,7 @@ let poolBuilds = 0;
 
 /**
  * Per-shard reply deadline. A worker that loads but never answers leaves the
- * decision unsettled forever — `onerror` catches a worker that crashes, not one
+ * decision unsettled forever, `onerror` catches a worker that crashes, not one
  * that is wedged (stalled module fetch, a message lost on bfcache restore). A
  * shard is ~9ms, so 400ms is ~40x the expected time: far outside any plausible
  * jitter, and still short enough that the sync fallback finishes well inside the
@@ -239,7 +239,7 @@ function dispatch<R extends AnyShardResult>(
 
 /**
  * Run every shard here, on the calling thread. It goes through the same encode
- * step and the same `runShard` the workers use — that is what makes the two
+ * step and the same `runShard` the workers use, that is what makes the two
  * paths identical by construction rather than by keeping two copies in step.
  * (`id` only correlates replies, so it is unused on this path.)
  */
@@ -256,7 +256,7 @@ export function runEquitySync(job: EquityJob): MonteCarloResult {
  * Run the shards across the worker pool, falling back to `runEquitySync` when
  * there are no workers (Node) or the pool has failed. The numbers are identical
  * either way, but the fallback is not free and not invisible: it blocks the
- * calling thread for the whole run — ~36ms preflop, ~23ms on the flop, i.e. two
+ * calling thread for the whole run, ~36ms preflop, ~23ms on the flop, i.e. two
  * or three dropped frames, worse on slower hardware.
  */
 export async function runEquity(job: EquityJob): Promise<MonteCarloResult> {
@@ -328,7 +328,7 @@ function encodeMultiwayJob(
 }
 
 /** Every shard on the calling thread, through the same `runMultiwayShard` the
- * workers use — the two paths are identical by construction, not by upkeep. */
+ * workers use, the two paths are identical by construction, not by upkeep. */
 export function runMultiwayEquitySync(req: EquityRequest): MultiwayEquity {
   const wire = encodeMultiwayJob(req);
   const parts = planShards(req.simulations, req.seed).map((s) =>

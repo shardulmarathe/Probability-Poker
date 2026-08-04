@@ -7,7 +7,7 @@ import type { Card, RankValue, Suit } from "../../types";
  * The suit order (s, h, d, c) is the one the evaluator has always used, which
  * keeps the encoding drop-in compatible with anything that already indexes by
  * it. Rank in the high bits means `n >> 2` is the rank offset and `n & 3` the
- * suit — both single instructions, which is the whole point of this module.
+ * suit, both single instructions, which is the whole point of this module.
  */
 const SUIT_INDEX: Record<Suit, number> = { s: 0, h: 1, d: 2, c: 3 };
 const SUITS: Suit[] = ["s", "h", "d", "c"];
@@ -23,7 +23,7 @@ export function encodeCard(card: Card): number {
 }
 
 /**
- * The shared `Card` instance for this code — callers must treat it as frozen.
+ * The shared `Card` instance for this code, callers must treat it as frozen.
  * Nothing in the app mutates cards, and copying here would defeat the purpose.
  */
 export function decodeCard(n: number): Card {

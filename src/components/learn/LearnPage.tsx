@@ -2,7 +2,7 @@
  * The concepts surface: the probability, without a hand attached.
  *
  * The hand review answers "what happened in that hand". This page answers "what
- * is this number, and why is it that number" — the same six or seven ideas the
+ * is this number, and why is it that number", the same six or seven ideas the
  * engine is built out of, each one demonstrated by running the engine here, in
  * the browser, on cards this page names out loud.
  *
@@ -13,8 +13,8 @@
  *     interval, class and exploitability below is computed when the page renders
  *     or when the reader presses the button that runs it. Where an example needs
  *     specific cards, the cards are the example and the numbers are the engine's.
- *   - The vocabulary is the review's vocabulary — the same `HowCalculated` folds,
- *     the same `Calc` blocks, the same fractions — so a student who learns the
+ *   - The vocabulary is the review's vocabulary, the same `HowCalculated` folds,
+ *     the same `Calc` blocks, the same fractions, so a student who learns the
  *     idea here recognises it the moment it turns up next to their own hand.
  */
 
@@ -1040,7 +1040,7 @@ const CHECKPOINTS = [10, 25, 50, 100, 200, 400];
  * Every combination on this board whose class falls in `[min, max]`.
  *
  * The two ranges below are defined this way rather than trimmed to a hand count,
- * because a trimmed uniform range is an arbitrary slice of the combo index — it
+ * because a trimmed uniform range is an arbitrary slice of the combo index, it
  * would solve just as fast and describe nothing. These are the hands a class
  * boundary actually names, and the counts they produce (~210 a side on this
  * board) are what the solve runs on.
@@ -1059,7 +1059,7 @@ function EquilibriumConcept() {
   const board = cardCodes(SOLVE_BOARD);
 
   const solve = () => {
-    // Out of position: one pair, middle to over — the bluff-catchers. In
+    // Out of position: one pair, middle to over, the bluff-catchers. In
     // position: top pair or better, the range that would be betting.
     const oop = classRange(board, HandBucket.MidPair, HandBucket.Overpair);
     const ip = classRange(board, HandBucket.TopPair, HandBucket.Monster);

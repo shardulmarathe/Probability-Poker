@@ -1,5 +1,5 @@
 /**
- * Tab 1 — what happened.
+ * Tab 1, what happened.
  *
  * The factual layer: the board, who sat where and what it cost them, how the
  * pot was cut up and why, the order the chips went in, and how the equity moved

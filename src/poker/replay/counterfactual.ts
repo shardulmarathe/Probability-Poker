@@ -2,7 +2,7 @@
  * "What if I had done X instead?"
  *
  * A counterfactual rewinds a recorded hand to one decision, substitutes a
- * different move, and lets the hand run on. The cards are the real cards — the
+ * different move, and lets the hand run on. The cards are the real cards, the
  * seed is the same, so the deck is the same and nothing is being invented about
  * what anybody held.
  *
@@ -13,15 +13,15 @@
  * by the bots, right now, at whatever the current model thinks. That is a
  * plausible continuation, not the continuation.
  *
- * Hence `simulated: true` on the result — a field, not a comment, so it cannot
- * be read past by accident — and `rederived`, the count of moves that came out
+ * Hence `simulated: true` on the result, a field, not a comment, so it cannot
+ * be read past by accident, and `rederived`, the count of moves that came out
  * of the model rather than out of the record. A counterfactual presented as
  * what would have happened is worse than no counterfactual at all: it teaches
  * the player to trust a number that has a bot's whole strategy baked into it.
  *
  * The seat being asked about is played by a bot too, after the substitution.
- * There is no alternative — the recorded line is a response to a hand that no
- * longer exists — and it is why the honest reading of `deltaNet` is "this line
+ * There is no alternative, the recorded line is a response to a hand that no
+ * longer exists, and it is why the honest reading of `deltaNet` is "this line
  * played out this way once", not "this line is worth this much".
  */
 
@@ -51,7 +51,7 @@ export interface Alternative {
 export interface Counterfactual {
   /**
    * Always true, and never omitted. Everything after `index` was re-derived by
-   * the bots, not observed — see the module comment.
+   * the bots, not observed, see the module comment.
    */
   simulated: true;
   /** Index into `report.actions` of the decision that was changed. */
@@ -136,7 +136,7 @@ const SIZE_VERB: Record<string, string> = { bet: "Bet", raise: "Raise" };
  *
  * The size it *chose* is then added whatever it was. No-Limit sizing is a
  * continuous range and the ladder is only the presets, so a seat that dragged
- * the slider to $63 has taken a line that no rung names — and a list of
+ * the slider to $63 has taken a line that no rung names, and a list of
  * alternatives that cannot show you what you did is not a list of alternatives.
  * Exactly one entry always comes back marked `actual`.
  */

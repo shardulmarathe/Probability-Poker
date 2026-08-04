@@ -9,7 +9,7 @@
  *
  * The modes gate *this file* and nothing else. `TableContext` never reads
  * `mode` before deciding anything, so switching to Study reveals cards without
- * changing a single bot's information set — which is what makes a hand studied
+ * changing a single bot's information set, which is what makes a hand studied
  * the same hand as a hand played.
  */
 
@@ -57,7 +57,7 @@ const STREET_LABEL: Record<Street, string> = {
 /**
  * How a made hand is spoken, not how it is titled.
  *
- * `HAND_CATEGORY_NAMES` is a label — "Pair", "Flush" — and lowercasing it after
+ * `HAND_CATEGORY_NAMES` is a label, "Pair", "Flush", and lowercasing it after
  * the word "with" produces "with pair" and "with flush". These carry their own
  * articles so the showdown line reads as a sentence.
  */
@@ -98,7 +98,7 @@ export default function TableGame() {
 
   /*
    * What each winner actually held, by seat. A showdown that only says who was
-   * paid teaches nothing — the point of the table is that a player can see
+   * paid teaches nothing, the point of the table is that a player can see
    * *why* the chips moved. Folded seats have a null `final` and are skipped,
    * which is also why this is empty when everyone else folded.
    */
@@ -111,8 +111,8 @@ export default function TableGame() {
   }, [lastReport]);
 
   /*
-   * The pot chip, once the hand is over. `table.pot` is zero by then — the
-   * chips have been pushed — and a showdown captioned "Pot $0" reads as a bug.
+   * The pot chip, once the hand is over. `table.pot` is zero by then, the
+   * chips have been pushed, and a showdown captioned "Pot $0" reads as a bug.
    * The total that was contested is the sum of the layers instead.
    */
   const potShown = handOver
@@ -143,7 +143,7 @@ export default function TableGame() {
   const wonBy = new Map<number, number>();
   /*
    * What the hand was worth to each seat, signed. Distinct from `won`, which is
-   * the pot collected and includes the seat's own money — announcing "+$2010"
+   * the pot collected and includes the seat's own money, announcing "+$2010"
    * beside a player who profited $1010 overstates it, and says nothing at all
    * to the seat that paid for it. Every seat that put chips in gets a number.
    */
@@ -193,9 +193,9 @@ export default function TableGame() {
         {/*
          * Two elements, because a real table is two things: a padded rail you
          * rest your arms on, and a bed of cloth sunk below it. `.pp-table`
-         * carries the rail — its padding *is* the rail's width — and
+         * carries the rail, its padding *is* the rail's width, and
          * `.pp-table-bed` is the cloth, inset by exactly that much. Both
-         * materials live in index.css; nothing here paints — and the table's
+         * materials live in index.css; nothing here paints, and the table's
          * minimum height lives there too, because it is the *bed* that has to
          * clear a seat, the board and the hero, and only the rail knows how
          * much of the outer box it is taking.
@@ -323,7 +323,7 @@ export default function TableGame() {
           ) : narrow && thinkingSeat ? (
             /*
              * On a phone the narration does not fit beside the chair it belongs
-             * to — hung off the seat it covered the board, and truncating it to
+             * to, hung off the seat it covered the board, and truncating it to
              * fit made the numbers unreadable, which defeats the point of
              * narrating them. It moves here instead, into space that is idle
              * anyway, and the chair keeps its marker so you still know who is
@@ -352,7 +352,7 @@ export default function TableGame() {
  * The table's own header: what this page is, what it is showing you, and how to
  * change either.
  *
- * `/table` had no `<h1>` at all — the main activity of the whole product opened
+ * `/table` had no `<h1>` at all, the main activity of the whole product opened
  * with a link labelled "← New table" and a chip reading "HAND #1". It also had
  * the only copy of the mode switch, whose three blurbs were `title=` attributes
  * and therefore invisible to every phone. Both fixed here: a real heading, and
@@ -400,7 +400,7 @@ function TopBar({
 
       {/*
        * The mode switch is a setting on this screen, not a second navigation,
-       * so it keeps its natural width instead of spanning the page — a
+       * so it keeps its natural width instead of spanning the page, a
        * full-width three-up sitting under the shell's own nav read as one.
        * Its blurb sits beside it, which is the whole reason the blurb is on
        * screen at all rather than in a `title=`.
@@ -467,7 +467,7 @@ function ResultStrip({
 
   /*
    * "Callin' Carla $3000" says who was paid. It does not say why, and the whole
-   * table exists to answer why — so the winning hand is named right where the
+   * table exists to answer why, so the winning hand is named right where the
    * chips are announced rather than one click away in the review.
    *
    * Only at a showdown: when everyone else folds, the winner's cards were never

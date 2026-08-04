@@ -58,7 +58,7 @@ export interface EquityRequest {
    *
    * This is the whole read, not a summary of one. A three-tier belief can say
    * an opponent is 70% likely to be strong; it cannot say *which* hands those
-   * are, so a sampler fed one has to guess — and the guess it used to make was
+   * are, so a sampler fed one has to guess, and the guess it used to make was
    * a preflop Chen score, which files 7-2 under "weak" on K-7-2-9-4 and aces
    * under "strong" on 5-6-7-8-9. A `Range` carries the board-relative answer
    * and the card removal together, so blockers land in the equity number rather
@@ -71,7 +71,7 @@ export interface EquityRequest {
    *
    * Consulted only for a seat `ranges` has no entry for, and then it is spread
    * over combos by *board-relative* bucket (`beliefRange`) rather than by the
-   * preflop score — so even this path no longer inherits the defect. Supplying
+   * preflop score, so even this path no longer inherits the defect. Supplying
    * neither is legal and means no read at all: a flat prior over every combo
    * the deck still allows.
    */
@@ -132,7 +132,7 @@ export interface BotDecision {
    * Why each bet or raise size scored what it did: the fold probability, the
    * equity against the range that continues, and the two EV terms they combine
    * into. Keyed by the same labels as `evByAction`, and present only for the
-   * bet/raise entries — checks, calls and folds have no fold-equity term.
+   * bet/raise entries, checks, calls and folds have no fold-equity term.
    *
    * Optional because a scripted decider (the engine's tests) does not price
    * anything, and because a seat with nobody left to act against has no fold
@@ -172,7 +172,7 @@ export type SyncBotDecider = (
 export interface SeatResult {
   seat: number;
   hole: number[];
-  /** Null when the seat folded before showdown — its cards stay hidden. */
+  /** Null when the seat folded before showdown, its cards stay hidden. */
   final: HandResult | null;
   invested: number;
   won: number;

@@ -2,7 +2,7 @@
 // dist/og.png, so the link preview always shows the current site with no manual
 // work. Runs after `vite build` (see package.json) against a local `vite preview`
 // server (this is a static SPA with no server runtime). Resilient: on any
-// failure it warns and exits 0 (never blocks the deploy) — the committed
+// failure it warns and exits 0 (never blocks the deploy), the committed
 // public/og.png (copied to dist/og.png by vite build) stays as the fallback.
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -15,7 +15,7 @@ const OUT = process.env.OG_OUT || join(ROOT, "dist", "og.png");
 
 const PORT = Number(process.env.OG_PORT || 4319);
 const URL = `http://localhost:${PORT}/`;
-const SETTLE_MS = Number(process.env.OG_SETTLE_MS || 3000); // DOM homepage — settle for fade-up animations
+const SETTLE_MS = Number(process.env.OG_SETTLE_MS || 3000); // DOM homepage, settle for fade-up animations
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

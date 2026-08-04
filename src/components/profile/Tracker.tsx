@@ -3,9 +3,9 @@
  * positional breakdown that is the only reason to keep them per-hand.
  *
  * Every counter is a `{n, d}` pair, so a stat with no denominator is printed as
- * "—" rather than 0%. That distinction is the whole point of storing pairs: a
+ * "-" rather than 0%. That distinction is the whole point of storing pairs: a
  * seat that has never faced a 3-bet has no fold-to-3-bet, and rendering that as
- * 0% would read as "never folds" — the opposite of what is known, which is
+ * 0% would read as "never folds", the opposite of what is known, which is
  * nothing.
  */
 
@@ -38,7 +38,7 @@ const pctFraction = (c: Counter): number | null => {
 
 /**
  * Deliberately not exported. This module's other exports are all components,
- * and a stray constant among them costs React Fast Refresh — the whole file
+ * and a stray constant among them costs React Fast Refresh, the whole file
  * reloads on every edit instead of re-rendering in place.
  */
 const STAT_SPECS: StatSpec[] = [
@@ -109,7 +109,7 @@ export function TrackerOverall({ stats }: { stats: PlayerStats }) {
       {/*
        * A dimmed meter was the only signal that a number came off two hands,
        * and a dimmed bar is not something a first-time reader can decode. The
-       * figures themselves are unhedged and printed to a decimal — "VPIP
+       * figures themselves are unhedged and printed to a decimal, "VPIP
        * 100.0%" off two hands claims a precision of one part in a thousand for
        * an estimate whose resolution is a half. This says the quiet part.
        */}
@@ -139,7 +139,7 @@ export function TrackerOverall({ stats }: { stats: PlayerStats }) {
 
 /**
  * The same stats by position. Positions the seat has never occupied are left
- * out entirely rather than shown as a row of dashes — at four-handed there is
+ * out entirely rather than shown as a row of dashes, at four-handed there is
  * no hijack, and printing one implies a gap in the sample that does not exist.
  */
 export function TrackerByPosition({ stats }: { stats: PlayerStats }) {

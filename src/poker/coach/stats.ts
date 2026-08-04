@@ -4,11 +4,11 @@
  * Everything is stored as a numerator/denominator PAIR rather than a
  * percentage, and that is the one structural decision the rest of the design
  * follows from: a percentage cannot be merged. "38% over 40 hands" and "22% over
- * 900 hands" have no average — you need the counts back to combine them, and by
+ * 900 hands" have no average, you need the counts back to combine them, and by
  * then the percentage has thrown them away. Pairs add. So a session merges into
  * a lifetime figure by integer addition, which is also exactly the shape the
  * `player_stats` table in db/migrations/001_persistence.sql stores
- * (`vpip_n`/`vpip_d`, `af_aggressive`/`af_passive`, …) — see `toPlayerStatsRow`.
+ * (`vpip_n`/`vpip_d`, `af_aggressive`/`af_passive`, …), see `toPlayerStatsRow`.
  *
  * Each stat below states its definition in full. That is not decoration: a
  * subtly wrong VPIP is worse than no VPIP, because it looks authoritative and
@@ -22,16 +22,16 @@
  *    counts toward neither VPIP nor the aggression denominators.
  *  - An all-in call is still a call. Nothing here reads the label or the size,
  *    which is what makes that true: `rules.ts` emits `{type:"call", cost:
- *    toCall}` unconditionally — only the *label* consults the stack — and
+ *    toCall}` unconditionally, only the *label* consults the stack, and
  *    `engine.ts` copies that straight into `ActionRecord.cost`. So the recorded
  *    cost of a short all-in call OVERSTATES the chips the seat actually put in
  *    (`commitChips` moves what the stack holds). Every counter here is a count
  *    of actions, so the overstatement cannot reach a stat; anything downstream
- *    that prices `ActionRecord.cost` — EV work in particular — is charging
+ *    that prices `ActionRecord.cost`. EV work in particular, is charging
  *    chips that never left the stack.
  *
  * Pure functions over reports. No state, no accumulation object, no ordering
- * requirement — `computeStats(a.concat(b))` equals `mergeStats(f(a), f(b))`.
+ * requirement, `computeStats(a.concat(b))` equals `mergeStats(f(a), f(b))`.
  */
 
 import type { ActionType } from "../../types";
@@ -39,7 +39,7 @@ import { positionOf, type PositionName } from "../table/position";
 import type { ActionRecord, TableHandReport } from "../table/contract";
 
 /**
- * A rate as the two integers it was measured from. `n / d`, undefined at d = 0 —
+ * A rate as the two integers it was measured from. `n / d`, undefined at d = 0 -
  * which is a real state ("never faced a 3-bet"), not a zero.
  */
 export interface Counter {
@@ -52,7 +52,7 @@ export interface StatCounters {
   hands: number;
 
   /**
-   * VPIP — Voluntarily Put money In Pot.
+   * VPIP. Voluntarily Put money In Pot.
    * n: hands with at least one preflop call, bet or raise by the seat.
    * d: hands dealt.
    * Posting a blind is forced, so it is not in the numerator; checking the big
@@ -61,7 +61,7 @@ export interface StatCounters {
   vpip: Counter;
 
   /**
-   * PFR — PreFlop Raise.
+   * PFR. PreFlop Raise.
    * n: hands with at least one preflop raise (or bet) by the seat.
    * d: hands dealt.
    * A preflop `bet` is only legal to the big blind facing limpers, which is a
@@ -70,11 +70,11 @@ export interface StatCounters {
   pfr: Counter;
 
   /**
-   * 3-bet% — making the third preflop bet.
+   * 3-bet%, making the third preflop bet.
    * The big blind is the first bet and an open raise is the second, so a
    * re-raise over an open is the third; hence the name.
    * n: the seat re-raised at its first opportunity.
-   * d: opportunities — the seat acted while exactly one voluntary raise stood
+   * d: opportunities, the seat acted while exactly one voluntary raise stood
    *    and that raise was somebody else's. Counted at most once per hand; a
    *    limper who later faces the open still had the chance and is counted.
    */
@@ -87,23 +87,23 @@ export interface StatCounters {
    *    *still facing the 3-bet*. A cold 4-bet landing in between removes the
    *    opportunity rather than creating a fold: the seat is answering the
    *    4-bet, and counting that here is the standard way this stat inflates.
-   * The seat's response to the 3-bet only — a 4-bet that later folds to a 5-bet
+   * The seat's response to the 3-bet only, a 4-bet that later folds to a 5-bet
    * is a non-fold here, because the question is what the 3-bet accomplished.
    */
   foldToThreeBet: Counter;
 
   /**
-   * AF — Aggression Factor, (bets + raises) / calls, POSTFLOP.
+   * AF. Aggression Factor, (bets + raises) / calls, POSTFLOP.
    * n: postflop bets and raises. d: postflop calls.
    * Checks and folds appear in neither, by the standard definition. Preflop is
-   * excluded because the forced blinds distort both terms — everyone "calls" a
+   * excluded because the forced blinds distort both terms, everyone "calls" a
    * blind they were priced into and nobody's style shows through it.
    * A ratio, so `d = 0` means undefined (see `rate`), not infinitely aggressive.
    */
   af: Counter;
 
   /**
-   * AFq — Aggression Frequency, (bets + raises) / (bets + raises + calls +
+   * AFq. Aggression Frequency, (bets + raises) / (bets + raises + calls +
    * folds), POSTFLOP. The share of postflop *decisions* that were aggressive.
    * Checks are excluded here too, which is what keeps AFq comparable to AF:
    * both ask what the seat did when it had chips to commit or fold.
@@ -112,27 +112,27 @@ export interface StatCounters {
   afq: Counter;
 
   /**
-   * WTSD — Went To ShowDown.
+   * WTSD. Went To ShowDown.
    * n: hands the seat reached showdown with cards live.
    * d: hands the seat saw a flop.
-   * "Saw a flop" means a flop was dealt and the seat had not folded preflop —
+   * "Saw a flop" means a flop was dealt and the seat had not folded preflop -
    * an all-in preflop seat that gets run out saw the flop and did go to
    * showdown, which is the standard treatment.
    */
   wtsd: Counter;
 
   /**
-   * W$SD — Won money at ShowDown.
+   * W$SD. Won money at ShowDown.
    * n: showdowns where the seat won at least part of a pot.
    * d: showdowns reached (= `wtsd.n`).
    * Read off `PotRecord.winners` rather than `SeatResult.won`, because `won`
    * also carries an uncalled bet coming back, which is not winning a showdown.
-   * A chopped pot counts as won — the tracker convention.
+   * A chopped pot counts as won, the tracker convention.
    */
   wsd: Counter;
 
   /**
-   * Flop c-bet% — continuation bet.
+   * Flop c-bet%, continuation bet.
    * n: the seat bet the flop.
    * d: hands where the seat was the preflop aggressor, saw the flop, and its
    *    first flop action faced no bet. A donk bet in front removes the
@@ -144,7 +144,7 @@ export interface StatCounters {
    * Fold to flop c-bet%.
    * n: the seat folded to it.
    * d: hands where somebody else was the preflop aggressor, bet the flop, and
-   *    the seat then had to act facing *that* bet — nothing raised in between.
+   *    the seat then had to act facing *that* bet, nothing raised in between.
    *    A raise of the c-bet ahead of the seat removes the opportunity: the
    *    seat's fold answers the raise, and scoring it here inflates the stat.
    */
@@ -177,7 +177,7 @@ const VOLUNTARY: ReadonlySet<ActionType> = new Set<ActionType>([
   "raise",
 ]);
 
-/** Preflop, an opening `bet` is only available to the big blind — it is a raise. */
+/** Preflop, an opening `bet` is only available to the big blind, it is a raise. */
 const AGGRESSIVE: ReadonlySet<ActionType> = new Set<ActionType>(["bet", "raise"]);
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ export function addCounter(into: Counter, from: Counter): void {
   into.d += from.d;
 }
 
-/** `a + b`, as a new object. Integer addition — this is why pairs are stored. */
+/** `a + b`, as a new object. Integer addition, this is why pairs are stored. */
 export function mergeCounters(a: StatCounters, b: StatCounters): StatCounters {
   const out = emptyCounters();
   out.hands = a.hands + b.hands;
@@ -323,7 +323,7 @@ function scanPreflop(actions: ActionRecord[], seat: number): PreflopScan {
       } else if (raises > 2) {
         // A cold 4-bet reached us before we got to act. Whatever we do next
         // answers *that*, so the 3-bet never got its answer and this hand is
-        // not an observation of the stat at all — arm nothing, count nothing.
+        // not an observation of the stat at all, arm nothing, count nothing.
         // (Our own 4-bet cannot land here: the block above already consumed
         // the flag on our action, before this one folds it into `raises`.)
         awaitingFoldToThreeBet = false;
@@ -458,7 +458,7 @@ export function computeStats(
 /**
  * The `player_stats` row shape from db/migrations/001_persistence.sql, exactly.
  *
- * The table stores a strict SUBSET of what is computed here — it has no column
+ * The table stores a strict SUBSET of what is computed here, it has no column
  * for AFq, c-bets, fold-to-3-bet or the positional slices. That is deliberate on
  * both sides: the row is the incrementally-maintained lifetime roll-up, and the
  * rest is derived on read from the `hands`/`decisions` tables. Nothing here
@@ -519,5 +519,5 @@ export function toPlayerStatsRow(
   };
 }
 
-/** The name of any `Counter` field on `StatCounters` — see `COUNTER_KEYS`. */
+/** The name of any `Counter` field on `StatCounters`, see `COUNTER_KEYS`. */
 export type { CounterKey };

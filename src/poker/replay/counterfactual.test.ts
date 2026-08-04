@@ -14,9 +14,9 @@ const BLINDS = { smallBlind: 5, bigBlind: 10 };
 
 /**
  * A decider that never simulates anything: it takes the first legal action from
- * a fixed preference order. Every test below is about the replay's plumbing —
+ * a fixed preference order. Every test below is about the replay's plumbing -
  * whether the right state is rewound to, what is labelled simulated, whether
- * the result is reproducible — and none of them is about the bot's judgement,
+ * the result is reproducible, and none of them is about the bot's judgement,
  * which has its own tests and costs a Monte Carlo run per move.
  */
 function scripted(order: string[]): SyncBotDecider {
@@ -204,7 +204,7 @@ describe("runCounterfactual", () => {
 
   it("reproducing the actual line reproduces the actual hand", () => {
     // Substituting the move that was played, then letting the bot answer, is
-    // not required to reproduce the hand — the opponents are re-derived either
+    // not required to reproduce the hand, the opponents are re-derived either
     // way. What must hold is that the branch point itself is not the source of
     // any difference: the chosen line is legal and the pot is unchanged by it.
     const { report, seat } = handWithDecisions(2);

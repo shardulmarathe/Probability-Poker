@@ -1,7 +1,7 @@
 /**
  * The top of a page: what it is, in one heading and one sentence.
  *
- * Every route now has an `<h1>` — `/table` and `/game` had none at all, which
+ * Every route now has an `<h1>`, `/table` and `/game` had none at all, which
  * meant a screen reader's document outline for the main activity of the product
  * started at "Hand #4". `compact` is for the table, where the felt needs the
  * vertical space and the heading earns one line rather than three.
@@ -74,7 +74,7 @@ export function PageHeader({
 /**
  * The one back-link form in the product.
  *
- * There were four vocabularies — "← New table", "← Back to table" pointing at
+ * There were four vocabularies, "← New table", "← Back to table" pointing at
  * two different destinations, "← Back to profile", "← Probability Poker". The
  * rule now: a back-link names its destination exactly as the nav names it, and
  * only exists when it returns you to something specific you came from. General

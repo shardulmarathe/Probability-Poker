@@ -9,8 +9,8 @@
  *
  * The two axes are the ones the game actually turns on:
  *
- *   how WIDE  — VPIP, the share of hands entered voluntarily.
- *   how HARD  — AF (bets+raises per call, postflop) and the share of entered
+ *   how WIDE. VPIP, the share of hands entered voluntarily.
+ *   how HARD. AF (bets+raises per call, postflop) and the share of entered
  *               hands that were raised preflop. Either one alone is easy to
  *               fool: a seat that never calls has no AF, and a seat that opens
  *               wide but gives up postflop has a fine PFR ratio.
@@ -18,8 +18,8 @@
  * Confidence is reported separately and is driven by sample size, because a
  * label from twelve hands is noise and the API has to say so out loud rather
  * than print "LAG" with the same weight it would after a thousand hands. There
- * is no threshold below which classification is refused — the label is still the
- * best guess available — but `provisional` and `confidence` mark it.
+ * is no threshold below which classification is refused, the label is still the
+ * best guess available, but `provisional` and `confidence` mark it.
  *
  * Ground truth for the thresholds is `../model/profiles.ts`: the bot roster's
  * styles are parameters, not opinions, so running a roster of known bots through
@@ -33,7 +33,7 @@ import { percent, rate, type PlayerStats } from "./stats";
 /**
  * The five styles.
  *
- * Two quadrants collapse. Tight-passive has no separate label — a rock and a nit
+ * Two quadrants collapse. Tight-passive has no separate label, a rock and a nit
  * differ in width but play the same losing way, and both land on `Nit`. The
  * maniac is not a sixth quadrant either: it is loose-aggressive taken past the
  * point where the label `LAG` still describes anything useful.
@@ -49,7 +49,7 @@ export const STYLE_BLURBS: Record<PlayStyle, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Thresholds — every one of them exported, on purpose
+// Thresholds, every one of them exported, on purpose
 // ---------------------------------------------------------------------------
 
 /** Below this VPIP a seat is a nit however it plays the few hands it enters. */
@@ -97,7 +97,7 @@ export interface StyleVector {
   /** PFR as a percentage, 0..100. */
   pfr: number;
   /**
-   * Postflop aggression factor, or null when the seat never called postflop —
+   * Postflop aggression factor, or null when the seat never called postflop -
    * which is a real state and must not read as zero aggression.
    */
   af: number | null;
@@ -143,7 +143,7 @@ export function sampleConfidence(hands: number): number {
 
 /**
  * Penalty for sitting on a cut point. A seat at 24.1% VPIP is not "a LAG" in any
- * meaningful sense — it is a coin flip between two labels — and the confidence
+ * meaningful sense, it is a coin flip between two labels, and the confidence
  * should say so even at a large sample. Bounded below at 0.6 so a borderline
  * seat with a huge sample still reads as better known than a clear-cut seat with
  * a tiny one; the sample term is meant to dominate.
@@ -163,7 +163,7 @@ export interface StyleVerdict {
   /** 0..1. Rises with sample size; falls near a threshold. */
   confidence: number;
   hands: number;
-  /** True below `MIN_CLASSIFY_HANDS` — the label is a guess, show it as one. */
+  /** True below `MIN_CLASSIFY_HANDS`, the label is a guess, show it as one. */
   provisional: boolean;
   vector: StyleVector;
   /** The thresholds that fired, in the order the rules were applied. */
@@ -179,14 +179,14 @@ function isAggressive(v: StyleVector): boolean {
 /**
  * The rules, in order. Each may veto the ones below it.
  *
- *   1. Maniac  — loose past `MANIAC_VPIP` *and* aggressive past `MANIAC_AF` or
+ *   1. Maniac, loose past `MANIAC_VPIP` *and* aggressive past `MANIAC_AF` or
  *                `MANIAC_PFR`. Both halves are required: a seat playing 70% of
  *                hands passively is a station, not a maniac.
- *   2. Nit     — under `NIT_VPIP` on width alone, or merely tight and passive.
+ *   2. Nit, under `NIT_VPIP` on width alone, or merely tight and passive.
  *                Tight-passive has no label of its own (see `PlayStyle`).
- *   3. TAG     — tight and aggressive.
- *   4. LAG     — loose and aggressive, short of maniac.
- *   5. Station — what is left: loose and passive.
+ *   3. TAG, tight and aggressive.
+ *   4. LAG, loose and aggressive, short of maniac.
+ *   5. Station, what is left: loose and passive.
  */
 export function classify(v: StyleVector): StyleVerdict {
   const reasons: string[] = [];
@@ -246,7 +246,7 @@ export function classifyStats(stats: PlayerStats): StyleVerdict {
 /**
  * The style each bot in `../model/profiles.ts` is built to play.
  *
- * These are not this file's opinion — they are the parameters the roster was
+ * These are not this file's opinion, they are the parameters the roster was
  * written from (entry threshold, aggression multiplier, bluff rate), restated as
  * labels. Running the roster through real hands and asking whether `classify`
  * recovers these is the validation that the thresholds above are calibrated to

@@ -9,21 +9,21 @@
  * **The rule is union, keyed by deal seed. Nothing is deleted on either side.**
  *
  *   1. Pull first. Newest-first, bounded, and only to learn which seeds the
- *      account already holds — which is also what makes step 3 idempotent
+ *      account already holds, which is also what makes step 3 idempotent
  *      without trusting any client-side bookkeeping to have survived.
  *   2. Merge down. Server hands the device has never seen go into the archive.
  *      A seed present on both sides keeps the *local* copy, because the round
  *      trip cannot restore a showdown category the archive never stored, and
  *      because that is the copy the replay pages were built from.
  *   3. Push up. Local hands the account has never seen are queued for upload.
- *      Never a delete, never an overwrite — `hand/record` only ever inserts.
+ *      Never a delete, never an overwrite, `hand/record` only ever inserts.
  *
  * A deal seed is a 32-bit hash of the session seed and the hand number, so two
  * devices playing different tables cannot collide, and the same hand recorded
  * twice cannot duplicate. `store.ts` already keys its own dedupe on it.
  *
  * The single lossy edge is the archive's 400-hand cap: merging more than that
- * trims oldest-first. Those hands are not gone — they are on the server, and
+ * trims oldest-first. Those hands are not gone, they are on the server, and
  * `fetchHands` still reaches them. Nothing this function does removes a row.
  */
 
@@ -43,7 +43,7 @@ const EMPTY: ReconcileSummary = { pulled: 0, pushed: 0, shared: 0 };
 
 /**
  * Runs at most once per signed-in user per page load. Reconciling twice is
- * harmless — every step is idempotent — but it costs a burst of requests.
+ * harmless, every step is idempotent, but it costs a burst of requests.
  */
 const done = new Set<string>();
 
@@ -62,7 +62,7 @@ export async function reconcile(): Promise<ReconcileSummary> {
 
     // Claim every seed either side already knows about *before* touching the
     // archive. `mergeSyncedHands` calls `saveArchive`, which re-enters the
-    // write-behind path — and that path would otherwise treat this device's
+    // write-behind path, and that path would otherwise treat this device's
     // history as hands that had just been dealt, queueing them through a live
     // session with hand numbers that restart per table. Step 3 below is the
     // one that uploads them, grouped into the runs they were actually played in.

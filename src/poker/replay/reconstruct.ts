@@ -7,7 +7,7 @@
  *
  * The guarantee is `fidelity`. Reconstruction is only worth anything if it
  * produces the *same* hand, so the replay finishes by comparing the report the
- * engine just built against the one it was given — board, hole cards, side-pot
+ * engine just built against the one it was given, board, hole cards, side-pot
  * layout, every seat's net, and each re-derived action record. Without that
  * check a replay is a plausible story about a hand rather than the hand, and it
  * would keep looking plausible after the engine changed underneath it.
@@ -59,7 +59,7 @@ export interface HandReplay {
  * `[min, max]` range rather than for equality. So the offered action is taken
  * and its cost substituted, which is exactly what the UI's slider does.
  *
- * Returns null when the recorded move is not on offer at all — that is a real
+ * Returns null when the recorded move is not on offer at all, that is a real
  * divergence and the caller reports it rather than forcing the move through.
  */
 export function recordedAction(
@@ -236,7 +236,7 @@ function runPass(
 /**
  * Entry stacks tightened by what the record already pins down.
  *
- * `ActionRecord.toCall` is what the seat *owed*, clamped to what it had — so a
+ * `ActionRecord.toCall` is what the seat *owed*, clamped to what it had, so a
  * seat that folded facing more than its stack recorded its exact remaining
  * chips without meaning to. Adding back what it had already invested recovers
  * the stack it sat down with, and only for the seats where `entryStacks` had to
@@ -276,8 +276,8 @@ function refineStacks(
 }
 
 /**
- * Passes allowed. One refinement is enough in every case the fixtures produce —
- * a seat folds once, so it can pin its own stack at most once — and the second
+ * Passes allowed. One refinement is enough in every case the fixtures produce -
+ * a seat folds once, so it can pin its own stack at most once, and the second
  * exists only so a report that somehow disagrees with itself terminates.
  */
 const MAX_PASSES = 3;

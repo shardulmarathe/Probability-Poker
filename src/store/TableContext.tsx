@@ -2,8 +2,8 @@
  * The N-handed table's store.
  *
  * It drives `poker/table/engine` one `applyAction` at a time and wraps each move
- * in the choreography the heads-up store established — a chip flight, a spoken
- * action, a staggered board deal — generalised from two fixed seats to however
+ * in the choreography the heads-up store established, a chip flight, a spoken
+ * action, a staggered board deal, generalised from two fixed seats to however
  * many are sitting. The engine itself is untouched by any of it: this file
  * decides *when* a move is shown, never *what* the move is.
  *
@@ -13,7 +13,7 @@
  *   1. One animated sequence at a time, released in a `finally`. A rejected
  *      decision or a wedged worker must not leave the table locked forever.
  *   2. Modes gate rendering only. Nothing here consults `mode` before deciding
- *      anything — the bots' information set is identical in Fair, Coach and
+ *      anything, the bots' information set is identical in Fair, Coach and
  *      Study, so a hand studied is the same hand as a hand played. `mode` is
  *      read in exactly two places, and both are display: the human's coach
  *      equity, and how much of a bot's narration is filled in (see "the
@@ -22,7 +22,7 @@
  * The provider outlives the felt: `/review`, `/profile` and `/replay` are
  * mounted inside it too, because the hand history lives here and a separately
  * mounted review would find an empty archive. That is deliberate, and it has
- * one consequence this file has to own — see "Pausing" below.
+ * one consequence this file has to own, see "Pausing" below.
  */
 
 import {
@@ -103,7 +103,7 @@ export interface ThinkLine {
   title: string;
   detail: string | null;
   /**
-   * Per-item detail the stage can table out — one row per bet size being
+   * Per-item detail the stage can table out, one row per bet size being
    * priced. Optional, and the narrow thought bubble ignores it; `<Thinking />`
    * is where it earns its place.
    */
@@ -131,7 +131,7 @@ export interface SeatFx {
 }
 
 export interface TableFx {
-  /** True while a sequence is animating — the human's controls are hidden. */
+  /** True while a sequence is animating, the human's controls are hidden. */
   busy: boolean;
   /** Community cards currently revealed, for the staggered deal. */
   dealtCount: number;
@@ -167,7 +167,7 @@ interface TableContextValue {
   legalActions: TableAction[];
   sizings: SizingOption[];
   fx: TableFx;
-  /** Public reads, seat-keyed — the bots' information set, not a privileged one. */
+  /** Public reads, seat-keyed, the bots' information set, not a privileged one. */
   reads: Record<number, BeliefDistribution>;
   heroRead: HeroRead | null;
   history: TableHandReport[];
@@ -244,7 +244,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 //
 // Every stage below names something `poker/model/decider.ts` genuinely does,
-// and every number in it is read off the very inputs the decider is handed —
+// and every number in it is read off the very inputs the decider is handed -
 // the `EquityRequest` it will sample, the shard plan `equity/pool` will use,
 // the ladder `table/rules` will size from, and (in the revealing modes) the
 // `BotDecision` it returned. Nothing here is illustrative, and a stage whose
@@ -254,7 +254,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // digit milliseconds on a fold and a few tens on a six-way priced decision,
 // which is far too fast to read, so each stage is held on screen for the dwell
 // below. That dwell is a *display minimum over work that has already happened*
-// — the previous version of this app hid a ~7ms decision behind a fabricated
+//, the previous version of this app hid a ~7ms decision behind a fabricated
 // 3.6-4.8s progress animation, and the difference between that and this is that
 // no number here is invented and no stage here describes work that did not run.
 
@@ -267,7 +267,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const STAGE_DWELL_MS = 480;
 
 /**
- * Extra dwell per item a stage reports, past the first — a range, a bet size, a
+ * Extra dwell per item a stage reports, past the first, a range, a bet size, a
  * candidate line. A stage with five bet sizes in it has five times the reading
  * to do, so the total length of a decision falls out of how much work that
  * decision actually involved rather than out of a chosen duration.
@@ -319,7 +319,7 @@ function liveCombos(range: Range | undefined): number {
  * `decision` is the completed `BotDecision` when the current mode is allowed to
  * print the bot's own numbers, and null otherwise. It only ever *appends* to a
  * stage's detail, so the stage list has the same length and the same order in
- * every mode — what changes is how much of each line is filled in.
+ * every mode, what changes is how much of each line is filled in.
  */
 function planStages(
   state: Table,
@@ -353,7 +353,7 @@ function planStages(
   }
 
   // Card removal, applied once up front inside `opponentRanges`. Genuinely
-  // instant — 51 slots touched per dead card — so the line says what it found
+  // instant, 51 slots touched per dead card, so the line says what it found
   // rather than pretending it took a while.
   stages.push({
     title: "Removing known cards",
@@ -364,7 +364,7 @@ function planStages(
   // Only records belonging to a seat still contesting the pot become factors:
   // `opponentRanges` builds no range for a seat that folded, so its actions are
   // skipped. "Nobody has acted" would therefore be wrong on a record that is not
-  // empty — the seats that acted are simply no longer in the hand.
+  // empty, the seats that acted are simply no longer in the hand.
   const live = new Set(opponents);
   const factors = handActions(state).filter((r) => live.has(r.seat)).length;
   stages.push({
@@ -377,7 +377,7 @@ function planStages(
   });
 
   // The shard plan the pool will actually use. `SHARDS` is a constant decoupled
-  // from the core count, so this split is the same on every machine — which is
+  // from the core count, so this split is the same on every machine, which is
   // exactly why it can be quoted.
   const shards = planShards(request.simulations, request.seed);
   const even = shards.every((sh) => sh.sims === shards[0].sims);
@@ -412,7 +412,7 @@ function planStages(
       detail,
       items: candidates.length,
       // The pot fraction is the number `priceSizes` tilts each fold rate by, and
-      // it is derived from the pot, the call and the size — all public. The fold
+      // it is derived from the pot, the call and the size, all public. The fold
       // rate and continuing equity it produces are the bot's own read, so they
       // arrive only with `decision`.
       facts: candidates.map((a) => {
@@ -429,7 +429,7 @@ function planStages(
     });
   }
 
-  // `priceCall` returns null — leaving `actionEv`'s exact number standing —
+  // `priceCall` returns null, leaving `actionEv`'s exact number standing -
   // unless there is a call on the table that somebody behind can still raise
   // the price of. Same predicate, so this stage appears exactly when it runs.
   const call = actions.find((a) => a.type === "call");
@@ -468,7 +468,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<TableHandReport[]>([]);
 
   // What the bots have learned about this player. Read on every decision,
-  // written only when a hand ends — never on the decision path. Refs rather
+  // written only when a hand ends, never on the decision path. Refs rather
   // than state because a re-render on every observation would be pointless: the
   // model is an input to the next decision, not something the UI renders live.
   const memoryRef = useRef<OpponentMemory>(loadMemory());
@@ -484,7 +484,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
    *
    * Built once. `models` is a function called per seat per decision, so it reads
    * through the refs and the decider never needs rebuilding when the memory
-   * grows — which would otherwise throw away the worker pool mid-session.
+   * grows, which would otherwise throw away the worker pool mid-session.
    */
   const decide = useMemo(
     () =>
@@ -505,8 +505,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
   tableRef.current = table;
   // Read the same way `tableRef` is, and for the same reason: the bot loop is a
   // long-lived async sequence that must see the mode as it is *now*, and putting
-  // `options` in its dependency list would rebuild `drive` — and re-fire the
-  // resume effect that depends on it — every time a setting changed.
+  // `options` in its dependency list would rebuild `drive`, and re-fire the
+  // resume effect that depends on it, every time a setting changed.
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const busyRef = useRef(false);
@@ -514,7 +514,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const startedRef = useRef(false);
   /**
    * Cleared when the provider unmounts. The bot loop is a long-lived async
-   * sequence, so leaving the table mid-hand would otherwise keep dealing —
+   * sequence, so leaving the table mid-hand would otherwise keep dealing -
    * running Monte Carlo and setting state on a component nobody is looking at
    * until the hand happened to end.
    */
@@ -537,7 +537,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   // situation arriving by a different door, so both drive one flag.
   //
   // The flag is held in a ref as well as in state because the bot loop is a
-  // long-lived async sequence that closes over neither — it re-reads the ref
+  // long-lived async sequence that closes over neither, it re-reads the ref
   // between turns, the way it already re-reads `aliveRef` and `tableRef`.
   const { pathname } = useLocation();
   const [hidden, setHidden] = useState(
@@ -558,7 +558,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   /**
    * Set when the loop stopped *because of* the pause, as opposed to because the
    * hand ended or the human is on the clock. Only the first case has a turn
-   * still owed, so only the first case is resumed — which is what keeps the
+   * still owed, so only the first case is resumed, which is what keeps the
    * resume from re-entering a loop that already finished for a good reason.
    */
   const resumeRef = useRef(false);
@@ -627,8 +627,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
    * The abandon window is the wait on the worker, which is the longest part of
    * a turn and so the part a pause is most likely to land in. Dropping the
    * decision there costs nothing and duplicates nothing: it is a pure function
-   * of `(seed, hand number, action count, seat)` — none of which the abandon
-   * changes — so re-entering recomputes this exact move rather than a different
+   * of `(seed, hand number, action count, seat)`, none of which the abandon
+   * changes, so re-entering recomputes this exact move rather than a different
    * one, and the table has not moved in the meantime.
    */
   const performBot = useCallback(
@@ -637,12 +637,12 @@ export function TableProvider({ children }: { children: ReactNode }) {
       const request = equityRequest(live, seat);
       // Kick the decision off first so the whole pipeline runs *underneath* the
       // narration rather than after it. It goes to the worker pool, so the main
-      // thread stays free to animate while it is in flight — and by the time the
+      // thread stays free to animate while it is in flight, and by the time the
       // first stage has been read it has long since landed.
       const pending = decide(live, seat, live.config);
       // A pause can abandon this turn with the decision still in flight, and
       // then nothing awaits it. `runMultiwayEquity` falls back rather than
-      // rejecting, so this is belt and braces — but an unhandled rejection is a
+      // rejecting, so this is belt and braces, but an unhandled rejection is a
       // console error nobody can act on, which is worth one line to prevent.
       void pending.catch(() => {});
 
@@ -710,7 +710,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
    * cannot recover from.
    *
    * The pause is tested between turns, never inside one, so a turn either
-   * happens whole or has not started — the seat still owes exactly the move it
+   * happens whole or has not started, the seat still owes exactly the move it
    * owed before, and `resumeRef` is what remembers that it does.
    */
   const drive = useCallback(async () => {
@@ -756,8 +756,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
   // ---- Public actions ------------------------------------------------------
   /**
    * Run one animated sequence at a time, releasing the lock in `finally`. The
-   * lock has to survive a throw: anything escaping the sequence — a rejected
-   * decision, a worker that never answers — would otherwise leave `busy` true
+   * lock has to survive a throw: anything escaping the sequence, a rejected
+   * decision, a worker that never answers, would otherwise leave `busy` true
    * forever, which kills every control on the table for good.
    */
   const runExclusive = useCallback((seq: () => Promise<void>) => {
@@ -797,7 +797,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   /*
    * Why these two queue instead of returning.
    *
-   * The result strip — and with it "Deal me another" — renders as soon as the
+   * The result strip, and with it "Deal me another", renders as soon as the
    * table reaches `hand-over`, but the sequence that got it there is still
    * unwinding: the last reveals, the final `setThinking({})`. During that tail
    * `busyRef` is true, and `runExclusive` drops any call that arrives while it
@@ -809,7 +809,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
    *
    * The same trap as the pause/resume path below, and the same escape: record
    * the intent and let the effect that watches `busy` spend it. Later intents
-   * overwrite earlier ones — clicking "Deal me another" twice deals one hand,
+   * overwrite earlier ones, clicking "Deal me another" twice deals one hand,
    * and changing the table after asking for a hand gives you the new table.
    */
   const pendingRef = useRef<(() => void) | null>(null);
@@ -917,7 +917,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   // ---- Observer mode deals itself on ---------------------------------------
   //
   // Gated on the pause too: dealing the *next* hand behind the review screen is
-  // the same defect as playing the current one, and the louder half of it —
+  // the same defect as playing the current one, and the louder half of it -
   // it is what moves the hand number.
   useEffect(() => {
     if (paused || !options.observer || busy || table.status === "playing") return;

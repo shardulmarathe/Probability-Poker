@@ -116,7 +116,7 @@ function readRanges(
 /**
  * The OLD sampler's law, written out: uniform inside a preflop `tierOf` bucket,
  * each bucket carrying `belief[tier]`. Nothing in production builds this any
- * more — it is here so the heads-up equivalence below can hand the new sampler
+ * more, it is here so the heads-up equivalence below can hand the new sampler
  * the exact distribution the old one drew from and compare like with like.
  */
 function tierProxyRange(pool: number[], belief: BeliefDistribution): Range {
@@ -149,7 +149,7 @@ interface Exact {
   pLoss: number;
   perOpponent: number[];
   /**
-   * Probability one whole-tuple proposal is accepted — the total mass the
+   * Probability one whole-tuple proposal is accepted, the total mass the
    * enumeration below found on disjoint tuples. It is exactly the normalizer,
    * and it is what says whether ignoring the sampler's retry bound is honest.
    */
@@ -170,7 +170,7 @@ function choose(n: number, k: number): number {
  * with probability proportional to its weight in that seat's range, restricted
  * to combos the pool can actually deal; the field's joint proposal is the
  * product of those; and the whole tuple is kept only if the hands are disjoint.
- * So the weight of a tuple is Π p(hᵢ) — no per-seat conditioning — renormalized
+ * So the weight of a tuple is Π p(hᵢ), no per-seat conditioning, renormalized
  * once at the end over the disjoint tuples alone, which is what whole-tuple
  * rejection converges to. Then uniform over board completions. It shares no
  * code with the kernel beyond `scoreInts` and the combo index, which are what
@@ -194,7 +194,7 @@ function enumerateMultiway(
   const handSize = 7;
 
   // Every combo the pool can deal, as a pair of pool indices, with each seat's
-  // normalized proposal mass on it — the kernel's `poolSampler`, enumerated.
+  // normalized proposal mass on it, the kernel's `poolSampler`, enumerated.
   const allCombos: number[][] = [];
   const comboOf: number[] = [];
   for (let i = 0; i < L; i++) {
@@ -281,7 +281,7 @@ function enumerateMultiway(
 
   // No renormalization here: a seat's proposal does not know what the seats
   // before it took, so the branch keeps its raw proposal mass. Branches that
-  // collide are simply not walked — that is the rejection — and what is left
+  // collide are simply not walked, that is the rejection, and what is left
   // sums to the acceptance probability rather than to 1.
   function dealSeat(o: number, w: number): void {
     if (o === N) {
@@ -570,7 +570,7 @@ describe("multiway — invariants", () => {
 
   it("zeroes the hero's cards and the board out of a range it is handed", () => {
     // A caller that forgot card removal must not be able to deal the hero's own
-    // ace to an opponent — the request's board and hole cards win.
+    // ace to an opponent, the request's board and hole cards win.
     const base = req(1);
     const flat = new Float64Array(COMBO_COUNT).fill(1) as Range;
     const dead = [...base.heroHole, ...base.board];
@@ -634,7 +634,7 @@ describe("multiway — one opponent is the heads-up sampler", () => {
   /**
    * WHAT CHANGED HERE, AND WHY.
    *
-   * This assertion used to be exact — `multi.wins === headsUp.wins`, count for
+   * This assertion used to be exact, `multi.wins === headsUp.wins`, count for
    * count. It could be, because both kernels drew a seat's hand the same way:
    * one `rng.next()` for a tier, one `rng.int()` for a combo inside it. The
    * range sampler spends a single `rng.next()` on an alias-table draw instead,
@@ -643,8 +643,8 @@ describe("multiway — one opponent is the heads-up sampler", () => {
    * mean keeping the preflop tier bucketing this migration exists to remove.
    *
    * What survives is the claim the identity was standing in for: hand the new
-   * sampler the *distribution* the old one drew from — `tierProxyRange`, the
-   * old law written out — and it estimates the same quantity. Measured over the
+   * sampler the *distribution* the old one drew from, `tierProxyRange`, the
+   * old law written out, and it estimates the same quantity. Measured over the
    * four streets below at 200k sims, |pWin_multi − pWin_headsup| came out
    * 0.0013 / 0.0004 / 0.0014 / 0.0000, against an SE-of-difference of ~0.0014.
    * Three of the four land inside one SE; the bound is 4.
@@ -684,7 +684,7 @@ describe("multiway — one opponent is the heads-up sampler", () => {
       expect(multi.wins + multi.ties + multi.losses).toBe(sims);
 
       // With one opponent the field result and the head-to-head are the same
-      // question, so these must be the same numbers — exactly.
+      // question, so these must be the same numbers, exactly.
       expect(multi.h2hWins[0]).toBe(multi.wins);
       expect(multi.h2hTies[0]).toBe(multi.ties);
       // Every tie is heads-up, hence a two-way chop.
@@ -712,7 +712,7 @@ describe("multiway — the field effect", () => {
   /**
    * The property the module exists for. `perOpponent` says the hero is a heavy
    * favourite over every single opponent; `equity` says the hero is an underdog
-   * to the pot. Both are true, and only the second one is what the chips do —
+   * to the pot. Both are true, and only the second one is what the chips do -
    * which is why a bot that reasoned pairwise would call off its stack here.
    */
   it("a hand that beats every opponent alone can still lose to the field", () => {
@@ -780,7 +780,7 @@ describe("multiway — dealing is symmetric in seat order", () => {
    * redrawing only the seat that collided conditioned each seat on the ones
    * before it: early seats took strong cards more often, later seats drew from
    * a pool already stripped of them, and `perOpponent` came out monotone in
-   * seat order — measured at 400k sims, a spread of 0.0037 / 0.0108 / 0.0184
+   * seat order, measured at 400k sims, a spread of 0.0037 / 0.0108 / 0.0184
    * at 2 / 4 / 6 opponents, i.e. 5 / 16 / 27 SE. It was a real number in the
    * analysis UI that meant nothing but the order the array happened to be in.
    *
@@ -874,7 +874,7 @@ describe("multiway — the sampler classifies against the board, not the deal", 
    * trash; aces on 5-6-7-8-9 are playing the board and it called them a monster.
    *
    * `tierProxyRange` above is that old law, written out, so both readings can be
-   * measured on one scale — the numbers below are the old sampler's answer and
+   * measured on one scale, the numbers below are the old sampler's answer and
    * the new one's for the same read on the same board.
    */
   const TIGHT: BeliefDistribution = { weak: 0.1, medium: 0.2, strong: 0.7 };
@@ -955,8 +955,8 @@ describe("multiway — the sampler classifies against the board, not the deal", 
       heroHole: hero, board, opponents: [1], ranges: { 1: after },
       simulations: 200_000, seed: 0xf2,
     });
-    // The hero never wins outright either way — the best hand available is the
-    // board — but how often the chop is taken away moves a long way.
+    // The hero never wins outright either way, the best hand available is the
+    // board, but how often the chop is taken away moves a long way.
     expect(eqBefore.pWin).toBe(0);
     expect(eqAfter.pWin).toBe(0);
     expect(eqAfter.equity).toBeLessThan(eqBefore.equity - 0.15);
@@ -989,21 +989,21 @@ describe("multiway — the sampler classifies against the board, not the deal", 
     const blocking = measure(["Ah", "9s"]);
     const not = measure(["Ad", "9s"]);
 
-    // The nut flush is not merely unlikely, it is impossible — and card removal
+    // The nut flush is not merely unlikely, it is impossible, and card removal
     // does it, with no blocker rule anywhere in the model.
     expect(blocking.nut).toBe(0);
     expect(not.nut).toBeGreaterThan(0.04);
     // Which thins the flush combos the opponent can hold at all.
     expect(blocking.flush).toBeLessThan(not.flush - 0.03);
 
-    // AND YET THE EQUITY BARELY MOVES — 0.25062 against 0.25059, a fortieth of
+    // AND YET THE EQUITY BARELY MOVES, 0.25062 against 0.25059, a fortieth of
     // one SE. That is not a bug here, it is the ceiling on what a three-tier
     // read can express, and it is worth pinning rather than glossing:
     // `beliefRange` sets each tier's TOTAL weight to `belief[tier]`, so deleting
     // the nut flush hands its mass straight back to the other strong combos and
     // P(opponent is strong) never changes. A blocker only reaches the number
     // when the weights are built per combo and never renormalised per tier,
-    // which is what `decider.opponentRanges` does — see its own blocker test,
+    // which is what `decider.opponentRanges` does, see its own blocker test,
     // where the same spot moves 0.1417 to 0.1509, about 16 SE.
     expect(Math.abs(blocking.equity - not.equity)).toBeLessThan(0.1 * not.se);
   });

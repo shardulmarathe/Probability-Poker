@@ -87,7 +87,7 @@ describe("recording", () => {
     });
     expect(model.observations).toBe(3);
     expect(model.unattributed).toBe(0);
-    // Each decision lands in its own node cell — the whole point of conditioning.
+    // Each decision lands in its own node cell, the whole point of conditioning.
     expect(model.cells["n:preflop:facing-bet"].actions.call).toBe(1);
     expect(model.cells["n:flop:unopened"].actions.check).toBe(1);
     expect(model.cells["n:river:facing-bet"].actions.raise).toBe(1);
@@ -149,7 +149,7 @@ describe("learning from folds", () => {
 
   it("moves every bucket together, compressing the likelihood ratio", () => {
     // 40 raises at this node, no showdown ever. The model cannot say *what* they
-    // raise with, only that they raise constantly — so the raise must lose
+    // raise with, only that they raise constantly, so the raise must lose
     // information, not gain it.
     const model = createLikelihoodModel();
     for (let i = 0; i < 40; i += 1) observe(model, raiseWith(null));
@@ -163,7 +163,7 @@ describe("learning from folds", () => {
     expect(after.strong).toBeCloseTo(0.5841, 4);
 
     // Every tier's raise rate rose, and the strong/weak ratio collapsed from
-    // 8.2 to 1.7 — a raise is now far weaker evidence than it was.
+    // 8.2 to 1.7, a raise is now far weaker evidence than it was.
     expect(after.weak).toBeGreaterThan(before.weak);
     expect(after.medium).toBeGreaterThan(before.medium);
     expect(after.strong).toBeGreaterThan(before.strong);
@@ -210,14 +210,14 @@ describe("learning is directional", () => {
     const before = raiseByTier(createLikelihoodModel());
     const after = raiseByTier(model);
 
-    // P(raise | weak) goes from 4.9% to 61% — a twelvefold rise — and now sits
+    // P(raise | weak) goes from 4.9% to 61%, a twelvefold rise, and now sits
     // level with P(raise | strong). The action has stopped meaning anything.
     expect(after.weak).toBeCloseTo(0.6108, 4);
     expect(after.strong).toBeCloseTo(0.54944, 4);
     expect(after.weak / before.weak).toBeGreaterThan(10);
     // The ratio is pinned rather than bounded, because where it lands is the
     // result: 8.20 before, 0.8995 after. It has not merely collapsed to 1, it
-    // has crossed it — this player raises weak hands *more* often than strong
+    // has crossed it, this player raises weak hands *more* often than strong
     // ones, which is what "habitual bluffer" means and is strictly stronger
     // evidence than indistinguishability. Two decades of the prior's
     // discrimination, undone by 30 showdowns.

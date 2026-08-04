@@ -32,7 +32,7 @@ import { buildPushFoldGame } from "./pushfold";
 // straight by chart cell.
 //
 // Three cells are footnoted in the source as having a gap rather than a single
-// threshold — 63s "7.1 - 5.1, 2.3", 53s "12.9 - 3.8, 2.4", 43s "10.0 - 4.9,
+// threshold, 63s "7.1 - 5.1, 2.3", 53s "12.9 - 3.8, 2.4", 43s "10.0 - 4.9,
 // 2.2". The top of each range is used here, which is exact at 10, 15 and 20bb
 // because none of the gaps straddle those depths.
 

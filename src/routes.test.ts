@@ -10,7 +10,7 @@ import vercel from "../vercel.json";
  * tells crawlers that a mistyped path is a real page.
  *
  * The cost is a second source of truth: that table mirrors the router in
- * `App.tsx`, and a route added to one and not the other still renders — it just
+ * `App.tsx`, and a route added to one and not the other still renders, it just
  * answers 404. That already happened once, to `/learn`, within an hour of the
  * table being introduced. This test is the reason it cannot happen quietly
  * again.
@@ -62,7 +62,7 @@ describe("vercel.json covers the router", () => {
   });
 
   it("never swallows an API path", () => {
-    // The functions must reach the filesystem handler, not the SPA shell —
+    // The functions must reach the filesystem handler, not the SPA shell -
     // otherwise every endpoint returns HTML and the client sees a parse error
     // instead of a 401.
     for (const url of ["/api/stats/me", "/api/hand/record", "/api/leaderboard"]) {
@@ -73,7 +73,7 @@ describe("vercel.json covers the router", () => {
 
 /**
  * `vercel.json` is validated against a closed schema before anything is built,
- * and an unknown top-level key is a hard error — not a warning, and not
+ * and an unknown top-level key is a hard error, not a warning, and not
  * something any local command reports. A `"_comment"` array explaining why this
  * file uses `routes` instead of `rewrites` therefore failed *every* production
  * deploy for a day while `npm run build`, `tsc` and CI all stayed green,
@@ -81,7 +81,7 @@ describe("vercel.json covers the router", () => {
  * above instead, where it costs nothing.
  */
 describe("vercel.json is a config Vercel will accept", () => {
-  // Not the whole schema — the keys a project like this one can legitimately
+  // Not the whole schema, the keys a project like this one can legitimately
   // use. Anything outside it is either a typo or a comment, and both break the
   // deploy the same way.
   const ALLOWED = new Set([

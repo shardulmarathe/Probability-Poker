@@ -2,8 +2,8 @@
  * Seat positions and acting order for an N-handed table.
  *
  * Seats are indexed 0..n-1 in clockwise seating order and the button is a seat
- * index, so "one seat later" is always `(i + 1) % n`. Everything else — who
- * posts which blind, who acts first on each street — is derived from the button
+ * index, so "one seat later" is always `(i + 1) % n`. Everything else, who
+ * posts which blind, who acts first on each street, is derived from the button
  * rather than stored, which keeps rotation to a single `button++`.
  *
  * Heads-up is the case that is usually gotten wrong, and it is special twice
@@ -64,7 +64,7 @@ export function blindSeats(button: number, n: number): { sb: number; bb: number 
 }
 
 /**
- * The seat that opens the betting on a street, ignoring folds and all-ins —
+ * The seat that opens the betting on a street, ignoring folds and all-ins -
  * callers skip inactive seats themselves.
  *
  * Preflop the action starts left of the big blind, so the blinds act last and

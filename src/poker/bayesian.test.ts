@@ -71,7 +71,7 @@ describe("learnedLikelihood", () => {
 
   it("moves toward the observed frequency as showdowns accumulate", () => {
     const model = createOpponentModel();
-    // One strong hand in which the player raised (and raised twice — actions are
+    // One strong hand in which the player raised (and raised twice, actions are
     // de-duplicated to a per-hand indicator).
     recordShowdownHand(model, "strong", ["raise", "raise", "call"]);
 

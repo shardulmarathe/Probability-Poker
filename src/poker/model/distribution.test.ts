@@ -148,7 +148,7 @@ describe("hand strength distributions", () => {
     // Two independent implementations of the same quantity: one enumerates the
     // 990 opponent holdings directly, the other ranks all 1081 holdings at once
     // and subtracts the ones hero blocks. On the turn both are exhaustive, so
-    // agreement is exact rather than statistical — and a blocker bug in either
+    // agreement is exact rather than statistical, and a blocker bug in either
     // would show up here immediately.
     const board = codes("Ks 7h 2d 9c");
     const set = allDistributions(board, makeRng(2), EXACT);
@@ -308,7 +308,7 @@ describe("the KcQc / 6c6d example from the literature", () => {
 
   it("is separated by the current taxonomy, for reasons of its own", () => {
     // The headline: this codebase does NOT commit the error the paper names.
-    // Preflop the ladder does not use equity at all — it bands the Chen
+    // Preflop the ladder does not use equity at all, it bands the Chen
     // holeScore, which rewards suited high cards and so puts KcQc four rungs
     // above 6c6d despite their identical EHS. The separation is real; the
     // reason is not distributional, and the direction is a claim EHS cannot
@@ -451,7 +451,7 @@ describe("is the 9-class taxonomy defensible under a distribution metric", () =>
     // Verified over six independent board samples (flop/turn/river x two
     // seeds): the answer is that the enum order is optimal or tied-optimal
     // every time, and the ONLY alternative that ever ties it swaps TopPair with
-    // Overpair — the one adjacency buckets.ts already declines to order,
+    // Overpair, the one adjacency buckets.ts already declines to order,
     // because the sign of the gap between them flips with the boards drawn.
     // Reaching that conclusion from EMD over distribution shapes, having
     // reached it before from mean equity, is two metrics agreeing about which

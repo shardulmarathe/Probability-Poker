@@ -1,8 +1,8 @@
 /**
  * What the bots remember about the person sitting at the table.
  *
- * `model/likelihood.ts` defines the estimate — P(action | bucket, street,
- * position, facing) over a six-level backoff — and `model/learn.ts` knows how to
+ * `model/likelihood.ts` defines the estimate. P(action | bucket, street,
+ * position, facing) over a six-level backoff, and `model/learn.ts` knows how to
  * accumulate one. Neither of them knows what a hand is. This file is the seam:
  * it turns a finished `TableHandReport` into the observations that model wants,
  * keeps the result across sessions, and hands the decider a `SeatModels` that
@@ -12,7 +12,7 @@
  * player. This module accumulates one, from one seat's actions, and
  * `seatModelsFor` applies it to that same seat and to nobody else. A bot
  * modelling another bot still gets the data-free prior, because nothing has been
- * observed about that bot — the observations here belong to the human.
+ * observed about that bot, the observations here belong to the human.
  *
  * OFF THE DECISION PATH. A decision only ever *reads* a model, at the same
  * O(levels) cost it has always paid; nothing here is called while a seat is
@@ -64,7 +64,7 @@ export const MEMORY_VERSION = 1;
  * The root of the backoff, pinned.
  *
  * `decider.OPPONENT_MODEL` is built on `"poker"`, and a model is only comparable
- * to — or mergeable with — one built on the same prior: the prior *is* what the
+ * to, or mergeable with, one built on the same prior: the prior *is* what the
  * counts are corrections to. A stored model on a different root is an estimate
  * of a different quantity, so it is discarded rather than adopted.
  */
@@ -78,8 +78,8 @@ const MEMORY_PRIOR: PriorId = "poker";
 export const MAX_TRACKED_HANDS = 400;
 
 /**
- * Ceiling on stored observations. Nothing legitimate approaches it — 400 hands
- * is a few thousand decisions — so a value past it means the row was edited, and
+ * Ceiling on stored observations. Nothing legitimate approaches it, 400 hands
+ * is a few thousand decisions, so a value past it means the row was edited, and
  * counts that large would pin every likelihood at its empirical frequency and
  * make the model unmovable by real play.
  */
@@ -92,7 +92,7 @@ export interface OpponentMemory {
   /**
    * Deal seeds already folded in, oldest first.
    *
-   * Recording is not idempotent — counts add — and the same report reaches this
+   * Recording is not idempotent, counts add, and the same report reaches this
    * module from more than one direction: the live hand-over effect, and the
    * archive being replayed on load. The deal seed is the closest thing a report
    * carries to an identity (`profile/store.dedupe` keys on it for the same
@@ -112,7 +112,7 @@ export function emptyMemory(): OpponentMemory {
 }
 
 export interface MemoryStats {
-  /** Hands folded in — what the UI should call "hands observed". */
+  /** Hands folded in, what the UI should call "hands observed". */
   hands: number;
   /** Decisions recorded, attributed or not. */
   observations: number;
@@ -138,7 +138,7 @@ export function memoryStats(memory: OpponentMemory): MemoryStats {
  * A flop bet has to be recorded against the flop, not against the river the hand
  * eventually ran out to. This is the same slicing `decider.streetBuckets` does
  * when it reads the model back, and it has to be, or a decision would be
- * *counted* under its river bucket and *looked up* under its flop bucket — a
+ * *counted* under its river bucket and *looked up* under its flop bucket, a
  * silent mismatch that no test of either side alone would catch. That is why
  * `BOARD_CARDS_AT` is imported rather than restated.
  *
@@ -177,13 +177,13 @@ const ACTION_SET: ReadonlySet<string> = new Set<string>(ACTIONS);
  * which `learn.observe` writes to the two bucket-free levels and no further.
  *
  * That is not a wasted hand. Those levels are the shrinkage target for every
- * bucket-conditioned one, so folds still move every bucket — together, which
+ * bucket-conditioned one, so folds still move every bucket, together, which
  * compresses the likelihood ratio rather than sharpening it. Learning that a
  * player raises constantly without ever seeing what they raise *with* should
  * make a raise mean less, and it does.
  *
  * The condition is `final !== null`, which the engine sets exactly when the seat
- * was still live at a showdown — not merely `wentToShowdown`, which is true of
+ * was still live at a showdown, not merely `wentToShowdown`, which is true of
  * the whole hand including the seats that folded out of it along the way.
  */
 function wasRevealed(report: TableHandReport, seat: number): boolean {
@@ -196,7 +196,7 @@ function wasRevealed(report: TableHandReport, seat: number): boolean {
  * Every decision `seat` took in one finished hand, in the form the model
  * records: action, hand class (or null), street, position, facing.
  *
- * Pure — it allocates and returns, and touches no model. That is deliberate:
+ * Pure, it allocates and returns, and touches no model. That is deliberate:
  * `observe` validates strictly and throws, and a half-written model would be
  * worse than a dropped hand, so the whole list is built before any of it is
  * committed.
@@ -247,7 +247,7 @@ export function handObservations(
  * Fold one finished hand into the memory, in place.
  *
  * In place because that is `learn.ts`'s convention for accumulation onto a model
- * you already own. Returns the number of decisions recorded — 0 for a hand
+ * you already own. Returns the number of decisions recorded, 0 for a hand
  * already seen, and also 0 for a hand the seat never acted in, which are the
  * same thing as far as the model is concerned.
  */
@@ -288,8 +288,8 @@ export function recordReports(
 /**
  * The learned model, pointed at the one seat it describes.
  *
- * `seat` is the human's. A null seat is observer mode — nobody at the table is
- * the person this memory is about — and every seat falls back to the prior.
+ * `seat` is the human's. A null seat is observer mode, nobody at the table is
+ * the person this memory is about, and every seat falls back to the prior.
  *
  * An empty memory is not merely *close* to the default, it is the default:
  * `betaMean(0, 0, m)` is exactly `m`, so a model with no cells cannot move a
@@ -315,7 +315,7 @@ export function normalizeMemory(raw: unknown): OpponentMemory {
 
   let model: LikelihoodModel;
   try {
-    // The only paranoid reader in the chain, by design — see `learn.ts`.
+    // The only paranoid reader in the chain, by design, see `learn.ts`.
     model = modelFromJSON(r.model);
   } catch {
     return emptyMemory();
@@ -368,7 +368,7 @@ export function saveMemory(memory: OpponentMemory): void {
       })
     );
   } catch {
-    /* private browsing / quota — the memory just will not persist */
+    /* private browsing / quota, the memory just will not persist */
   }
 }
 

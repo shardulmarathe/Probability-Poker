@@ -4,8 +4,8 @@
  * `components/ui/tokens.ts` is the design system and these values are copied
  * from it rather than imported, because this folder is a drop-in for a slot in
  * a shell owned elsewhere: it has to compile and look right on its own. The
- * palette itself is `index.css`'s `@theme` — deep felt, gold hairlines, ivory
- * ink — so nothing here is a new colour, only a local name for an existing one.
+ * palette itself is `index.css`'s `@theme`, deep felt, gold hairlines, ivory
+ * ink, so nothing here is a new colour, only a local name for an existing one.
  */
 
 export const TONE = {

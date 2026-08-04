@@ -10,7 +10,7 @@ describe("makeRng", () => {
   it("matches a reference xoshiro128** implementation exactly", () => {
     // Known-answer test. Every other assertion here is statistical, so a
     // swapped state index or a wrong rotate constant would still yield a
-    // perfectly good PRNG and pass silently — only pinned output catches it.
+    // perfectly good PRNG and pass silently, only pinned output catches it.
     // These five words were produced by an independent BigInt port of
     // xoshiro128** + SplitMix32 written from the algorithm spec.
     const rng = makeRng(12345);

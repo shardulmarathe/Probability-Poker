@@ -1,14 +1,14 @@
 /**
  * The N-handed hand lifecycle: deal, bet, advance, settle.
  *
- * Everything mechanical is delegated — turn order and round closure to
+ * Everything mechanical is delegated, turn order and round closure to
  * `state.ts`, legal action sets to `rules.ts`, side-pot layout to `pots.ts`,
  * blinds and odd chips to `position.ts`. What is left here is the sequencing:
  * which of those to call, in what order, and what a finished hand looks like.
  *
  * The engine never imports the bot or the equity code. A move arrives as an
  * already-chosen `TableAction`, and `playHandHeadless` asks for one through an
- * injected `SyncBotDecider` — so the entire lifecycle can be exercised with a
+ * injected `SyncBotDecider`, so the entire lifecycle can be exercised with a
  * two-line scripted decider and no Monte Carlo anywhere in sight.
  */
 
@@ -49,8 +49,8 @@ import {
  * A table is a `TableState` plus the handful of things the lifecycle needs that
  * one hand's state does not carry: the blinds, the rebuy level, and the records
  * accumulated while a hand plays. It *extends* `TableState` rather than
- * wrapping it, so every primitive — and every bot, which is handed a
- * `TableState` — keeps working on it unchanged.
+ * wrapping it, so every primitive, and every bot, which is handed a
+ * `TableState`, keeps working on it unchanged.
  */
 export interface Table extends TableState {
   config: TableConfig;
@@ -87,7 +87,7 @@ export interface TableSetup extends TableConfig {
 const CODES = Array.from({ length: 52 }, (_, i) => i);
 
 /**
- * Entropy enters here and nowhere else — everything downstream is a
+ * Entropy enters here and nowhere else, everything downstream is a
  * deterministic function of this seed. Tests and replays pass one in.
  */
 function randomSeed(): number {
@@ -200,7 +200,7 @@ export function startHand(table: Table): Table {
 }
 
 /**
- * Two cards each, one at a time starting left of the button — the real order,
+ * Two cards each, one at a time starting left of the button, the real order,
  * and no more expensive than slicing the deck in seat order.
  */
 function deal(table: Table): void {
@@ -395,7 +395,7 @@ function showdown(table: Table): void {
  * Split the pot into layers, pay the winners, and record the hand.
  *
  * Called for both endings: a showdown, and everyone folding to one seat. The
- * only difference is where the scores come from — with a single seat left there
+ * only difference is where the scores come from, with a single seat left there
  * is nothing to compare, and its cards stay face down.
  */
 export function resolve(table: Table): TableHandReport {
@@ -430,14 +430,14 @@ export function resolve(table: Table): TableHandReport {
     0
   );
   // The layers partition the pot exactly, so a mismatch means chips were
-  // created or destroyed — never worth shipping past the hand it happened in.
+  // created or destroyed, never worth shipping past the hand it happened in.
   if (paid !== table.pot) {
     throw new Error(`payout ${paid} does not match pot ${table.pot}`);
   }
 
   const seats: SeatResult[] = table.seats.map((s) => {
     // An uncalled bet coming back is not winnings, but it is a chip movement,
-    // so it belongs in `won` — that is what makes `net` the stack delta.
+    // so it belongs in `won`, that is what makes `net` the stack delta.
     const won = (winnings[s.id] ?? 0) + (refunds[s.id] ?? 0);
     return {
       seat: s.id,
@@ -494,7 +494,7 @@ export function resolve(table: Table): TableHandReport {
 }
 
 /**
- * Reload every busted seat. The alternative — seats going "out" — shrinks the
+ * Reload every busted seat. The alternative, seats going "out", shrinks the
  * table mid-session and breaks the positional layouts, so a cash-game rebuy is
  * both the simpler rule and the more realistic one. It is the only place chips
  * enter the table, which is why the amount is tracked.
@@ -527,7 +527,7 @@ function handResult(score: number): HandResult {
  * and a seat can only jam once), so a street holds at most `stack / bigBlind + n`
  * raises, and each of those puts the other `n - 1` seats back in exactly once.
  * Four streets of that is the ceiling. Exceeding it means the turn order is
- * cycling — as a hang that would be far harder to find than as a throw.
+ * cycling, as a hang that would be far harder to find than as a throw.
  */
 function actionBound(table: Table): number {
   const n = table.seats.length;

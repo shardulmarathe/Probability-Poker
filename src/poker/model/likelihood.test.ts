@@ -61,7 +61,7 @@ describe("axes", () => {
     expect(tierFromBucket((BUCKET_COUNT - 1) as HandBucket)).toBe("strong");
     // The split is buckets.ts's, not a second opinion about it: Overpair and up
     // is value, WeakPair..TopPair is marginal, Air..StrongDraw has no showdown
-    // value yet. Nine classes, imported — this module never re-declares them,
+    // value yet. Nine classes, imported, this module never re-declares them,
     // because a persisted cell key built from a bucket id only means anything
     // if there is exactly one taxonomy in the codebase.
     expect(BUCKET_COUNT).toBe(9);
@@ -160,7 +160,7 @@ describe("default prior", () => {
   // free money if it gets through more than `alpha = s / (P + s)` of the time,
   // so no unexploitable opponent folds more than alpha: half pot 1/3, three
   // quarters 3/7, pot 1/2. The shipped prior used to fold 46.4% of a range to a
-  // half-pot bet — 13 points past the bound — and every bet in the game is
+  // half-pot bet, 13 points past the bound, and every bet in the game is
   // priced against it, which is why the bots bet nearly everything.
 
   /** Renormalised over the moves that are legal facing a bet, as decider does. */
@@ -234,8 +234,8 @@ describe("default prior", () => {
 
   it("stays close to the bound rather than collapsing under it", () => {
     // A prior that folded nothing would satisfy MDF trivially and be useless:
-    // it would price every bluff at zero fold equity. The binding cell — the
-    // flop facing a raise, whose bucket mix is the most air-heavy — sits within
+    // it would price every bluff at zero fold equity. The binding cell, the
+    // flop facing a raise, whose bucket mix is the most air-heavy, sits within
     // a point of alpha, which is what makes this a cap rather than a rewrite.
     const binding = rangeFoldRate("flop", "facing-raise", 0.5);
     expect(binding).toBeGreaterThan(0.3);
@@ -245,7 +245,7 @@ describe("default prior", () => {
   it("leaves everything except the fold/call split exactly where it was", () => {
     // The cap moves weight from fold to call after the row is normalised, so
     // the aggressive and give-up weights it does not touch are bit-identical to
-    // the uncapped prior. That is the property that makes it the minimum edit —
+    // the uncapped prior. That is the property that makes it the minimum edit -
     // and it is why the raise pins above did not move when the level did.
     for (const street of STREETS) {
       for (const facing of FACINGS) {
@@ -282,7 +282,7 @@ describe("default prior", () => {
       expect(priorRow("flat", 3, "turn", "facing-bet")[a]).toBe(0.2);
     }
     // Five actions at 0.20 is a symmetric Dirichlet whose pseudo-counts sum to
-    // LEARNING_PRIOR_DENOM exactly — the shipped constants already are one.
+    // LEARNING_PRIOR_DENOM exactly, the shipped constants already are one.
     expect(sumRow(priorRow("flat", 3, "turn", "facing-bet"))).toBe(1);
   });
 

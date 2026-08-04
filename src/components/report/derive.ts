@@ -1,7 +1,7 @@
 /**
  * Everything the hand review reads out of a finished `TableHandReport`.
  *
- * The report is a factual record — cards, chips, actions, and the decisions the
+ * The report is a factual record, cards, chips, actions, and the decisions the
  * bots actually priced. It is deliberately *not* a set of conclusions, so every
  * derived quantity on the review pages is computed here, in one place, from
  * that record alone. Nothing here invents an input: if a number cannot be
@@ -10,7 +10,7 @@
  * Two things are *recomputed* rather than read back, and both are recomputed
  * from the record's own contents. `streetEquities` settles each head-to-head by
  * running the two seats' real hole cards out over the real board (see
- * `headsUpEquity`) — post-hand every card is face up, so the honest answer is
+ * `headsUpEquity`), post-hand every card is face up, so the honest answer is
  * available and no estimate needs to stand in for it. And:
  *
  * `rangeView` reconstructs what the sampler drew from: a weight for each of the
@@ -100,7 +100,7 @@ function streetIndex(street: Street): number {
  * One column of the review's street-by-street narrative.
  *
  * `actionsUpTo` is the count of actions folded into the read, so a street's
- * entry is the table's read *entering* that street — which is what makes the
+ * entry is the table's read *entering* that street, which is what makes the
  * sequence of charts a story about narrowing rather than a set of snapshots
  * taken at arbitrary moments.
  */
@@ -143,7 +143,7 @@ export function reviewStreets(report: TableHandReport): ReviewStreet[] {
 /**
  * The three-tier row every belief update on this table multiplies by.
  *
- * Declared once, applied below and quoted by `appliedLikelihood` — the Math tab
+ * Declared once, applied below and quoted by `appliedLikelihood`, the Math tab
  * must never reach for the constant on its own, or the worked example becomes a
  * second opinion about what the engine did rather than a readout of it.
  * `decider.readsFromActions` calls `updateBelief` with no override, so this is
@@ -235,7 +235,7 @@ interface NodeContext {
  * `facing` is not stored on an action, so it is reconstructed from the
  * aggression that preceded it on that street: preflop the big blind is already
  * an open, which is why the count starts at one there and at zero on every
- * later street. One walk, one rule — the range reweighting and the Math tab's
+ * later street. One walk, one rule, the range reweighting and the Math tab's
  * quoted likelihoods must agree about which node they are talking about.
  */
 function nodeContexts(actions: ActionRecord[]): NodeContext[] {
@@ -266,7 +266,7 @@ function nodeContexts(actions: ActionRecord[]): NodeContext[] {
  * The model `opponentRanges` runs backwards, rebuilt rather than imported.
  *
  * `decider.ts` keeps its `OPPONENT_MODEL` private, but it is a fresh
- * `createLikelihoodModel("poker")` that is never written to — so this is the
+ * `createLikelihoodModel("poker")` that is never written to, so this is the
  * same object, not an approximation of it. `derive.test.ts` pins the two
  * together by asserting this module's range equals `opponentRanges`' output.
  */
@@ -275,7 +275,7 @@ const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
 export interface RangeView {
   seat: number;
   /**
-   * The weight on each of the 1326 hole-card combinations — what the sampler
+   * The weight on each of the 1326 hole-card combinations, what the sampler
    * draws from, per combo rather than per tier. Sums to 1.
    */
   range: Range;
@@ -287,13 +287,13 @@ export interface RangeView {
   liveCombos: number;
   /**
    * The range's weight collapsed onto the three legacy tiers by
-   * `tierFromBucket` — board-relative, so on K-7-2 the 7-2 combos count as
+   * `tierFromBucket`, board-relative, so on K-7-2 the 7-2 combos count as
    * strong. Not a preflop judgement, and not the three-tier belief.
    */
   tierWeight: [number, number, number];
   /** Weight on each board-relative bucket, from `classifyAll`. */
   buckets: Float64Array;
-  /** Largest single-cell probability — the top of the heat scale. */
+  /** Largest single-cell probability, the top of the heat scale. */
   maxCell: number;
   /**
    * Smallest set of combos holding half the range's weight. The honest measure
@@ -309,7 +309,7 @@ export interface RangeView {
  * A local re-derivation for the same reason `readsAfter` is one: the review
  * needs the range as it stood *entering* a street, and `opponentRanges` only
  * knows how to fold in a whole hand from a live `TableState`. Every step is the
- * same step, in the same order, off the same model — the flat prior with the
+ * same step, in the same order, off the same model, the flat prior with the
  * dead cards removed, one `P(action | bucket, street, position, facing)` factor
  * per action the seat took, renormalised after each.
  *
@@ -364,14 +364,14 @@ function opponentRangeAt(
 }
 
 /**
- * The likelihoods the engine actually applied to one action — both of them.
+ * The likelihoods the engine actually applied to one action, both of them.
  *
  * The table runs two models over the same action and the Math tab has to be
  * able to say which is which:
  *
  *  - `tier` is the flat three-tier row `updateBelief` multiplies the belief by.
  *    It is `TIER_LIKELIHOODS` verbatim, because `readsAfter` and
- *    `decider.readsFromActions` both call `updateBelief` with no override — the
+ *    `decider.readsFromActions` both call `updateBelief` with no override, the
  *    N-handed table has no learned per-player table, and the report carries
  *    none. Read from the same constant this module applies rather than fetched
  *    independently, so the worked example cannot drift from the arithmetic.
@@ -474,7 +474,7 @@ export function rangeView(
     tierWeight[tier === "weak" ? 0 : tier === "medium" ? 1 : 2] += w;
   }
 
-  // Rank cells by weight *per combo* — the density the sampler actually sees —
+  // Rank cells by weight *per combo*, the density the sampler actually sees -
   // and walk down until half the mass is covered.
   const order: number[] = [];
   for (let i = 0; i < GRID_CELLS; i++) if (cellCombos[i] > 0) order.push(i);
@@ -557,7 +557,7 @@ export function blockerView(cards: number[]): BlockerView {
 // Equity, street by street
 // ---------------------------------------------------------------------------
 
-/** Last decision each seat made on each street — the most informed one. */
+/** Last decision each seat made on each street, the most informed one. */
 function lastDecisions(decisions: BotDecision[]): Map<string, BotDecision> {
   const out = new Map<string, BotDecision>();
   for (const d of decisions) out.set(`${d.street}:${d.seat}`, d);
@@ -570,7 +570,7 @@ function lastDecisions(decisions: BotDecision[]): Map<string, BotDecision> {
  * A report's board is 0, 3, 4 or 5 cards, so the only runout that cannot be
  * walked in full is the preflop one: C(48,5) = 1.7M boards against C(47,2) =
  * 1081 on the flop, 44 on the turn and 1 on the river. 20k sims puts the
- * standard error at p ≈ 0.13 around 0.24 points — under the display precision,
+ * standard error at p ≈ 0.13 around 0.24 points, under the display precision,
  * and paid once per matchup per review.
  */
 const H2H_SIMS = 20000;
@@ -587,7 +587,7 @@ export interface HeadToHeadEquity {
  *
  * This is the one question a hand review is uniquely able to answer honestly:
  * at the table nobody knew the opponent's cards, but the report has them, so
- * "what was my equity here" needs no read, no range and no belief — only the
+ * "what was my equity here" needs no read, no range and no belief, only the
  * evaluator and the cards the deck had left. Chops split, so the result is pot
  * share rather than win probability, on the same scale as `MultiwayEquity`.
  *
@@ -682,14 +682,14 @@ export interface HeadToHead {
   /**
    * Where the number came from.
    *
-   *  - `actual` — both seats' real hole cards, run out over the real board by
+   *  - `actual`, both seats' real hole cards, run out over the real board by
    *    `headsUpEquity`. The true answer, available because the hand is over.
-   *  - `estimate` — the reviewing seat's own recorded Monte Carlo against this
+   *  - `estimate`, the reviewing seat's own recorded Monte Carlo against this
    *    opponent, used only when the opponent's cards are missing from the
    *    record. Its own cards are real; the opponent's are drawn from the read.
    *
    * There is deliberately no third case. The opponent's `perOpponent[focus]`
-   * inverts to "the bot's read on you, versus the bot's hand" — the reviewing
+   * inverts to "the bot's read on you, versus the bot's hand", the reviewing
    * seat's real cards never enter it, so it returns the same number whether the
    * seat held aces or 7-2. It is not this seat's equity and is not shown as it.
    */
@@ -711,7 +711,7 @@ export interface StreetEquity {
 /**
  * Per-street equity from the reviewing seat's point of view.
  *
- * The decisions decide *who* appears — a matchup is on the panel iff one of the
+ * The decisions decide *who* appears, a matchup is on the panel iff one of the
  * two seats priced a decision naming the other, which is exactly "we were both
  * still in the pot here". They do not decide the *number*. A bot's recorded
  * `perOpponent[x]` is its own cards against a hand sampled from its read on x,
@@ -773,7 +773,7 @@ export function streetEquities(
       if (real) {
         vs.push({ seat, equity: real.equity, source: "actual", exact: real.exact });
       } else if (estimated.has(seat)) {
-        // No cards on record for the opponent — a hand that ended before this
+        // No cards on record for the opponent, a hand that ended before this
         // seat was ever dealt in should not happen, but the reviewing seat's
         // own estimate is at least *its* equity, so fall back rather than lie.
         vs.push({
@@ -822,7 +822,7 @@ export interface PotView {
  * Side pots with their eligibility explained.
  *
  * The layout is a stack of layers cut at each distinct all-in level, so a pot's
- * cap is the smallest investment among the seats eligible for it — the shortest
+ * cap is the smallest investment among the seats eligible for it, the shortest
  * stack in it is exactly what limits what everyone else can win from it. Every
  * seat that reached the cap paid into the layer; only the unfolded ones can
  * take it down.

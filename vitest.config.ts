@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// Pure-logic tests only — no DOM, no React. Kept deliberately separate from
+// Pure-logic tests only, no DOM, no React. Kept deliberately separate from
 // vite.config.ts so the app build never pulls in test configuration.
 export default defineConfig({
   test: {

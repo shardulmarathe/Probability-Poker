@@ -2,8 +2,8 @@
  * Two-user authorization test: user A must never read user B's hands.
  *
  * Runs against DATABASE_URL (Neon). Seeds two neon_auth users, writes a hand
- * for each, then asserts the same SQL the handlers use — scoped by session
- * user_id — returns 404-equivalent empty for cross-user access.
+ * for each, then asserts the same SQL the handlers use, scoped by session
+ * user_id, returns 404-equivalent empty for cross-user access.
  *
  *   DATABASE_URL=... npm run test:api
  */
@@ -19,8 +19,8 @@ describeIfDb("hand access scoping (two users)", () => {
   /*
    * Connected lazily, not at collection time.
    *
-   * `describe.skip` still *evaluates* its callback — it only marks the tests
-   * inside as skipped — so a top-level `neon(DATABASE_URL!)` ran even when the
+   * `describe.skip` still *evaluates* its callback, it only marks the tests
+   * inside as skipped, so a top-level `neon(DATABASE_URL!)` ran even when the
    * suite was meant to be skipped, and threw "No database connection string was
    * provided". `npm run test:api` therefore failed rather than skipped for
    * anyone without the env var, which is a bad state for the one test standing
@@ -93,7 +93,7 @@ describeIfDb("hand access scoping (two users)", () => {
   });
 
   it("GET hand/:id scoped by session user_id returns 404 for the other user", async () => {
-    // Same predicate as api/hand/[id].ts — user_id from session, never body.
+    // Same predicate as api/hand/[id].ts, user_id from session, never body.
     const asA = await sql`
       select id from hands
       where id = ${handBId}::uuid and user_id = ${userA}::uuid

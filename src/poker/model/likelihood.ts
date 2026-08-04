@@ -1,5 +1,5 @@
 /**
- * Conditioned action likelihoods — P(action | bucket, street, position, facing).
+ * Conditioned action likelihoods. P(action | bucket, street, position, facing).
  *
  * `data/constants.ts` ships a flat 3x5 table: one P(action | tier) row that is
  * the same preflop and on the river, in the big blind and on the button,
@@ -10,7 +10,7 @@
  * This module conditions on all four axes and then solves the problem that
  * conditioning creates. 9 buckets x 4 streets x 6 positions x 3 facings = 648
  * cells; a 200-hand session produces a few hundred decisions. Most cells are
- * empty forever, so the backoff scheme below is the whole design — see
+ * empty forever, so the backoff scheme below is the whole design, see
  * "The backoff" further down.
  *
  * Nothing here mutates. `learn.ts` owns accumulation, serialisation and merging;
@@ -46,7 +46,7 @@ import { BUCKET_COUNT, tierFromBucket, type HandBucket } from "./buckets";
  *
  * That is not tidiness. Cell keys are built from bucket ids (`contextKeys`) and
  * the model is serialised to a database. A model written under one taxonomy and
- * read back under another would not error — every stored cell would simply be
+ * read back under another would not error, every stored cell would simply be
  * reinterpreted as a different set of hand classes, silently and permanently.
  * One definition, imported, is the only version of this that is safe.
  *
@@ -75,7 +75,7 @@ export type Facing = "unopened" | "facing-bet" | "facing-raise";
  * Value lists for every axis.
  *
  * Built from an exhaustive `Record<Union, true>` rather than written as a bare
- * array so the compiler fails if a union ever gains a member — a silently short
+ * array so the compiler fails if a union ever gains a member, a silently short
  * list here would produce a model that ignores a whole street.
  */
 const STREET_KEYS: Record<LearnStreet, true> = {
@@ -126,7 +126,7 @@ export interface LikelihoodContext {
   facing: Facing;
 }
 
-/** Context with the hand class removed — what a fold leaves you with. */
+/** Context with the hand class removed, what a fold leaves you with. */
 export type UnattributedContext = Omit<LikelihoodContext, "bucket">;
 
 // ---------------------------------------------------------------------------
@@ -142,12 +142,12 @@ export interface CellCounts {
 /**
  * Which data-free table sits at the root of the backoff.
  *
- * - `poker`  — the generated prior below. The default for a real player.
- * - `flat`   — every action at exactly `LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM`
+ * - `poker`, the generated prior below. The default for a real player.
+ * - `flat`, every action at exactly `LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM`
  *              = 0.20. This is the writeup's "no data" value made explicit, and
  *              it is what makes the Beta claim in TECHNICAL_WRITEUP.md §7 still
  *              literally true of this module.
- * - `legacy` — the flat 3x5 `ACTION_LIKELIHOODS` broadcast over buckets. Kept so
+ * - `legacy`, the flat 3x5 `ACTION_LIKELIHOODS` broadcast over buckets. Kept so
  *              the old model is demonstrably a *special case* of this one rather
  *              than something that was thrown away.
  */
@@ -185,7 +185,7 @@ export function createLikelihoodModel(prior: PriorId = "poker"): LikelihoodModel
 }
 
 // ---------------------------------------------------------------------------
-// Beta / Dirichlet smoothing — unchanged from `bayesian.learnedLikelihood`
+// Beta / Dirichlet smoothing, unchanged from `bayesian.learnedLikelihood`
 // ---------------------------------------------------------------------------
 
 /**
@@ -194,8 +194,8 @@ export function createLikelihoodModel(prior: PriorId = "poker"): LikelihoodModel
  * This is `LEARNING_PRIOR_DENOM` and it stays that way. With
  * `LEARNING_PRIOR_ALPHA = 2` for each of the 5 actions, the pseudo-counts sum to
  * 5 x 2 = 10 = delta exactly, so the constants the writeup already ships are a
- * symmetric Dirichlet(2,2,2,2,2) — the multi-action generalisation of its
- * Beta(2,8) — with no re-derivation needed.
+ * symmetric Dirichlet(2,2,2,2,2), the multi-action generalisation of its
+ * Beta(2,8), with no re-derivation needed.
  */
 export const PRIOR_STRENGTH = LEARNING_PRIOR_DENOM;
 
@@ -204,7 +204,7 @@ export const PRIOR_STRENGTH = LEARNING_PRIOR_DENOM;
  *
  * A decision recorded without a hand class could have come from any of the
  * `BUCKET_COUNT` buckets, so as evidence about *one specific* bucket it is worth
- * roughly `1 / BUCKET_COUNT` of a decision that was attributed — the value of a
+ * roughly `1 / BUCKET_COUNT` of a decision that was attributed, the value of a
  * uniform soft assignment. Weighting it that way is the same as making its
  * prior strength `BUCKET_COUNT` times larger, which is all this constant is.
  *
@@ -226,7 +226,7 @@ export const FLAT_PRIOR_MEAN = LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM;
  *
  * Substituting `priorMean = LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM` and the
  * default strength gives `(count + LEARNING_PRIOR_ALPHA) / (total +
- * LEARNING_PRIOR_DENOM)` — exactly `bayesian.learnedLikelihood`, digit for digit
+ * LEARNING_PRIOR_DENOM)`, exactly `bayesian.learnedLikelihood`, digit for digit
  * (10 * 0.2 is exactly 2.0 in IEEE-754, so this is not an approximation). The
  * only generalisation is that the prior mean is now supplied by a coarser
  * estimate instead of being pinned at 0.20, which is what turns one Beta update
@@ -245,7 +245,7 @@ export function betaMean(
 }
 
 // ---------------------------------------------------------------------------
-// The default prior — sane poker, generated rather than typed out
+// The default prior, sane poker, generated rather than typed out
 // ---------------------------------------------------------------------------
 
 /**
@@ -281,7 +281,7 @@ const ROLE: Record<PlayerActionType, "aggro" | "mid" | "give"> = {
  *
  * These are the *shape* of the prior. Its fold LEVEL is set separately, one line
  * down, because the level is bounded by something these numbers know nothing
- * about — see `MDF_FOLD_SCALE`.
+ * about, see `MDF_FOLD_SCALE`.
  */
 const BASE_MIX: Record<Facing, ActionWeights> = {
   unopened: { check: 0.55, bet: 0.42, call: 0.01, raise: 0.01, fold: 0.01 },
@@ -290,7 +290,7 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
 };
 
 /**
- * MINIMUM DEFENCE FREQUENCY — the ceiling on how much this prior may fold.
+ * MINIMUM DEFENCE FREQUENCY, the ceiling on how much this prior may fold.
  *
  * Against a bet of `s` into a pot of `P`, a bluff risking `s` to win `P` breaks
  * even when it gets through with probability
@@ -298,7 +298,7 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  *     alpha = s / (P + s)
  *
  * so an opponent folding more than `alpha` can be beaten by betting *any two
- * cards*, and an unexploitable one folds at most `alpha` — equivalently it
+ * cards*, and an unexploitable one folds at most `alpha`, equivalently it
  * defends the MDF `1 - alpha`. Half pot alpha = 1/3, three quarters 3/7, pot 1/2.
  *
  * The uncapped rows above folded 46.4% of a range to a half-pot bet: 13 points
@@ -308,8 +308,8 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  * correctly collected it by betting close to everything. This constant removes
  * the subsidy.
  *
- * WHAT IS ANCHORED. The bound is on the *range-weighted* fold frequency — the
- * share of the hands an opponent actually holds that go in the muck — which is
+ * WHAT IS ANCHORED. The bound is on the *range-weighted* fold frequency, the
+ * share of the hands an opponent actually holds that go in the muck, which is
  * what `foldEquityEv` integrates. Not the flat mean over the nine buckets: a
  * random range is air-heavy and air is what folds, so the range-weighted rate
  * runs 6-12 points above the per-bucket mean, and pinning the smaller number
@@ -317,8 +317,8 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  *
  * WHY ONE SIZE IS ENOUGH. `decider.foldAtSize` shifts the log-odds of a fold by
  * `log(s / REFERENCE_FRACTION)` at unit sensitivity, i.e. odds(s) = odds(0.5) x
- * 2s. Alpha in odds form is exactly `s / P = s`. So odds(0.5) = 1/2 — that is,
- * p = 1/3 — gives odds(s) = s at every size: the MDF frontier is a fixed point
+ * 2s. Alpha in odds form is exactly `s / P = s`. So odds(0.5) = 1/2, that is,
+ * p = 1/3, gives odds(s) = s at every size: the MDF frontier is a fixed point
  * of the sizing law, and anchoring the reference size holds the whole curve.
  * Measured at 0.50 / 0.75 / 1.00 pot the rows below come out at 32.4 / 41.3 /
  * 47.9% facing a bet and 32.6 / 41.7 / 48.5% facing a raise, against alphas of
@@ -327,7 +327,7 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  * WHY A SCALAR. MDF constrains the total share of a range that folds, not how
  * that share is spread over hand classes. The prior's spread was never the
  * problem; its level was. So the fold weight is scaled by a constant and the
- * surplus handed to `call` — after normalisation, so the row still sums to one
+ * surplus handed to `call`, after normalisation, so the row still sums to one
  * and `bet`, `raise` and `check` keep the values they had before this constant
  * existed. Strength ordering, street sharpening and the raise weights are all
  * untouched, which is why this is the smallest edit that makes the claim true.
@@ -338,7 +338,7 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  * because it starts higher, and the flop binds among streets because its bucket
  * mix is the most air-heavy; facing a bet then lands comfortably under. Scaling
  * both by the same number is also what keeps the facing comparison exactly as it
- * was — a three-bet still folds out more than a bet does from every single
+ * was, a three-bet still folds out more than a bet does from every single
  * bucket, because a shared positive factor cannot reorder anything. Two
  * separately-solved factors did invert that at the air bucket.
  */
@@ -373,7 +373,7 @@ const AGGRO_LIFT = 1.0;
 /** How much a strong hand suppresses checking and folding. */
 const GIVEUP_DROP = 1.0;
 /**
- * Calling is the *middle* action, not a weak one — it peaks at medium strength
+ * Calling is the *middle* action, not a weak one, it peaks at medium strength
  * and falls off at both ends (nothing to call with, or too good to just call).
  * A quadratic in the strength tilt is the cheapest shape with that property.
  */
@@ -486,7 +486,7 @@ export function priorRow(
     // Deliberately unnormalised: the legacy table is five independent
     // per-hand Bernoullis, not a categorical, and its rows sum to ~1.75. That
     // is harmless here because Bayes normalises over *hypotheses*, not over
-    // actions — scaling a likelihood column leaves the posterior untouched.
+    // actions, scaling a likelihood column leaves the posterior untouched.
     const tier = tierFromBucket(b as HandBucket);
     row = {} as ActionWeights;
     for (const a of ACTIONS) row[a] = ACTION_LIKELIHOODS[a][tier];
@@ -533,12 +533,12 @@ function clampBucket(bucket: Bucket): Bucket {
  * of sparsity (6 values, and most of what position does is already visible
  * through `facing`). Bucket is introduced late but never dropped from levels
  * 2-5, because it is the axis being estimated. Levels 0 and 1 carry no bucket at
- * all, which is exactly what makes them writable from folds — see `learn.ts`.
+ * all, which is exactly what makes them writable from folds, see `learn.ts`.
  *
  * NO DOUBLE COUNTING. The naive version of this chain feeds the same
  * observation into all six levels, so 30 hands at one context move the estimate
- * as if there had been 180. Instead each level uses its *exclusive* evidence —
- * the observations it saw that the finer levels did not — via inclusion and
+ * as if there had been 180. Instead each level uses its *exclusive* evidence -
+ * the observations it saw that the finer levels did not, via inclusion and
  * exclusion over the six cells (`LEVEL_COEFFS`). The coefficient columns sum to
  * (1,0,0,0,0,0), so summing the exclusive totals across levels returns exactly
  * the global total: every observation is counted once, at the most specific
@@ -565,7 +565,7 @@ export const LEVEL_NAMES = [
 
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
-/** Number of leading levels that carry no bucket — the ones folds can write. */
+/** Number of leading levels that carry no bucket, the ones folds can write. */
 export const BUCKET_FREE_LEVELS = 2;
 
 /** Prior strength used at each level; the pooled ones are trusted more slowly. */
@@ -683,7 +683,7 @@ export function likelihoodOf(
 export interface BackoffStep {
   level: LevelName;
   key: string;
-  /** Exclusive decisions this level contributed — see the backoff note. */
+  /** Exclusive decisions this level contributed, see the backoff note. */
   observations: number;
   /** Of those, ones that took the queried action. */
   matching: number;
@@ -768,7 +768,7 @@ export function collapseToTiers(
 }
 
 /**
- * The whole 5x3 table for one context — a drop-in replacement for
+ * The whole 5x3 table for one context, a drop-in replacement for
  * `bayesian.learnedActionLikelihoods`, so `updateBelief` can consume this model
  * with no change at the call site. Passing a fresh `legacy`-prior model through
  * here reproduces `ACTION_LIKELIHOODS` exactly, which is the concrete sense in

@@ -1,6 +1,6 @@
 /**
- * The human's controls: fold / check / call, and — the part No-Limit actually
- * turns on — choosing how much.
+ * The human's controls: fold / check / call, and, the part No-Limit actually
+ * turns on, choosing how much.
  *
  * Sizing is offered twice over, because the two ways people think about it are
  * genuinely different. The preset rungs come straight from `sizingLadder`, so
@@ -55,7 +55,7 @@ export interface ActionBarProps {
   onAct: (action: TableAction) => void;
 }
 
-/** Chips owed before any raise — the part of a sizing that is not the raise. */
+/** Chips owed before any raise, the part of a sizing that is not the raise. */
 function toCallOf(actions: TableAction[]): number {
   return actions.find((a) => a.type === "call")?.cost ?? 0;
 }
@@ -78,7 +78,7 @@ export function ActionBar({
   );
   const [sheet, setSheet] = useState(false);
 
-  // A new decision point invalidates the chosen size — the legal range has
+  // A new decision point invalidates the chosen size, the legal range has
   // moved and the old number may not even be legal any more.
   useEffect(() => {
     setSheet(false);

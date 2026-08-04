@@ -1,10 +1,10 @@
 /**
- * Tab 4 — the derivations, worked on this hand's own numbers.
+ * Tab 4, the derivations, worked on this hand's own numbers.
  *
  * Every figure quoted here is pulled out of the report rather than invented for
  * the example, so the arithmetic can be checked against the tables on the other
- * tabs. Where the hand did not produce a number — nobody was ever priced, no
- * action moved a belief — the section says so instead of falling back to a
+ * tabs. Where the hand did not produce a number, nobody was ever priced, no
+ * action moved a belief, the section says so instead of falling back to a
  * textbook illustration that never happened.
  */
 
@@ -106,7 +106,7 @@ function num(v: number, digits = 3): string {
  * "Callin' Carla's", or "your" when the seat under review is the reader's.
  *
  * `seatName` returns the table's own label for a seat, and for the human that
- * label is "You" — which reads correctly as a subject and not at all as a
+ * label is "You", which reads correctly as a subject and not at all as a
  * possessive. One helper rather than a second name-for-prose function, so a new
  * sentence cannot pick the wrong one.
  */
@@ -123,7 +123,7 @@ function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** The decision with the most samples behind it — the best worked example. */
+/** The decision with the most samples behind it, the best worked example. */
 function richest(decisions: BotDecision[]): BotDecision | null {
   let best: BotDecision | null = null;
   for (const d of decisions) {
@@ -136,7 +136,7 @@ function richest(decisions: BotDecision[]): BotDecision | null {
 /**
  * The decision whose fold-equity breakdown makes the best worked example: the
  * reviewed seat's own if it has one, otherwise the one that priced the most
- * sizes. Returns null when nobody ever bet — checks, calls and folds carry no
+ * sizes. Returns null when nobody ever bet, checks, calls and folds carry no
  * fold-equity term, so there is nothing to show rather than something to
  * approximate.
  */
@@ -155,9 +155,9 @@ function bluffing(decisions: BotDecision[], focus: number): BotDecision | null {
 /**
  * A hand read back from the archive rather than played this session.
  *
- * `profile/store.ts` strips `decisions` before writing — the Monte Carlo audit
+ * `profile/store.ts` strips `decisions` before writing, the Monte Carlo audit
  * trail is a build-specific object and a stored one is either absent or no
- * longer understood — so a restored hand has a full action record and no
+ * longer understood, so a restored hand has a full action record and no
  * pricing. Every panel below that reads `BotDecision` has to say *that* rather
  * than "nobody was ever priced", which would be a claim about the hand instead
  * of a fact about the storage.
@@ -190,7 +190,7 @@ export function MathTab({ report, focus, seatName }: Props) {
   // The whole archive, not just this hand: a likelihood model estimated from one
   // hand's four decisions would be a demonstration of the formula rather than a
   // read on anybody. Assembled exactly the way `HandReview` assembles its own
-  // list — stored hands, then the live ones on top — so the panel counts the
+  // list, stored hands, then the live ones on top, so the panel counts the
   // same hands the picker at the top of the page offers, and survives a reload.
   //
   // Restricted to tables of this size, because a seat index is all the record
@@ -207,7 +207,7 @@ export function MathTab({ report, focus, seatName }: Props) {
     );
   }, [history, lastReport, report.seatCount]);
 
-  // First action that actually moved a read — the Bayes example. The
+  // First action that actually moved a read, the Bayes example. The
   // likelihoods come from `appliedLikelihood` rather than from the constants
   // module: the worked example has to be a readout of what the engine did to
   // this hand, not a second opinion about it.
@@ -1068,7 +1068,7 @@ function CategoryShape({
 // The information ladder
 // ===========================================================================
 
-/** C(n, k), small n only — used for runout counts. */
+/** C(n, k), small n only, used for runout counts. */
 function combinations(n: number, k: number): number {
   if (k < 0 || k > n) return 0;
   let out = 1;
@@ -2323,7 +2323,7 @@ function moveLabel(label: string): string {
 /**
  * Solve the river subgame off the first paint.
  *
- * A solve is a few dozen milliseconds of tight loops — fast enough to be worth
+ * A solve is a few dozen milliseconds of tight loops, fast enough to be worth
  * doing, far too slow to do during a render that also has two charts in it. The
  * same zero-timeout the EV-loss panel uses: the section paints, then the work
  * happens, then the numbers arrive.

@@ -66,7 +66,7 @@ function base(
 
 /** An Rng that always fires the bluff coin, without touching Math.random. */
 const ALWAYS: Rng = { next: () => 0, int: () => 0, shuffle: (a) => a.slice() };
-/** An Rng that explodes if drawn from — proves a profile consumes no entropy. */
+/** An Rng that explodes if drawn from, proves a profile consumes no entropy. */
 const FORBIDDEN: Rng = {
   next: () => {
     throw new Error("drew from the rng");
@@ -185,7 +185,7 @@ describe("profile coherence", () => {
   it("rock is tight and passive", () => {
     tight("rock");
     passive("rock");
-    // Wider than a nit but more reluctant to bet — that is the whole contrast.
+    // Wider than a nit but more reluctant to bet, that is the whole contrast.
     expect(BOT_PROFILES.rock.entryThreshold).toBeLessThan(
       BOT_PROFILES.nit.entryThreshold
     );
@@ -245,7 +245,7 @@ describe("profile coherence", () => {
     // describe any real player. Note this is deliberately *not* a claim that
     // bluffRate is monotone in aggression across the whole roster: it is not,
     // and cannot be, because the professor sits at aggression 1 with bluffRate
-    // 0 — a pure maximiser bluffs when the EV says to and never as a style.
+    // 0, a pure maximiser bluffs when the EV says to and never as a style.
     const passiveIds = BOT_ARCHETYPES.filter((id) => BOT_PROFILES[id].aggression < 1);
     const aggroIds = BOT_ARCHETYPES.filter((id) => BOT_PROFILES[id].aggression > 1);
     expect(passiveIds.sort()).toEqual(["nit", "rock", "station"]);
@@ -449,7 +449,7 @@ describe("bluffing", () => {
 
   it("fires at roughly the declared rate", () => {
     // sd at n=20000 is at most 0.0035, so 0.02 is more than 5 standard errors
-    // for every profile — a tolerance that catches a wrong constant, not noise.
+    // for every profile, a tolerance that catches a wrong constant, not noise.
     for (const id of BOT_ARCHETYPES) {
       const declared = BOT_PROFILES[id].bluffRate;
       expect(Math.abs(bluffFrequency(id) - declared)).toBeLessThan(0.02);
@@ -562,7 +562,7 @@ describe("bluffing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Passive discipline — the other half of the bluff coin
+// Passive discipline, the other half of the bluff coin
 // ---------------------------------------------------------------------------
 
 describe("passive discipline", () => {
@@ -595,7 +595,7 @@ describe("passive discipline", () => {
   };
 
   it("shows the multiplier genuinely cannot express this", () => {
-    // Not a claim about the constants — a claim about the shape of the rule.
+    // Not a claim about the constants, a claim about the shape of the rule.
     // Every aggression the roster could carry, and every one it could not.
     for (const aggression of [0.01, 0.1, 0.55, 0.7, 0.8, 0.999]) {
       expect(tiltEv(12, aggression)).toBeGreaterThan(-5);
@@ -636,7 +636,7 @@ describe("passive discipline", () => {
 
   it("declines to raise but never converts a raise into a fold", () => {
     // Width is `entryThreshold`'s job and nothing else's. Folding here would
-    // make `aggression` a second, hidden entry gate and would move VPIP —
+    // make `aggression` a second, hidden entry gate and would move VPIP -
     // measured, from 53% to ~19% for the station, against a declared 67%.
     const choice = split("station", {
       // Calling is worse than folding, and the station calls anyway.
@@ -677,7 +677,7 @@ describe("passive discipline", () => {
 
   it("reads the same coin as the bluff, drawing no extra entropy", () => {
     // A passive profile below the floor consumes exactly one draw, whichever
-    // way the coin lands — so a replay cannot desynchronise on this rule.
+    // way the coin lands, so a replay cannot desynchronise on this rule.
     const draws = (id: BuiltArchetype): number => {
       let n = 0;
       const counting: Rng = {
@@ -766,7 +766,7 @@ describe("preflop entry gate", () => {
     // Same spot, same price, one bit different: seats behind still owe chips,
     // so the pot the EV was measured against is a forecast rather than a
     // quotation. `ev.callEv` raises exactly these numbers, which is why the
-    // override has to stop reading them — see `clearlyProfitable`.
+    // override has to stop reading them, see `clearlyProfitable`.
     const bar = ENTRY_OVERRIDE_EDGE * 10;
     const spot = (closesAction: boolean) =>
       chooseAction(
@@ -852,7 +852,7 @@ describe("preflop entry gate", () => {
   });
 
   it("does not apply when checking is free", () => {
-    // No fold action means nobody has bet — the big blind's option is not a
+    // No fold action means nobody has bet, the big blind's option is not a
     // decision to enter, so even the nit takes its free flop.
     const choice = chooseAction(
       base("nit", {

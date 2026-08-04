@@ -32,7 +32,7 @@ export default function NotFound() {
         />
 
         {/*
-         * One button. Three of equal weight is the catalog's CTA duplication —
+         * One button. Three of equal weight is the catalog's CTA duplication -
          * they all looked like the thing to do, so none of them did.
          */}
         <div className="mt-8">

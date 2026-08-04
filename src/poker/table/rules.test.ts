@@ -80,7 +80,7 @@ describe("legalActions", () => {
     t.street = "flop";
     t.currentBet = 50;
     t.lastRaiseSize = 50;
-    // Minimum re-raise is to 100 — up by at least the 50 that came before.
+    // Minimum re-raise is to 100, up by at least the 50 that came before.
     expect(find(t, 0, "raise")?.amount).toBe(100);
   });
 

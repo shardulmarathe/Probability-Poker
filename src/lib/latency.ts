@@ -7,7 +7,7 @@
  *   - compute  : the whole decision, kickoff to resolved (clone + MC + EV, and
  *                the worker round trip, which is why it is wall-clock not CPU)
  *   - render   : React commit duration for the resulting update (from <Profiler>)
- *   - total    : compute + render — the work on the decision→render path
+ *   - total    : compute + render, the work on the decision→render path
  *
  * `total` is a sum, not a stopwatch reading, and deliberately so: the store
  * holds the decision behind a ~1.2–1.8s "thinking" beat, and a wall-clock total

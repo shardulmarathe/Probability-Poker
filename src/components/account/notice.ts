@@ -13,7 +13,7 @@
  *
  * The fix is not to soften it into something vague enough to always be true.
  * `storageNotice` returns the sentence that is *exactly* true right now, which
- * means the signed-out wording is the original promise, unweakened — because
+ * means the signed-out wording is the original promise, unweakened, because
  * signed out, it really is the whole truth.
  *
  * This is a plain function of the sync state so the copy lives in one place and

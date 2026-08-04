@@ -10,7 +10,7 @@ import { mix32, seedRecoveryHolds, sessionSeedForHand, unmix32 } from "./seed";
 import { entryStacks, inferBlinds, replayBlocker } from "./table";
 
 // ---------------------------------------------------------------------------
-// Seed recovery — the mechanism the whole replay rests on
+// Seed recovery, the mechanism the whole replay rests on
 // ---------------------------------------------------------------------------
 
 describe("mix32", () => {
@@ -62,7 +62,7 @@ describe("sessionSeedForHand", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fidelity — reconstructing a hand must reproduce it exactly
+// Fidelity, reconstructing a hand must reproduce it exactly
 // ---------------------------------------------------------------------------
 
 const BLIND_LEVELS = [
@@ -81,7 +81,7 @@ interface Fixture {
 
 /**
  * Every table size across a spread of blind levels and stack depths, several
- * sessions each so stacks drift between hands — a report's entry stacks are
+ * sessions each so stacks drift between hands, a report's entry stacks are
  * whatever the last hand left behind, never the table's starting stack.
  */
 function allFixtureHands(): Fixture[] {
@@ -277,7 +277,7 @@ describe("inferBlinds", () => {
           seatCount,
           hands: 4,
           seed: 31,
-          // Deep enough that no blind is ever posted short — a crippled blind
+          // Deep enough that no blind is ever posted short, a crippled blind
           // breaks the premise the inference rests on, which is what the
           // fallback and the `sane` guard are for.
           startingStack: 100 * config.bigBlind,

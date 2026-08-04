@@ -17,11 +17,11 @@
  *  - Opponents share one deck, so the field is drawn as one object: propose
  *    every seat's hole cards from that seat's own range, and if any two seats
  *    want the same card throw the whole tuple away and start over. The law that
- *    survives is `Π p(hᵢ)` conditioned on the hands being disjoint — symmetric
+ *    survives is `Π p(hᵢ)` conditioned on the hands being disjoint, symmetric
  *    under relabelling the seats, which is the point. See `MAX_TUPLE_ATTEMPTS`.
  *
- * WHAT A SEAT'S HAND IS DRAWN FROM. A `Range` — one weight for each of the 1326
- * hole-card combinations — and not the three-tier `BeliefDistribution` this
+ * WHAT A SEAT'S HAND IS DRAWN FROM. A `Range`, one weight for each of the 1326
+ * hole-card combinations, and not the three-tier `BeliefDistribution` this
  * module sampled from originally. That version bucketed the pool with
  * `bayesian.tierOf`, a *preflop* Chen score, and drew uniformly inside the
  * chosen tier. On K-7-2-9-4 that calls 7-2 weak when it is two pair, and on
@@ -29,19 +29,19 @@
  * number the bot acted on was built on that classifier. A range fixes it at the
  * source: `model/buckets.ts` classifies each combo against the actual board,
  * `model/likelihood.ts` reweights it by what the seat has done, and
- * `model/range.ts`'s `removeCards` zeroes what the hero can see — so card
+ * `model/range.ts`'s `removeCards` zeroes what the hero can see, so card
  * removal is arithmetic rather than a special case, and a blocker moves the
  * equity rather than only the chart.
  *
- * `perOpponent` — the hero's head-to-head equity against each seat alone —
+ * `perOpponent`, the hero's head-to-head equity against each seat alone -
  * falls out of the same pass: every comparison it needs was already made to
  * find the best opponent. It costs nothing and never needs a second run.
  *
  * Performance notes mirror the heads-up kernel: 0..51 card codes throughout,
  * `Uint8Array` hand buffers reused across sims, no allocation in the loop, and
  * the hero scored once when the board is already complete. Redrawing the whole
- * field costs what it costs — measured against per-seat rejection it is a wash
- * up to two opponents, 1.1x at four and 1.6x at six with ordinary reads — and
+ * field costs what it costs, measured against per-seat rejection it is a wash
+ * up to two opponents, 1.1x at four and 1.6x at six with ordinary reads, and
  * the price is paid in the tuple loop, never in the scoring.
  */
 
@@ -98,7 +98,7 @@ const UNIFORM_BELIEF: BeliefDistribution = {
 const MAX_TUPLE_ATTEMPTS = 256;
 
 /**
- * Raw outcome counts from a run — the sufficient statistics for everything
+ * Raw outcome counts from a run, the sufficient statistics for everything
  * `MultiwayEquity` reports, handed back unnormalized because a shard is only
  * meaningful once summed with its siblings.
  *
@@ -114,7 +114,7 @@ export interface MultiwayCounts {
   /**
    * Chops by size of the tied set: `tieBySize[k]` counts sims the hero split
    * the pot k ways, so k ≥ 2 and slots 0 and 1 stay empty. Storing the
-   * histogram rather than a running Σ1/k keeps the shard integral — a float
+   * histogram rather than a running Σ1/k keeps the shard integral, a float
    * accumulator would make the merge depend on shard arithmetic order.
    */
   tieBySize: number[];
@@ -147,7 +147,7 @@ export function remainingPool(heroHole: number[], board: number[]): Uint8Array {
  *  - Each tier's *total* weight is set to `belief[tier]` and split evenly
  *    inside it, rather than writing `belief[tier]` into every combo. The weak
  *    tier holds several times the combos the strong one does, so the naive form
- *    turns a 0.40 / 0.35 / 0.25 read into an effective 0.70 / 0.24 / 0.06 — an
+ *    turns a 0.40 / 0.35 / 0.25 read into an effective 0.70 / 0.24 / 0.06, an
  *    opponent four times less likely to hold a real hand than the table
  *    believes.
  *
@@ -186,7 +186,7 @@ export function beliefRange(
 /**
  * One range per opponent, in request order.
  *
- * A seat with an explicit range gets it (copied — the kernel masks in place and
+ * A seat with an explicit range gets it (copied, the kernel masks in place and
  * a caller's range outlives the call). A seat with only a belief gets that
  * belief spread by board-relative bucket. A seat with neither gets a flat prior
  * rather than being dropped, since an unknown opponent still takes cards out of
@@ -214,8 +214,8 @@ export function rangesFor(req: EquityRequest): Range[] {
  * The pool is the authority, not the range: a caller that forgets to remove a
  * card would otherwise have a seat draw a card the hero is holding, and the
  * kernel's availability permutation has no slot to take it from. Masking here
- * costs one pass over 1326 weights per seat per call — nothing next to the run
- * it feeds — and makes the kernel correct on its own inputs rather than on a
+ * costs one pass over 1326 weights per seat per call, nothing next to the run
+ * it feeds, and makes the kernel correct on its own inputs rather than on a
  * promise about them.
  */
 function poolSampler(
@@ -232,7 +232,7 @@ function poolSampler(
     masked[c] = w;
     total += w;
   }
-  // A read this deck leaves nothing of — every combo it liked is already on the
+  // A read this deck leaves nothing of, every combo it liked is already on the
   // board or in the hero's hand. Fall back to no read at all rather than to an
   // empty range, which has no draw to make. Mirrors `beliefRange`'s fallback.
   if (!(total > 0)) {
@@ -302,7 +302,7 @@ export function runMultiwayCountsFromCodes(
   // Card removal as a permutation with two cursors: `avail[lo..hi)` is what is
   // still live, `pos` inverts it so availability is a single comparison. Hole
   // cards leave through the top, board cards through the bottom. The bottom
-  // cursor is not arbitrary — advancing `lo` makes the board draw arithmetically
+  // cursor is not arbitrary, advancing `lo` makes the board draw arithmetically
   // identical to the heads-up sampler's partial Fisher-Yates.
   const avail = new Uint8Array(L);
   const pos = new Uint8Array(L);
@@ -315,7 +315,7 @@ export function runMultiwayCountsFromCodes(
 
   // The tuple under construction, as card codes: seat o proposes `cand[2o]`,
   // `cand[2o+1]`. Disjointness is checked against `mark`, which is stamped
-  // rather than cleared — an attempt writes its own stamp, so the previous
+  // rather than cleared, an attempt writes its own stamp, so the previous
   // attempt's marks go stale for free. `stamp` is local to this call and
   // advances at most MAX_TUPLE_ATTEMPTS per sim, far short of wrapping.
   const cand = new Uint8Array(2 * N);
@@ -384,7 +384,7 @@ export function runMultiwayCountsFromCodes(
       for (let o = 0; o < N; o++) {
         const a = cand[2 * o];
         const b = cand[2 * o + 1];
-        // Read `pos[·]` after the first swap — b moves if it sat at the top.
+        // Read `pos[·]` after the first swap, b moves if it sat at the top.
         swapAt(pos[poolIndex[a]], hi - 1);
         hi--;
         swapAt(pos[poolIndex[b]], hi - 1);
@@ -395,8 +395,8 @@ export function runMultiwayCountsFromCodes(
       }
     } else {
       // Documented fallback: give up on the ranges and deal the whole field
-      // uniformly at random from what is live. It cannot fail — the pool-size
-      // guard reserves two cards per seat — which is what makes this loop
+      // uniformly at random from what is live. It cannot fail, the pool-size
+      // guard reserves two cards per seat, which is what makes this loop
       // terminate rather than merely usually terminate, and it is exchangeable,
       // so the escape hatch does not smuggle the seat-order artifact back in.
       for (let o = 0; o < N; o++) {
@@ -535,7 +535,7 @@ export function finalizeMultiway(
 ): MultiwayEquity {
   const { sims, wins, ties, losses } = c;
 
-  // Σ over chop sizes in fixed ascending order — the only float sum here, and
+  // Σ over chop sizes in fixed ascending order, the only float sum here, and
   // it happens once per merged run rather than once per shard.
   let tieShare = 0;
   for (let k = 2; k < c.tieBySize.length; k++) tieShare += c.tieBySize[k] / k;

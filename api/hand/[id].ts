@@ -23,7 +23,7 @@ export default async function handler(
 
     const sql = getSql();
 
-    // Scope by session user_id — never trust a body user_id.
+    // Scope by session user_id, never trust a body user_id.
     const hands = await sql`
       select
         h.id::text as id,

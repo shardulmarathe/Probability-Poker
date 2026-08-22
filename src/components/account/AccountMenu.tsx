@@ -74,7 +74,7 @@ export function AccountMenu({ className = "" }: AccountMenuProps) {
           type="button"
           onClick={() => setDialog(true)}
           data-testid="account-signin"
-          className={`${BUTTON.base} ${BUTTON.secondary} min-h-[34px] px-3 py-1.5 text-xs`}
+          className={`${BUTTON.base} ${BUTTON.secondary} min-h-[34px] px-2 py-1.5 text-[0.7rem] sm:px-3 sm:text-xs`}
         >
           Sign in
         </button>
@@ -102,7 +102,7 @@ export function AccountMenu({ className = "" }: AccountMenuProps) {
       >
         <span
           aria-hidden
-          className="grid h-[22px] w-[22px] place-items-center rounded-full font-display text-[0.7rem] text-ink-950"
+          className="grid h-[22px] w-[22px] place-items-center rounded-full font-display text-[0.7rem] text-felt-deep"
           style={{ background: "linear-gradient(160deg,#e2c563,#c9a227)" }}
         >
           {initial}

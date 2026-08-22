@@ -108,14 +108,22 @@ export function ActionBar({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+      <div
+        className={
+          narrow
+            ? "flex w-full min-w-0 flex-nowrap items-center justify-center gap-2 overflow-x-hidden"
+            : "flex flex-wrap items-center justify-center gap-2 sm:gap-3"
+        }
+      >
         {simple.map((action) => (
           <ActionButton
             key={action.type}
             action={action.type}
             data-testid={`action-${action.type}`}
             onClick={() => onAct(action)}
-            className="flex-1 sm:min-w-[8rem] sm:flex-none"
+            className={
+              narrow ? "min-w-0 flex-1" : "flex-1 sm:min-w-[8rem] sm:flex-none"
+            }
           >
             {action.label}
           </ActionButton>
@@ -126,7 +134,9 @@ export function ActionBar({
             action={commit.type}
             data-testid={`action-${commit.type}`}
             onClick={() => (narrow ? setSheet(true) : onAct(commit))}
-            className="flex-1 sm:min-w-[9rem] sm:flex-none"
+            className={
+              narrow ? "min-w-0 flex-1" : "flex-1 sm:min-w-[9rem] sm:flex-none"
+            }
           >
             {narrow ? (commit.type === "bet" ? "Bet…" : "Raise…") : commit.label}
           </ActionButton>
@@ -151,7 +161,7 @@ export function ActionBar({
               setSheet(false);
               onAct(sized(raise, cost));
             }}
-            className="mt-4 w-full"
+            className="mt-3 w-full"
           >
             {sized(raise, cost).label}
           </ActionButton>
@@ -279,7 +289,7 @@ function Sheet({
            token, because Tailwind scans source text and would not emit a class
            assembled at runtime. `rounded-t-3xl` was the product's only 24px
            corner. */
-        className="pp-t-sheet relative w-full rounded-t-2xl border-t px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"
+        className="pp-t-sheet relative w-full rounded-t-2xl border-t px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2"
         style={{
           borderColor: "rgba(201,162,39,0.4)",
           background:
@@ -287,7 +297,7 @@ function Sheet({
           boxShadow: "0 -20px 50px rgba(0,0,0,0.6)",
         }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-ivory/25" />
+        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-ivory/25" />
         {children}
       </div>
     </div>

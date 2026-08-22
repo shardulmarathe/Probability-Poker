@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { signIn, signUp } from "../../lib/auth";
 import { BUTTON, FIELD, LABEL, LINE, SURFACE } from "./skin";
 
@@ -53,6 +54,15 @@ export function AccountDialog({
 
   if (!open) return null;
 
+  /*
+   * Portalled to `document.body` on purpose. This dialog is opened from a
+   * control that lives inside the sticky header, and that header uses
+   * `backdrop-filter`. A filter on an ancestor becomes the containing block
+   * for `position: fixed`, so a modal rendered in-tree is trapped in the
+   * 52px header: the email field is clipped off the top of the viewport and
+   * the form is unusable. The body has no such ancestor.
+   */
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
@@ -71,9 +81,9 @@ export function AccountDialog({
     setError(result.error ?? "That did not work. Try again.");
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
       style={{ background: "rgba(3,8,6,0.72)", backdropFilter: "blur(6px)" }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -197,6 +207,7 @@ export function AccountDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

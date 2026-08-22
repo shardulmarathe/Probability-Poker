@@ -14,8 +14,12 @@ const SIZES: Record<Size, string> = {
   xl: "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)] text-[clamp(1.5rem,5.6vw,3rem)] rounded-xl sm:rounded-2xl",
 };
 
-// The card size used for empty community-card placeholders on the table, kept
-// in sync with the `xl` card footprint above so slots and cards line up.
+// Empty slot footprints, kept in sync with the matching `SIZES` row so a
+// placeholder and the card that lands in it are the same size.
+export const MD_CARD_BOX =
+  "h-[clamp(4.5rem,15vw,6rem)] w-[clamp(3.25rem,10.8vw,4.25rem)]";
+export const LG_CARD_BOX =
+  "h-[clamp(5rem,17vw,7rem)] w-[clamp(3.5rem,12.2vw,5rem)]";
 export const XL_CARD_BOX =
   "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)]";
 

@@ -49,8 +49,13 @@
   }
 }
 
+/*
+ * The keyframes start at opacity 0. The class itself must not: a static
+ * `opacity: 0` hides the hero until the animation runs, so a first paint
+ * (or any environment that drops the animation) is a blank felt with a
+ * header. Visible first, then the fade, is the opposite of that failure.
+ */
 .pp-fade-up {
-  opacity: 0;
   animation: pp-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -242,6 +247,14 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+/*
+ * Learn's concept chips are in-page `#` links. Without this they land under
+ * the sticky header, so the heading the chip named is hidden on arrival.
+ */
+html {
+  scroll-padding-top: calc(var(--pp-header-h) + 0.75rem);
 }
 
 /*

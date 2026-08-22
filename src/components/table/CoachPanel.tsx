@@ -45,7 +45,7 @@ export function CoachPanel({
 
   if (!read) {
     return (
-      <Shell>
+      <Shell tight={narrow}>
         <span className="font-mono text-xs text-ivory/45">
           Estimating equity…
         </span>
@@ -55,17 +55,15 @@ export function CoachPanel({
 
   const share = read.equity.equity;
   const ahead = read.toCall === 0 || share >= read.required;
+  // One row on a phone: the extra "equity vs N" wrap was growing into the felt.
   const summary = (
-    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span className="font-display text-lg font-bold text-gold-soft">
+    <span className="flex min-w-0 items-baseline gap-x-2.5 overflow-hidden whitespace-nowrap">
+      <span className="font-display text-lg font-bold leading-none text-gold-soft">
         {pct(share, 1)}
-      </span>
-      <span className="font-mono text-[0.68rem] text-ivory/55">
-        equity vs {read.opponents.length}
       </span>
       {read.toCall > 0 && (
         <span
-          className="font-mono text-[0.68rem]"
+          className="shrink-0 font-mono text-[0.68rem] leading-none"
           style={{ color: ahead ? TONE.good : TONE.bad }}
         >
           need {pct(read.required, 1)}
@@ -78,14 +76,14 @@ export function CoachPanel({
   // the vertical space more than the numbers do.
   if (narrow && !open) {
     return (
-      <Shell>
+      <Shell tight>
         <button
           data-testid="coach-toggle"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-between gap-2"
+          className="flex w-full min-w-0 items-center justify-between gap-2"
         >
           {summary}
-          <span className="font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
+          <span className="shrink-0 font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
             more ▾
           </span>
         </button>
@@ -94,27 +92,37 @@ export function CoachPanel({
   }
 
   return (
-    <Shell>
+    <Shell tight={narrow}>
       <div className="flex w-full flex-col gap-1.5">
         {narrow && (
           <button
             data-testid="coach-toggle"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center justify-between gap-2"
+            className="flex w-full min-w-0 items-center justify-between gap-2"
           >
             {summary}
-            <span className="font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
+            <span className="shrink-0 font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
               less ▴
             </span>
           </button>
         )}
 
-        {/* One surface, five numbers. Each of these used to sit in its own
-            bordered box inside this already-bordered strip. */}
+        {/*
+         * One surface, five numbers. On a phone the expanded body used to
+         * grow until Fold and Call sat below the fold, so that path is
+         * capped and the action bar stays on screen.
+         */}
         <div
-          className="grid grid-cols-2 gap-x-5 gap-y-2 sm:flex sm:flex-wrap sm:items-start sm:gap-x-7"
-          data-testid="coach-stats"
+          className={
+            narrow
+              ? "max-h-[9rem] overflow-y-auto overscroll-contain"
+              : undefined
+          }
         >
+          <div
+            className="grid grid-cols-2 gap-x-5 gap-y-2 sm:flex sm:flex-wrap sm:items-start sm:gap-x-7"
+            data-testid="coach-stats"
+          >
           <Stat
             label="Your equity"
             value={pct(share, 1)}
@@ -155,6 +163,7 @@ export function CoachPanel({
         {mode === "study" && (
           <StudyDetail read={read} actions={actions} seats={seats} />
         )}
+        </div>
       </div>
     </Shell>
   );
@@ -231,11 +240,19 @@ function Chip({
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({
+  children,
+  tight,
+}: {
+  children: React.ReactNode;
+  tight?: boolean;
+}) {
   return (
     <div
       data-testid="coach-panel"
-      className={`mx-auto flex w-full max-w-3xl items-center border px-3.5 py-2 ${RADIUS.surface}`}
+      className={`mx-auto flex w-full max-w-3xl items-center border ${
+        tight ? "px-3 py-1.5" : "px-3.5 py-2"
+      } ${RADIUS.surface}`}
       style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
     >
       {children}

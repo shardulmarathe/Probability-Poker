@@ -43,14 +43,35 @@ export interface ThinkingProps {
    * every finished stage pushes the *running* one further down, and by stage
    * five it is below the fold on a phone, the one line that is actually live
    * is the one you cannot see. Zero holds the height constant instead.
+   *
+   * Ignored when `compact` is true; that path always keeps history at zero.
    */
   history?: number;
+  /**
+   * Phone dock under the felt. One truncated title, a `n/total` count, dots,
+   * and the progress bar. Header, history, Done rows, facts, and the detail
+   * sentence are omitted so the dock stays one line. TableGame decides this;
+   * do not infer viewport here.
+   */
+  compact?: boolean;
+  /**
+   * Who is on the clock. Compact only: the gold ring on a 28px avatar is easy
+   * to miss while reading this dock, so the name sits in the same line.
+   */
+  who?: string;
 }
 
-export function Thinking({ step, className, history = HISTORY }: ThinkingProps) {
+export function Thinking({
+  step,
+  className,
+  history = HISTORY,
+  compact = false,
+  who,
+}: ThinkingProps) {
   if (!step) return null;
 
-  const hidden = Math.max(0, step.done.length - Math.max(0, history));
+  const keep = compact ? 0 : history;
+  const hidden = Math.max(0, step.done.length - Math.max(0, keep));
   const shown = step.done.slice(hidden);
   const progress = step.total > 0 ? (step.step + 1) / step.total : 0;
 
@@ -75,36 +96,46 @@ export function Thinking({ step, className, history = HISTORY }: ThinkingProps) 
         boxShadow: "0 10px 30px rgba(0,0,0,0.45)",
       }}
     >
-      <header
-        className="flex items-baseline justify-between gap-2 border-b px-3 py-1.5"
-        style={{ borderColor: LINE.goldFaint }}
-      >
-        <span className="font-display text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-ivory/55">
-          Thinking
-        </span>
-        <span className="font-mono text-[0.6rem] tabular-nums" style={{ color: TONE.gold }}>
-          {step.step + 1}/{step.total}
-        </span>
-      </header>
+      {!compact && (
+        <header
+          className="flex items-baseline justify-between gap-2 border-b px-3 py-1.5"
+          style={{ borderColor: LINE.goldFaint }}
+        >
+          <span className="font-display text-[0.55rem] font-semibold uppercase tracking-[0.22em] text-ivory/55">
+            Thinking
+          </span>
+          <span className="font-mono text-[0.6rem] tabular-nums" style={{ color: TONE.gold }}>
+            {step.step + 1}/{step.total}
+          </span>
+        </header>
+      )}
 
       {/* A seven-stage decision with six priced sizes in it is the tallest this
           gets, and on a 390px phone that is most of the felt. The cap is a
           backstop rather than the usual case: nothing is hidden until the panel
-          would otherwise be taller than the screen it is floating over. */}
-      <div className="max-h-[min(60vh,26rem)] overflow-y-auto px-3 py-2">
-        {hidden > 0 && (
+          would otherwise be taller than the screen it is floating over.
+          Compact skips the cap: the dock is the live stage only. */}
+      <div
+        className={
+          compact
+            ? "px-2.5 py-1.5"
+            : "max-h-[min(60vh,26rem)] overflow-y-auto px-3 py-2"
+        }
+      >
+        {!compact && hidden > 0 && (
           <p className="mb-1 pl-4 font-mono text-[0.55rem] text-ivory/30">
             +{hidden} earlier
           </p>
         )}
 
         <ol className="min-w-0">
-          {shown.map((line, i) => (
-            <Done key={`${hidden + i}-${line.title}`} line={line} />
-          ))}
+          {!compact &&
+            shown.map((line, i) => (
+              <Done key={`${hidden + i}-${line.title}`} line={line} />
+            ))}
           {/* Re-keyed on the step index so each new stage fades in on arrival
               rather than the text swapping under a static box. */}
-          <Current key={step.step} step={step} />
+          <Current key={step.step} step={step} compact={compact} who={who} />
         </ol>
       </div>
 
@@ -151,7 +182,42 @@ function Done({ line }: { line: ThinkLine }) {
 }
 
 /** The stage running now. The only thing on screen at full contrast. */
-function Current({ step }: { step: ThinkStep }) {
+function Current({
+  step,
+  compact,
+  who,
+}: {
+  step: ThinkStep;
+  compact?: boolean;
+  who?: string;
+}) {
+  if (compact) {
+    const short = who?.trim().split(/\s+/).pop();
+    return (
+      <li className="pp-thought min-w-0">
+        <p className="flex items-center gap-1.5 font-display text-[0.8rem] font-semibold leading-none text-ivory">
+          {short && (
+            <span className="shrink-0" style={{ color: TONE.gold }}>
+              {short}
+            </span>
+          )}
+          <span className="min-w-0 truncate">{step.title}</span>
+          <span
+            className="shrink-0 font-mono text-[0.6rem] tabular-nums"
+            style={{ color: TONE.gold }}
+          >
+            {step.step + 1}/{step.total}
+          </span>
+          <span aria-hidden className="flex shrink-0 gap-0.5">
+            <Dot delay="0s" />
+            <Dot delay="0.18s" />
+            <Dot delay="0.36s" />
+          </span>
+        </p>
+      </li>
+    );
+  }
+
   return (
     <li className="pp-thought relative min-w-0 pl-4">
       <Bead />
@@ -171,7 +237,7 @@ function Current({ step }: { step: ThinkStep }) {
           {step.detail}
         </p>
       )}
-      {step.facts && step.facts.length > 0 && (
+      {!compact && step.facts && step.facts.length > 0 && (
         <dl
           className={`mt-1.5 min-w-0 overflow-hidden border ${RADIUS.control}`}
           style={{ borderColor: LINE.quietFaint, background: SURFACE.sunk }}

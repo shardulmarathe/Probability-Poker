@@ -15,7 +15,7 @@
 
 import { useMemo } from "react";
 import { HandCategory } from "../../types";
-import { PlayingCard } from "../PlayingCard";
+import { LG_CARD_BOX, MD_CARD_BOX, PlayingCard } from "../PlayingCard";
 import { money } from "../../lib/format";
 import { TABLE_MODES, type TableMode } from "../../lib/tableOptions";
 import { findProfile } from "../../poker/model/profiles";
@@ -37,14 +37,6 @@ import {
   seatLayout,
   useNarrow,
 } from "./chrome";
-
-/**
- * The empty community slots, kept in step with `PlayingCard`'s `lg` footprint
- * so a slot and the card that lands in it are the same size. The board is `lg`
- * rather than `xl`: at four-handed a seat sits directly above it, and the
- * larger card leaves no room for both.
- */
-const LG_CARD_BOX = "h-[clamp(5rem,17vw,7rem)] w-[clamp(3.5rem,12.2vw,5rem)]";
 
 const STREET_LABEL: Record<Street, string> = {
   preflop: "Pre-Flop",
@@ -218,14 +210,15 @@ export default function TableGame() {
                 {[0, 1, 2, 3, 4].map((i) => {
                   const card = table.board[i];
                   const dealt = i < fx.dealtCount && !!card;
+                  const slot = narrow ? MD_CARD_BOX : LG_CARD_BOX;
                   return dealt ? (
                     <div key={`c-${i}`} className="pp-deal">
-                      <PlayingCard card={card} size="lg" />
+                      <PlayingCard card={card} size={narrow ? "md" : "lg"} />
                     </div>
                   ) : (
                     <div
                       key={`s-${i}`}
-                      className={`pp-slot ${LG_CARD_BOX} rounded-xl sm:rounded-2xl`}
+                      className={`pp-slot ${slot} rounded-xl sm:rounded-2xl`}
                     />
                   );
                 })}
@@ -291,7 +284,7 @@ export default function TableGame() {
         </div>
 
         {/* ---------------------------- Controls ---------------------------- */}
-        <div className="mt-3 flex min-h-[6rem] flex-col justify-end gap-2">
+        <div className="mt-2 flex min-h-[4.25rem] flex-col justify-end gap-1.5 sm:mt-3 sm:min-h-[6rem] sm:gap-2">
           <CoachPanel
             mode={mode}
             read={heroRead}
@@ -322,21 +315,14 @@ export default function TableGame() {
             />
           ) : narrow && thinkingSeat ? (
             /*
-             * On a phone the narration does not fit beside the chair it belongs
-             * to, hung off the seat it covered the board, and truncating it to
-             * fit made the numbers unreadable, which defeats the point of
-             * narrating them. It moves here instead, into space that is idle
-             * anyway, and the chair keeps its marker so you still know who is
-             * deciding.
+             * On a phone the narration does not fit beside the chair. It docks
+             * here, one live stage, and the gold-ringed seat is who is deciding.
+             * The extra "X is deciding" line used to stack on the transcript
+             * and steal a row the felt needed.
              */
-            <div className="py-2">
-              <p className="mb-1.5 text-center font-cormorant text-sm italic text-ivory/40">
-                {thinkingSeat.name} is deciding
-              </p>
-              <Thinking step={thinkingSeat.step} history={0} />
-            </div>
+            <Thinking step={thinkingSeat.step} compact who={thinkingSeat.name} />
           ) : (
-            <p className="py-4 text-center font-cormorant text-base italic text-ivory/40">
+            <p className="py-2 text-center font-cormorant text-sm italic text-ivory/40 sm:py-4 sm:text-base">
               {fx.busy ? "Watching the table…" : " "}
             </p>
           )}
@@ -381,8 +367,26 @@ function TopBar({
     </ButtonLink>
   );
 
+  const modes = (
+    <Tabs
+      label="What the table shows you"
+      as="options"
+      layout="fill"
+      size="sm"
+      testIdPrefix="mode"
+      showHint={false}
+      value={mode}
+      onChange={onMode}
+      options={TABLE_MODES.map((m) => ({
+        value: m.id,
+        label: narrow ? m.name.split(" ")[0] : m.name,
+        hint: m.blurb,
+      }))}
+    />
+  );
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5 sm:gap-2">
       <PageHeader
         compact
         title={observer ? "The table" : "Your table"}
@@ -391,56 +395,30 @@ function TopBar({
           <>
             {observer && <Rail>Watching</Rail>}
             <Rail>Hand #{handNumber}</Rail>
-            {/* On a phone this is the only place the control fits without
-                costing the felt a whole row of its own. */}
             {narrow && change}
           </>
         }
       />
 
       {/*
-       * The mode switch is a setting on this screen, not a second navigation,
-       * so it keeps its natural width instead of spanning the page, a
-       * full-width three-up sitting under the shell's own nav read as one.
-       * Its blurb sits beside it, which is the whole reason the blurb is on
-       * screen at all rather than in a `title=`.
-       *
-       * Beside it on a wide screen. *Under* it on a phone, via the control's
-       * own `showHint`: a 19rem switch and a sentence sharing a 390px row left
-       * the sentence a 90px column, which set "Your equity, pot odds, and outs
-       * shown while you decide." as seven lines and pushed the table 180px down
-       * the screen. Same words, one line, and the felt gets the space back.
+       * Phone: modes get their own full-width row. Stuffing them into the
+       * heading next to Hand and Change wrapped into a jumble. Desktop keeps
+       * the switch, the blurb, and Change table on one line.
        */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="w-full max-w-[19rem] shrink-0 sm:w-[19rem]">
-          <Tabs
-            label="What the table shows you"
-            as="options"
-            layout="fill"
-            size="sm"
-            testIdPrefix="mode"
-            showHint={narrow}
-            value={mode}
-            onChange={onMode}
-            options={TABLE_MODES.map((m) => ({
-              value: m.id,
-              label: narrow ? m.name.split(" ")[0] : m.name,
-              hint: m.blurb,
-            }))}
-          />
+      {narrow ? (
+        <div className="w-full">{modes}</div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="w-full max-w-[19rem] shrink-0 sm:w-[19rem]">{modes}</div>
+          <p
+            className="min-w-0 flex-1 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
+            data-testid="mode-hint"
+          >
+            {TABLE_MODES.find((m) => m.id === mode)?.blurb}
+          </p>
+          {change}
         </div>
-        {!narrow && (
-          <>
-            <p
-              className="min-w-0 flex-1 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
-              data-testid="mode-hint"
-            >
-              {TABLE_MODES.find((m) => m.id === mode)?.blurb}
-            </p>
-            {change}
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
 }

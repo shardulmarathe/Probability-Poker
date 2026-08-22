@@ -30,6 +30,7 @@ import {
   ThoughtPocket,
   bubbleAlign,
   chipStacks,
+  useNarrow,
   type SeatPoint,
 } from "./chrome";
 import { Thinking } from "./Thinking";
@@ -238,13 +239,6 @@ function Commit({
 }
 
 /**
- * All-in is a state, not a stack size, $0 behind says nothing on its own.
- *
- * `tight` is the phone's six-handed case, where a chair is 3.5rem wide: at the
- * desktop's tracking "ALL IN" is wider than the seat and two neighbouring
- * all-ins print straight through each other.
- */
-/**
  * The signed result of the finished hand. Gold for a profit, muted red for a
  * loss, the same two colours the felt already uses for a win and for an
  * all-in, so it needs no legend.
@@ -262,6 +256,13 @@ function Net({ net, className }: { net: number | null; className?: string }) {
   );
 }
 
+/**
+ * All-in is a state, not a stack size, $0 behind says nothing on its own.
+ *
+ * `tight` is the phone's six-handed case, where a chair is 3rem wide: at the
+ * desktop's tracking "ALL IN" is wider than the seat and two neighbouring
+ * all-ins print straight through each other.
+ */
 function Stack({
   seat,
   tight,
@@ -291,47 +292,62 @@ function Stack({
 
 function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, settled }: Skinned) {
   const skin = plate(state, won);
+  const narrow = useNarrow();
   return (
-    <div className="flex items-end gap-3 sm:gap-4">
+    <div className={`flex items-end ${narrow ? "min-w-0 gap-2" : "gap-3 sm:gap-4"}`}>
       {/* Two cards pushed across cloth by one hand: the near one lands on top
-          of the far one, and neither lands square. */}
-      <div className="flex gap-1.5 sm:gap-2">
-        <PlayingCard card={seat.hole[0]} faceDown={!reveal} size="lg" tilt={-1.4} />
+          of the far one, and neither lands square. On a phone, md cards keep
+          the plate from eating the pot. */}
+      <div className="flex shrink-0 gap-1.5 sm:gap-2">
+        <PlayingCard
+          card={seat.hole[0]}
+          faceDown={!reveal}
+          size={narrow ? "md" : "lg"}
+          tilt={-1.4}
+        />
         <PlayingCard
           card={seat.hole[1]}
           faceDown={!reveal}
-          size="lg"
+          size={narrow ? "md" : "lg"}
           tilt={1.1}
           overlaps
         />
       </div>
       <div
-        className={`${skin.className} flex flex-col items-start rounded-2xl px-3 py-2`}
+        className={`${skin.className} flex min-w-0 flex-col items-start overflow-hidden rounded-2xl px-3 py-2`}
         {...skin.props}
       >
-        <div className="flex items-center gap-2">
-          <span className="pp-avatar text-xl leading-none sm:text-2xl">
+        <div className="flex min-w-0 flex-nowrap items-center gap-2">
+          <span
+            className={`pp-avatar leading-none ${narrow ? "text-lg" : "text-xl sm:text-2xl"}`}
+          >
             {profile?.avatar ?? "\u{1F9D1}"}
           </span>
-          <span className="font-display text-sm tracking-wide text-ivory">
+          <span className="min-w-0 truncate font-display text-sm tracking-wide text-ivory">
             {seat.name}
           </span>
           <Badge label={position} tone={position === "BTN" ? "dealer" : "blind"} />
-        </div>
-        {/* `nowrap`, deliberately: this row is an absolutely-positioned box
-            whose width comes from its own min-content, so letting it wrap made
-            "$901 · $99 in" two lines on a phone and grew the plate downward
-            into the rail. */}
-        <div className="mt-0.5 flex flex-nowrap items-center gap-2 whitespace-nowrap font-mono text-sm text-ivory/80">
-          <Stack seat={seat} settled={settled} />
-          {seat.streetCommit > 0 && (
-            <span className="flex items-center gap-1 text-gold-soft">
-              <HeroCommit amount={seat.streetCommit} bigBlind={bigBlind} />
-              {money(seat.streetCommit)} in
+          {/* Phone: stack only. The chip pile and "$N in" sat on this row
+              and, with ALL IN, grew the plate over the hole cards. */}
+          {narrow && (
+            <span className="shrink-0 font-mono text-sm text-ivory/80">
+              <Stack seat={seat} tight settled={settled} />
+              <Net net={net} className="ml-1" />
             </span>
           )}
-          <Net net={net} />
         </div>
+        {!narrow && (
+          <div className="mt-0.5 flex flex-nowrap items-center gap-2 whitespace-nowrap font-mono text-sm text-ivory/80">
+            <Stack seat={seat} settled={settled} />
+            {seat.streetCommit > 0 && (
+              <span className="flex items-center gap-1 text-gold-soft">
+                <HeroCommit amount={seat.streetCommit} bigBlind={bigBlind} />
+                {money(seat.streetCommit)} in
+              </span>
+            )}
+            <Net net={net} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -434,16 +450,16 @@ function FullSeat({
 // Compact opponent, phones
 //
 // Everything below the avatar and the stack is dropped: at six seats on a
-// 390px screen the arc gives each chair about 46px, and a name or a blurb
-// simply does not fit. Cards appear only once they are face up, overlapped so
-// a revealed pair stays inside the same footprint.
+// 390px screen the arc gives each chair about 46px, and a name, a blurb, or a
+// study read simply does not fit. Cards appear only once they are face up,
+// overlapped so a revealed pair stays inside the same footprint.
 // ---------------------------------------------------------------------------
 
-function CompactSeat({ seat, position, profile, reveal, read, won, state, settled }: Skinned) {
+function CompactSeat({ seat, position, profile, reveal, won, state, settled }: Skinned) {
   const inHand = state !== "folded" && seat.hole.length > 0;
 
   return (
-    <div className="flex w-[3.5rem] flex-col items-center" title={profile?.blurb}>
+    <div className="flex w-[3rem] flex-col items-center" title={profile?.blurb}>
       {reveal && inHand ? (
         <div className="mb-1 flex">
           <PlayingCard card={seat.hole[0]} size="sm" tilt={-1.5} />
@@ -463,7 +479,7 @@ function CompactSeat({ seat, position, profile, reveal, read, won, state, settle
       )}
 
       <span
-        className={`pp-avatar flex h-9 w-9 items-center justify-center rounded-full border text-lg ${
+        className={`pp-avatar flex h-7 w-7 items-center justify-center rounded-full border text-lg ${
           won ? "pp-seat-won" : ""
         }`}
         style={avatarStyle(state, won)}
@@ -476,11 +492,6 @@ function CompactSeat({ seat, position, profile, reveal, read, won, state, settle
       <span className="max-w-full truncate font-mono text-[0.62rem] leading-tight text-ivory/80">
         <Stack seat={seat} tight settled={settled} />
       </span>
-      {read && (
-        <span className="mt-0.5">
-          <BeliefBar belief={read} width="2.4rem" />
-        </span>
-      )}
     </div>
   );
 }

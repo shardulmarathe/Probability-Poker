@@ -46,11 +46,10 @@ export default function AppShell() {
   /*
    * Keep the current page's tab visible in the nav.
    *
-   * Four labels, the wordmark and the account control do not fit across 390px,
-   * so the list scrolls rather than overlapping, but nothing scrolled it, and
-   * the last tab was the one that got cut. Landing on /learn from a phone
-   * showed a gold-ringed "Lear" sliced off where the account button starts,
-   * which reads as a layout bug rather than as "there is more this way".
+   * Four labels, the wordmark and Sign in do not fit across 390px at the
+   * desktop padding, so both the tabs and the account control tighten under
+   * 640px. This still scrolls the active tab into view if type is larger
+   * than we budgeted for.
    */
   useEffect(() => {
     const active = navRef.current?.querySelector("[aria-current='page']");
@@ -119,7 +118,7 @@ export default function AppShell() {
                     to={item.to}
                     data-testid={`nav-${item.label.toLowerCase()}`}
                     className={({ isActive }) =>
-                      `inline-flex min-h-[34px] items-center whitespace-nowrap rounded-lg border px-2 py-1 font-display text-[0.78rem] tracking-wide transition sm:px-3 sm:text-sm ${
+                      `inline-flex min-h-[34px] items-center whitespace-nowrap rounded-lg border px-1.5 py-1 font-display text-[0.75rem] tracking-wide transition sm:px-3 sm:text-sm ${
                         isActive
                           ? "border-gold/50 bg-gold/15 text-gold-soft"
                           : "border-transparent text-ivory/60 hover:bg-white/[0.04] hover:text-ivory"

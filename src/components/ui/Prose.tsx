@@ -109,11 +109,100 @@ export function Why({
 }
 
 /**
+ * Anything the reader can open, closed until they do.
+ *
+ * The shape this product kept getting wrong. It learned, correctly, that a
+ * `title=` attribute is invisible on every touch device, and then generalised
+ * that into "print the explanation on the screen permanently". Counted across
+ * the app that came to 78 always-on prose slots: a hint under every control, a
+ * subtitle under every heading, a lede under every title, and thirty-one boxes
+ * explaining things nobody had asked about yet. Text nobody asked for is not
+ * more visible than text behind a control, it is less: it is the noise the eye
+ * learns to skip, and it pushes the thing you came for below the fold.
+ *
+ * So: a summary you can read at a glance, and one control that reveals the
+ * rest. `defaultOpen` exists for the handful of places where the body IS the
+ * page and collapsing it would be coy.
+ *
+ * `tone="quiet"` drops the box and leaves just the toggle, for use inside a
+ * surface that is already drawing its own border.
+ */
+export function Reveal({
+  label,
+  summary,
+  defaultOpen = false,
+  tone = "boxed",
+  testId,
+  children,
+}: {
+  label: string;
+  /** Shown beside the label while closed: the answer in one glance. */
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  tone?: "boxed" | "quiet";
+  testId?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const boxed = tone === "boxed";
+  return (
+    <div
+      className={boxed ? `mt-5 overflow-hidden border ${RADIUS.control}` : "mt-3"}
+      style={
+        boxed
+          ? { borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }
+          : undefined
+      }
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        data-testid={testId}
+        className={`flex w-full items-center justify-between gap-3 text-left transition hover:bg-white/[0.03] ${
+          boxed ? "px-3 py-3 sm:px-4" : "py-1.5"
+        }`}
+      >
+        <span className="flex min-w-0 items-baseline gap-2.5">
+          <span className="font-display text-[0.8rem] font-semibold tracking-wide text-gold-soft sm:text-sm">
+            {label}
+          </span>
+          {summary && !open && (
+            <span className="min-w-0 truncate font-mono text-[0.68rem] text-ivory/45">
+              {summary}
+            </span>
+          )}
+        </span>
+        <span
+          aria-hidden
+          className="shrink-0 text-gold-soft transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "none" }}
+        >
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div
+          className={
+            boxed
+              ? "border-t px-3 py-4 text-sm leading-relaxed text-ivory/80 sm:px-4"
+              : "pt-2 text-sm leading-relaxed text-ivory/80"
+          }
+          style={boxed ? { borderColor: LINE.goldFaint } : undefined}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * A derivation the reader can open, collapsed by default.
  *
- * Collapsed rather than absent because the maths is the product's argument, and
- * collapsed rather than always-open because a page of algebra above the numbers
- * it explains is a page nobody reads.
+ * `Reveal` with the derivation's default label. Kept as its own name because
+ * thirty call sites say what they mean by using it, and because a derivation is
+ * a specific promise: the maths behind a number that is already on the screen.
  */
 export function HowCalculated({
   label = "How is this calculated?",
@@ -122,37 +211,5 @@ export function HowCalculated({
   label?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div
-      className={`mt-5 overflow-hidden border ${RADIUS.control}`}
-      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition hover:bg-white/[0.03] sm:px-4"
-      >
-        <span className="font-display text-[0.8rem] font-semibold tracking-wide text-gold-soft sm:text-sm">
-          {label}
-        </span>
-        <span
-          aria-hidden
-          className="text-gold-soft transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "none" }}
-        >
-          ▾
-        </span>
-      </button>
-      {open && (
-        <div
-          className="border-t px-3 py-4 text-sm leading-relaxed text-ivory/80 sm:px-4"
-          style={{ borderColor: LINE.goldFaint }}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  );
+  return <Reveal label={label}>{children}</Reveal>;
 }

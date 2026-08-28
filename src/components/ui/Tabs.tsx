@@ -54,6 +54,21 @@ export interface TabsProps<T extends string | number> {
   as?: "tabs" | "options";
   /** Print the active option's `hint` under the row. */
   showHint?: boolean;
+  /**
+   * Where a hint is allowed to appear.
+   *
+   * `"block"` is the original: one line of italic prose under the row, always
+   * visible, describing whichever option is active. It is the right answer on a
+   * setup form, where the reader is choosing and has the room.
+   *
+   * `"tooltip"` shows each option's own hint on hover or keyboard focus, over
+   * whatever is beside it. That is for the rows that have moved into the 52px
+   * app bar, where a permanently visible blurb is exactly the 114px of chrome
+   * that pushed Fold and Call off the bottom of the screen. It is deliberately
+   * not `title=`: no touch device has ever shown a `title` to anyone, which is
+   * the bug this component's own header comment was written about.
+   */
+  hintAs?: "block" | "tooltip";
   /** Renders `data-testid={`${testIdPrefix}-${value}`}` on each control. */
   testIdPrefix?: string;
   size?: "sm" | "md";
@@ -67,12 +82,14 @@ export function Tabs<T extends string | number>({
   layout = "fill",
   as = "tabs",
   showHint = false,
+  hintAs = "block",
   testIdPrefix,
   size = "md",
 }: TabsProps<T>) {
   const uid = useId();
   const tabs = as === "tabs";
   const active = options.find((o) => o.value === value);
+  const tips = showHint && hintAs === "tooltip";
 
   const row =
     layout === "fill"
@@ -118,19 +135,21 @@ export function Tabs<T extends string | number>({
       >
         {options.map((option, i) => {
           const on = option.value === value;
-          return (
+          const tipId = tips && option.hint ? `${uid}-tip-${i}` : undefined;
+          const control = (
             <button
               key={`${uid}-${i}`}
               type="button"
               role={tabs ? "tab" : "radio"}
               {...(tabs ? { "aria-selected": on } : { "aria-checked": on })}
+              aria-describedby={tipId}
               disabled={option.disabled}
               data-testid={
                 option.testId ??
                 (testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined)
               }
               onClick={() => onChange(option.value)}
-              className={`${cell} ${metrics} ${RADIUS.control} border font-display font-semibold tracking-wide transition disabled:cursor-not-allowed disabled:opacity-30`}
+              className={`${tips ? "w-full" : cell} ${metrics} ${RADIUS.control} border font-display font-semibold tracking-wide transition disabled:cursor-not-allowed disabled:opacity-30`}
               style={{
                 borderColor: on ? "rgba(201,162,39,0.6)" : idleBorder,
                 background: on ? SURFACE.goldWashStrong : "transparent",
@@ -145,10 +164,34 @@ export function Tabs<T extends string | number>({
               )}
             </button>
           );
+
+          if (!tipId) return control;
+
+          // Hover *and* focus-within, so the blurb is reachable from a keyboard
+          // and not only from a mouse. No React state: an open/closed boolean
+          // per option would re-render the whole row on every pointer move
+          // across a control that lives in the header of every table hand.
+          return (
+            <span key={`${uid}-w-${i}`} className={`group relative ${cell}`}>
+              {control}
+              <span
+                role="tooltip"
+                id={tipId}
+                className="pointer-events-none invisible absolute left-1/2 top-[calc(100%+0.5rem)] z-50 w-56 -translate-x-1/2 border px-2.5 py-2 text-left font-cormorant text-[0.9rem] italic leading-snug text-ivory/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+                style={{
+                  borderColor: LINE.gold,
+                  background: "rgba(6,20,13,0.97)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                {option.hint}
+              </span>
+            </span>
+          );
         })}
       </div>
 
-      {showHint && active?.hint && (
+      {showHint && hintAs === "block" && active?.hint && (
         <p
           className="mt-2 font-cormorant text-[0.95rem] italic leading-snug text-ivory/60"
           data-testid={testIdPrefix ? `${testIdPrefix}-hint` : undefined}

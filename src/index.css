@@ -296,6 +296,50 @@ body {
   min-height: calc(100svh - var(--pp-header-h));
 }
 
+/*
+ * On a desktop window tall enough to hold a legal table, the table page is
+ * exactly one screen and does not scroll.
+ *
+ * Measured before this rule: at 1543x797 with a live decision the document was
+ * 1034px, so Fold and Call sat 240px below the fold and the player scrolled to
+ * act on every single decision. The 240px was never the felt. It was the page
+ * header and mode row (114px), the permanently expanded sizing ladder (140px)
+ * and a four-metric coach strip - all three of which are now a header slot, a
+ * popover and one line. `height` rather than `min-height` is what converts
+ * "the felt may flex into what is left" into "the felt takes what is left",
+ * and the `overflow: hidden` is the assertion: if anything ever overflows this
+ * box again it is a layout bug, and clipping makes it visible immediately
+ * rather than hiding it behind a scrollbar nobody notices.
+ *
+ * The 730px height query is not decoration, it is arithmetic. chrome.tsx
+ * computes the smallest cloth that can hold a seat, the board, the pot and the
+ * hero without any two overlapping, and lands on 502px of *bed*; below that the
+ * pot readout prints across the hero's hole cards. Adding the rail back gives a
+ * 558px felt, and the rest of the column is 52 header + 8 + 8 + 36 coach + 8 +
+ * 52 actions + 8 = 172. 558 + 172 = 730. Under that there is no arrangement
+ * that both fits and stays legal, so a short window goes back to scrolling.
+ * Scrolling is a worse experience; overlapping cards is a broken one.
+ */
+@media (min-width: 768px) and (min-height: 730px) {
+  .pp-shell main.pp-screen,
+  .pp-screen {
+    height: calc(100svh - var(--pp-header-h));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /*
+   * The felt absorbs whatever the column does not use, down to the legal floor
+   * and no further. `flex: 1 1 auto` with the floor as `min-height` is the
+   * whole mechanism: above 730px the table simply grows, and it can never be
+   * squeezed into the geometry chrome.tsx already ruled out.
+   */
+  .pp-screen .pp-table {
+    flex: 1 1 auto;
+    min-height: calc(31.5rem + 2 * var(--pp-rail-t));
+  }
+}
+
 /* ------------------------------------------------------------------------ */
 /* The table, as a physical object                                           */
 /*                                                                           */
@@ -363,6 +407,11 @@ body {
   --pp-table-r: clamp(2rem, 16%, 13rem) / clamp(2rem, 34%, 13rem);
 
   /*
+   * Desktop overrides this to a racetrack, below. The pair above is the phone
+   * and tablet shape and stays as it was.
+   */
+
+  /*
    * A grain tile: fractal noise, desaturated, rasterised once by the browser
    * and then tiled like any other image. `filter` appears inside the SVG, so
    * it is resolved at decode time, there is no CSS `filter` on any element.
@@ -381,6 +430,22 @@ body {
      * which is the tightest case.
      */
     --pp-table-r: clamp(2rem, 32%, 9rem) / clamp(2rem, 17%, 9rem);
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    /*
+     * A racetrack on a wide screen, not an egg.
+     *
+     * The previous pair took a 1400x560 box to an ellipse so pronounced that
+     * the only cloth a seat could sit on was the top arc, which is why four
+     * chairs clustered above the board and the left, right and lower thirds
+     * were empty green. Flattening the vertical radius opens the sides, and
+     * `seatLayout` puts chairs there. This is also, not incidentally, the
+     * shape of an actual casino table: a rectangle with semicircular ends.
+     */
+    --pp-table-r: clamp(2rem, 10%, 6rem) / clamp(2rem, 18%, 7rem);
   }
 }
 

@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { SURFACE } from "../ui";
 
 // ---------------------------------------------------------------------------
 // Viewport
@@ -275,12 +276,12 @@ export function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
         }
       : tone === "blind"
         ? {
-            background: "rgba(0,0,0,0.4)",
+            background: SURFACE.tray,
             color: "#e2c563",
             border: "1px solid rgba(201,162,39,0.55)",
           }
         : {
-            background: "rgba(0,0,0,0.35)",
+            background: SURFACE.sunk,
             color: "rgba(244,237,228,0.7)",
             border: "1px solid rgba(244,237,228,0.2)",
           };
@@ -570,7 +571,7 @@ export function BeliefBar({
   return (
     <span
       className="inline-flex h-1.5 overflow-hidden rounded-full"
-      style={{ width, background: "rgba(0,0,0,0.45)" }}
+      style={{ width, background: SURFACE.tray }}
       title={`weak ${Math.round(belief.weak * 100)}% · medium ${Math.round(
         belief.medium * 100
       )}% · strong ${Math.round(belief.strong * 100)}%`}

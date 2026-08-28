@@ -44,11 +44,22 @@ export const LINE = {
 
 /**
  * Backgrounds, in order of depth: `sunk` sits inside a panel, `panel` sits on
- * the felt, `tray` holds a row of controls.
+ * the felt, `tray` holds a row of controls, `overFelt` sits on the cloth itself
+ * and has to stay legible over a card face.
+ *
+ * Four, and the count is the point. These five names were already here and
+ * thirty-five call sites went round them anyway, hand-writing
+ * `rgba(0,0,0,0.2)`, `0.25`, `0.28`, `0.35`, `0.4`, `0.45` and `0.5` — seven
+ * shades of the same black for what are only ever three or four depths. Nobody
+ * can name that difference when they see it, which is exactly why it reads as
+ * clutter: every box looks like a slightly different kind of box, so the eye
+ * treats each one as a new thing to parse instead of recognising a repeat.
  */
 export const SURFACE = {
   sunk: "rgba(0,0,0,0.28)",
   tray: "rgba(0,0,0,0.42)",
+  /** On the cloth, under type that must survive a card face behind it. */
+  overFelt: "rgba(0,0,0,0.6)",
   panel:
     "linear-gradient(180deg, rgba(18,53,36,0.65) 0%, rgba(11,34,24,0.75) 100%)",
   goldWash: "rgba(201,162,39,0.12)",

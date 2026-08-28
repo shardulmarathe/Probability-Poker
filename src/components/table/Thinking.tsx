@@ -216,7 +216,7 @@ export function Thinking({
 
       <div
         className="h-[2px] w-full shrink-0"
-        style={{ background: "rgba(0,0,0,0.45)" }}
+        style={{ background: SURFACE.tray }}
       >
         <div
           className="h-full transition-[width] duration-500 ease-out"

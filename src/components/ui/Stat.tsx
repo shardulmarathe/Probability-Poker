@@ -21,7 +21,7 @@
  */
 
 import type { ReactNode } from "react";
-import { TONE, type Tone } from "./tokens";
+import { SURFACE, TONE, type Tone } from "./tokens";
 
 export interface StatProps {
   label: string;
@@ -67,7 +67,7 @@ function Track({ value, thin }: { value: number | null; thin?: boolean }) {
   return (
     <div
       className="mt-1.5 h-1 w-full overflow-hidden rounded-full"
-      style={{ background: "rgba(0,0,0,0.45)" }}
+      style={{ background: SURFACE.tray }}
     >
       {value !== null && (
         <div

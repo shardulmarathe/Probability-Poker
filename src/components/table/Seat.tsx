@@ -16,7 +16,7 @@
 
 import type { CSSProperties } from "react";
 import { PlayingCard } from "../PlayingCard";
-import { LINE } from "../ui";
+import { LINE, SURFACE } from "../ui";
 import { money } from "../../lib/format";
 import type { SeatFx } from "../../store/TableContext";
 import type { PositionName } from "../../poker/table/position";
@@ -183,7 +183,7 @@ function avatarStyle(state: SeatState, won: number | null): CSSProperties {
         : state === "allin"
           ? "rgba(163,2,34,0.7)"
           : "rgba(244,237,228,0.18)",
-    background: lit ? "rgba(201,162,39,0.14)" : "rgba(0,0,0,0.4)",
+    background: lit ? "rgba(201,162,39,0.14)" : SURFACE.tray,
     boxShadow: lit
       ? "inset 0 1px 0 rgba(255,240,200,0.25), var(--pp-shadow-contact)"
       : "var(--pp-shadow-contact)",
@@ -214,7 +214,7 @@ function Commit({
     <span
       className={`absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full py-0.5 pl-1.5 pr-2 font-mono text-[0.62rem] leading-none text-gold-soft ${pos}`}
       style={{
-        background: "rgba(0,0,0,0.6)",
+        background: SURFACE.overFelt,
         border: "1px solid rgba(201,162,39,0.4)",
       }}
     >

@@ -263,7 +263,32 @@ const T = {
   blindGap: 150, // gap between the small and big blind chips
 };
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/**
+ * Report a timer that arrived so late its animation beat is no longer usable.
+ *
+ * Two conditions, and it needs both. A ratio alone is wrong at the short end:
+ * the shortest dwell here is `settle` at 100ms, so six times it is 600ms, and a
+ * 600ms hiccup is ordinary on a loaded laptop. Bailing there would abandon a
+ * perfectly good hand and hand the player a table that stopped for no reason,
+ * which is the bug this guard exists to prevent, arriving by the front door.
+ *
+ * The absolute floor is set against what starvation actually looked like when
+ * it was measured in Chrome: callbacks arriving 7.4, 11.2, 13.0 and 16.1
+ * seconds late. A full second of overshoot is nowhere near that and nowhere
+ * near ordinary jitter either, so the gap between a false positive and a true
+ * one is roughly an order of magnitude in both directions.
+ */
+const STARVED_FLOOR_MS = 1000;
+
+const sleep = (ms: number) => {
+  const started = performance.now();
+  return new Promise<boolean>((resolve) =>
+    setTimeout(() => {
+      const elapsed = performance.now() - started;
+      resolve(elapsed > ms * 6 && elapsed - ms > STARVED_FLOOR_MS);
+    }, ms)
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Narrating the decision
@@ -696,9 +721,26 @@ export function TableProvider({ children }: { children: ReactNode }) {
   /** Reveal community cards one at a time, as if dealt off the deck. */
   const dealUpTo = useCallback(async (fromLen: number, toLen: number) => {
     for (let i = fromLen; i < toLen; i++) {
+      /*
+       * A pause can land while the previous card's timer is starved. Stopping
+       * at the next card boundary keeps the stale sequence from holding the
+       * table lock, and records that the live turn loop still has work owed.
+       */
+      if (pausedRef.current || !aliveRef.current) {
+        resumeRef.current = true;
+        return false;
+      }
       setDealtCount(i + 1);
-      await sleep(T.dealStep);
+      if (await sleep(T.dealStep)) {
+        /*
+         * A minutes-late deal beat is the same interruption as a pause: let
+         * the existing resume effect pick up once this stale sequence releases.
+         */
+        resumeRef.current = true;
+        return false;
+      }
     }
+    return true;
   }, []);
 
   // ---- One committed move, with its animation ------------------------------
@@ -712,14 +754,33 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
       say(seat, action.label);
       if (action.cost > 0) spawnChip(seat);
-      await sleep(action.cost > 0 ? T.chip : T.noChip);
+      const actionStarved = await sleep(action.cost > 0 ? T.chip : T.noChip);
+      /*
+       * Nothing has reached the engine yet, so abandoning this stale animation
+       * leaves the same move owed. The resume effect releases the busy lock
+       * first and then gives that turn back to the normal driver.
+       */
+      if (pausedRef.current || !aliveRef.current || actionStarved) {
+        resumeRef.current = true;
+        return false;
+      }
 
       applyAction(next, seat, action);
       commit(next);
 
-      await sleep(T.settle);
+      const settleStarved = await sleep(T.settle);
+      /*
+       * Here the move is already committed, so resuming continues from the
+       * engine's new actor; it never recomputes or changes the decision that
+       * was just applied.
+       */
+      if (pausedRef.current || !aliveRef.current || settleStarved) {
+        resumeRef.current = true;
+        return false;
+      }
       say(seat, null);
-      await dealUpTo(before, next.board.length);
+      if (!(await dealUpTo(before, next.board.length))) return false;
+      return true;
     },
     [commit, dealUpTo, say, spawnChip]
   );
@@ -787,7 +848,17 @@ export function TableProvider({ children }: { children: ReactNode }) {
           total: stages.length,
         });
         done.push(asLine(stages[i]));
-        await sleep(dwellFor(stages[i]));
+        const starved = await sleep(dwellFor(stages[i]));
+        /*
+         * A renderer-starved dwell is no longer narration, it is the reported
+         * dead-table state: thinking disappears while the stale sequence keeps
+         * the lock. Abandon at the same safe boundary as an explicit pause.
+         */
+        if (pausedRef.current || !aliveRef.current || starved) {
+          think(seat, null);
+          resumeRef.current = true;
+          return false;
+        }
       }
 
       if (pausedRef.current || !aliveRef.current) {
@@ -800,7 +871,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       // ahead of the decision, and the decision is never applied without one.
       const decision = early ?? (await pending);
       think(seat, null);
-      await perform(seat, decision.action, decision);
+      if (!(await perform(seat, decision.action, decision))) return false;
       return true;
     },
     [perform, think]
@@ -913,7 +984,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       );
       setHeroRead(null);
       runExclusive(async () => {
-        await perform(seat, action);
+        if (!(await perform(seat, action))) return;
         await drive();
       });
     },

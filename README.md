@@ -146,19 +146,21 @@ once per hand, across 5 table sizes × 5 scripted styles × 1,000 hands.
 
 ## Hand review
 
-Every finished hand opens into four tabs:
+Every finished hand opens into three tabs:
 
 - **Hand**, what happened, and what it cost each seat.
 - **Ranges**, the 13×13 chart of what the table thought everyone held,
   rebuilt exactly the way the sampler built it, plus the blockers your cards
   removed.
 - **Your play**, every decision, re-priced two ways, with the EV loss attributed.
-- **Math**, where the numbers on the other tabs come from: the Wilson interval
-  and why it isn't `p̂ ± 1.96·SE`, the street-by-street equity ladder and why the
-  last rung is a fact rather than an estimate, the made-hand distribution, Bayes'
-  rule on the actual likelihood rows used, the EV of every action *and every
-  size* considered with the fold-equity derivation behind each one, and what the
-  model has learned about you.
+
+The derivations sit next to the numbers they explain rather than in a tab of
+their own, each one collapsed until asked for (`src/components/report/derivations/`):
+the Wilson interval and why it isn't `p̂ ± 1.96·SE`, the street-by-street equity
+ladder and why the last rung is a fact rather than an estimate, the made-hand
+distribution, Bayes' rule on the actual likelihood rows used, the EV of every
+action *and every size* considered with the fold-equity derivation behind each
+one, and what the model has learned about you.
 
 The review reads the stored decision records rather than recomputing them, so the
 EV numbers on screen are literally the ones the bot decided with. The two things

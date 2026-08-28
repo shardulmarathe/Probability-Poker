@@ -164,7 +164,7 @@ $$
 
 Because the nine categories are mutually exclusive and exhaustive, $\sum_k \widehat{\Pr}(k)=1$. Two hands can share a win rate and be nothing alike: one that gets there by making flushes plays differently from one that gets there by making top pair, same average, different shape, different bets. The win probability is one number off this whole distribution.
 
-The review runs this at 20,000 trials, matching the budget the street-equity panel uses so the two panels' sampling error is the same size, and reports how many distinct runouts the deck actually allowed alongside it: where the deck allows fewer than 20,000, every runout is hit many times and the shape is exact to within rounding (`src/components/report/MathTab.tsx`).
+The review runs this at 20,000 trials, matching the budget the street-equity panel uses so the two panels' sampling error is the same size, and reports how many distinct runouts the deck actually allowed alongside it: where the deck allows fewer than 20,000, every runout is hit many times and the shape is exact to within rounding (`src/components/report/derivations/MadeHandDistribution.tsx`).
 
 ---
 
@@ -395,7 +395,7 @@ $$
 \frac{\widehat p + \frac{z^2}{2N} \pm z\sqrt{\dfrac{\widehat p(1-\widehat p)}{N} + \dfrac{z^2}{4N^2}}}{1 + \frac{z^2}{N}}.
 $$
 
-Because the bound is derived from the *true* $p$ rather than the estimate, it stays inside $[0,1]$ and retains positive width at $\widehat p \in \{0,1\}$ (`src/poker/core/stats.ts`, `wilsonInterval`, at $z = 1.959964$). At the extremes the two endpoints are equal only to within rounding, leaving ~$10^{-20}$ of dust, so $k=0$ and $k=n$ are snapped rather than clamped with an epsilon. The report surfaces the Wilson interval next to both the Wald standard error and the crude worst-case bound $\pm 100/\sqrt N$, so the gap between them is visible rather than hidden (`src/components/report/MathTab.tsx`).
+Because the bound is derived from the *true* $p$ rather than the estimate, it stays inside $[0,1]$ and retains positive width at $\widehat p \in \{0,1\}$ (`src/poker/core/stats.ts`, `wilsonInterval`, at $z = 1.959964$). At the extremes the two endpoints are equal only to within rounding, leaving ~$10^{-20}$ of dust, so $k=0$ and $k=n$ are snapped rather than clamped with an epsilon. The report surfaces the Wilson interval next to both the Wald standard error and the crude worst-case bound $\pm 100/\sqrt N$, so the gap between them is visible rather than hidden (`src/components/report/derivations/MonteCarloPrecision.tsx`).
 
 ### How many simulations, and why
 The live table's budget is per-street and per-field-size (`src/poker/model/decider.ts`):

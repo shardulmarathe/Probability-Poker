@@ -99,14 +99,22 @@ export function useProfileArchive(): ProfileView {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, version]);
 
-  const seatCount = useMemo(
-    () =>
-      archive.hands.reduce((n, hand) => Math.max(n, hand.seatCount), table.seats.length),
-    [archive.hands, table.seats.length]
-  );
+  // How many seats the picker may offer, and the archive is the only honest
+  // source for it. The live table used to be folded in with `Math.max`, so
+  // sitting down at a six-max table put "Seat 5" and "Seat 6" in the picker
+  // while every archived hand was four-handed: both chairs profiled zero hands
+  // and read as a player who never plays, which is a claim about a seat that
+  // has never existed. The live table is the fallback only while the archive is
+  // empty, and there the page renders its empty state with no picker at all.
+  const seatCount = useMemo(() => {
+    const widest = archive.hands.reduce((n, hand) => Math.max(n, hand.seatCount), 0);
+    return widest > 0 ? widest : table.seats.length;
+  }, [archive.hands, table.seats.length]);
 
   const defaultSeat = heroSeat ?? archive.stored.heroSeat ?? 0;
-  const seat = Math.min(seatCount - 1, seatOverride ?? defaultSeat);
+  // `seatCount` is at least 1 whenever a hand exists, but a first paint with an
+  // empty archive and no table yet would otherwise clamp the seat to -1.
+  const seat = Math.max(0, Math.min(seatCount - 1, seatOverride ?? defaultSeat));
 
   const seatName = useCallback(
     (id: number) => {

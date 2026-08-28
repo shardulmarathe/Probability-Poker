@@ -26,6 +26,52 @@ import { LINE, RADIUS, SURFACE, TONE } from "../ui";
 /** Completed stages kept visible above the current one. */
 const HISTORY = 3;
 
+/** Completed stages kept on the felt rail, which has ~100px of cloth to use. */
+const RAIL_HISTORY = 2;
+
+/**
+ * Stage titles that name an algorithm, said as the poker they stand for.
+ *
+ * The store's titles are written from the decider's side of the fence, which is
+ * right for the store, and "Rejection-sampling the field" is a true description
+ * of what `equity/pool` does. It is not a description a player recognises,
+ * though, and this panel is read by someone waiting to act rather than by
+ * someone reading the source. Only titles that would need a computer-science
+ * gloss are translated; "Reading the table" and "Pricing every size" are
+ * already poker and are left exactly as the store wrote them.
+ */
+const POKER_TITLES: Record<string, string> = {
+  "Rejection-sampling the field": "Simulating the rest of the hand",
+};
+
+/**
+ * Detail clauses this panel does not print, and the words it renames.
+ *
+ * The shard split ("4 shards (1,667 + 1,667 + 1,667 + 1,666)") is real and it
+ * is worth showing, which is why it is not deleted from the product: it is the
+ * one number that proves the estimate is reproducible across machines, and the
+ * review's derivations are where a player goes to be shown that. Beside a live
+ * decision it is noise, and it was the longest clause on the longest line.
+ * Same for "on common random numbers", which explains a variance-reduction
+ * trick nobody is asking about while they hold a hand.
+ */
+const ENGINE_CLAUSE = /\bshards?\b/;
+
+/** The store's stage, said in poker. Titles it does not know pass through. */
+function poker(line: ThinkLine): ThinkLine {
+  const detail = line.detail
+    ?.split(" · ")
+    .filter((clause) => !ENGINE_CLAUSE.test(clause))
+    .join(" · ")
+    .replace(/\btrials\b/g, "runouts")
+    .replace(/ on common random numbers/g, "");
+  return {
+    ...line,
+    title: POKER_TITLES[line.title] ?? line.title,
+    detail: detail || null,
+  };
+}
+
 export interface ThinkingProps {
   /**
    * The seat's current frame, straight from `fx.seats[id].thinking`. Null when
@@ -55,22 +101,39 @@ export interface ThinkingProps {
    */
   compact?: boolean;
   /**
-   * Who is on the clock. Compact only: the gold ring on a 28px avatar is easy
-   * to miss while reading this dock, so the name sits in the same line.
+   * The side rail on the wide felt. Three stages at most, one line of detail
+   * each, no header and no per-size table: the strip of cloth below the board
+   * and beside the hero is about 100px tall at the felt's floor height, and a
+   * panel that outgrows it is a panel back on top of the community cards,
+   * which is the bug this placement exists to fix. The per-size breakdown is
+   * deferred to the review, alongside the shard split, for the same reason.
+   *
+   * `who` is shown here too: nothing else on the rail says whose decision this
+   * is, because the rail is not attached to a chair.
+   */
+  rail?: boolean;
+  /**
+   * Who is on the clock. Compact and rail only: the gold ring on a 28px avatar
+   * is easy to miss while reading this dock, so the name sits in the same line.
    */
   who?: string;
 }
 
 export function Thinking({
-  step,
+  step: raw,
   className,
   history = HISTORY,
   compact = false,
+  rail = false,
   who,
 }: ThinkingProps) {
-  if (!step) return null;
+  if (!raw) return null;
+  // The store's frame, restated in poker, before anything below reads it. Doing
+  // it once here rather than at each print site is what keeps a `Done` row and
+  // the `Current` row that produced it saying the same words.
+  const step: ThinkStep = { ...raw, ...poker(raw), done: raw.done.map(poker) };
 
-  const keep = compact ? 0 : history;
+  const keep = compact ? 0 : rail ? RAIL_HISTORY : history;
   const hidden = Math.max(0, step.done.length - Math.max(0, keep));
   const shown = step.done.slice(hidden);
   const progress = step.total > 0 ? (step.step + 1) / step.total : 0;
@@ -82,7 +145,7 @@ export function Thinking({
       data-testid="thinking"
       data-step={step.step}
       data-total={step.total}
-      className={`w-full min-w-0 overflow-hidden border ${RADIUS.surface} ${className ?? ""}`}
+      className={`flex w-full min-w-0 flex-col overflow-hidden border ${RADIUS.surface} ${className ?? ""}`}
       style={{
         borderColor: LINE.gold,
         // The panel gradient over a near-opaque base rather than straight on
@@ -96,7 +159,9 @@ export function Thinking({
         boxShadow: "0 10px 30px rgba(0,0,0,0.45)",
       }}
     >
-      {!compact && (
+      {/* The rail carries the count on its live line instead. A 100px panel
+          cannot spend a quarter of itself on a title bar. */}
+      {!compact && !rail && (
         <header
           className="flex items-baseline justify-between gap-2 border-b px-3 py-1.5"
           style={{ borderColor: LINE.goldFaint }}
@@ -114,12 +179,16 @@ export function Thinking({
           gets, and on a 390px phone that is most of the felt. The cap is a
           backstop rather than the usual case: nothing is hidden until the panel
           would otherwise be taller than the screen it is floating over.
-          Compact skips the cap: the dock is the live stage only. */}
+          Compact skips the cap: the dock is the live stage only. The rail takes
+          its ceiling from whatever cloth its wrapper gives it, `min-h-0` so the
+          list is what scrolls and the progress bar stays on the bottom edge. */}
       <div
         className={
           compact
             ? "px-2.5 py-1.5"
-            : "max-h-[min(60vh,26rem)] overflow-y-auto px-3 py-2"
+            : rail
+              ? "min-h-0 flex-1 overflow-y-auto px-2.5 py-1.5"
+              : "max-h-[min(60vh,26rem)] overflow-y-auto px-3 py-2"
         }
       >
         {!compact && hidden > 0 && (
@@ -131,15 +200,24 @@ export function Thinking({
         <ol className="min-w-0">
           {!compact &&
             shown.map((line, i) => (
-              <Done key={`${hidden + i}-${line.title}`} line={line} />
+              <Done key={`${hidden + i}-${line.title}`} line={line} rail={rail} />
             ))}
           {/* Re-keyed on the step index so each new stage fades in on arrival
               rather than the text swapping under a static box. */}
-          <Current key={step.step} step={step} compact={compact} who={who} />
+          <Current
+            key={step.step}
+            step={step}
+            compact={compact}
+            rail={rail}
+            who={who}
+          />
         </ol>
       </div>
 
-      <div className="h-[2px] w-full" style={{ background: "rgba(0,0,0,0.45)" }}>
+      <div
+        className="h-[2px] w-full shrink-0"
+        style={{ background: "rgba(0,0,0,0.45)" }}
+      >
         <div
           className="h-full transition-[width] duration-500 ease-out"
           style={{
@@ -159,9 +237,9 @@ export function Thinking({
  * of the pipeline, while its detail is held to one line, because three past
  * stages at full height would push the current one off a phone.
  */
-function Done({ line }: { line: ThinkLine }) {
+function Done({ line, rail }: { line: ThinkLine; rail?: boolean }) {
   return (
-    <li className="relative min-w-0 pb-1.5 pl-4">
+    <li className={`relative min-w-0 pl-4 ${rail ? "pb-1" : "pb-1.5"}`}>
       <Rail />
       <Bead filled />
       <p className="truncate font-display text-[0.68rem] font-semibold text-ivory/50">
@@ -170,10 +248,15 @@ function Done({ line }: { line: ThinkLine }) {
       {/*
        * The detail wraps rather than truncating. These lines are the counts the
        * narration exists to show, a clipped "1,225 of 1,326 combos surv…" is
-       * worse than one that takes a second line.
+       * worse than one that takes a second line. The rail is the exception, and
+       * for the same reason: there, a second line is one fewer stage on screen.
        */}
       {line.detail && (
-        <p className="font-mono text-[0.55rem] leading-snug text-ivory/28">
+        <p
+          className={`font-mono text-[0.55rem] leading-snug text-ivory/28 ${
+            rail ? "truncate" : ""
+          }`}
+        >
           {line.detail}
         </p>
       )}
@@ -185,14 +268,47 @@ function Done({ line }: { line: ThinkLine }) {
 function Current({
   step,
   compact,
+  rail,
   who,
 }: {
   step: ThinkStep;
   compact?: boolean;
+  rail?: boolean;
   who?: string;
 }) {
+  const short = who?.trim().split(/\s+/).pop();
+
+  if (rail) {
+    return (
+      <li className="pp-thought relative min-w-0 pl-4">
+        <Bead />
+        <p className="flex items-baseline gap-1.5 font-display text-[0.72rem] font-semibold leading-snug text-ivory">
+          {short && (
+            <span className="shrink-0" style={{ color: TONE.gold }}>
+              {short}
+            </span>
+          )}
+          <span className="min-w-0 truncate">{step.title}</span>
+          <span
+            className="ml-auto shrink-0 font-mono text-[0.55rem] tabular-nums"
+            style={{ color: TONE.gold }}
+          >
+            {step.step + 1}/{step.total}
+          </span>
+        </p>
+        {step.detail && (
+          <p
+            className="truncate font-mono text-[0.55rem] leading-snug"
+            style={{ color: TONE.gold }}
+          >
+            {step.detail}
+          </p>
+        )}
+      </li>
+    );
+  }
+
   if (compact) {
-    const short = who?.trim().split(/\s+/).pop();
     return (
       <li className="pp-thought min-w-0">
         <p className="flex items-center gap-1.5 font-display text-[0.8rem] font-semibold leading-none text-ivory">

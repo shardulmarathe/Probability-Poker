@@ -11,9 +11,18 @@
  * On a phone the whole thing moves into a bottom sheet. Six seats, a board and
  * a slider do not coexist on a 390px screen, and shrinking the desktop layout
  * until they do produces a slider nobody can hit.
+ *
+ * On a wide screen it now moves into a popover that opens *upward*, over the
+ * felt. The sizing panel used to sit in the flow above the buttons on every
+ * decision, all 140px of it, and it was the single largest reason Fold and Call
+ * were ~240px below the fold at 1440x760. It is also the wrong default: most
+ * decisions are taken at the rung already selected, so the common case is now
+ * one click on `Raise to $150` and the ladder is one click away for the rest.
+ * Nothing was deleted, the slider and all five rungs are the same control in a
+ * different place, and they cost the column no height at all.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { money } from "../../lib/format";
 import type { SizingOption, TableAction } from "../../poker/table/rules";
 import { ActionButton, LINE, RADIUS, Tabs } from "../ui";
@@ -77,14 +86,41 @@ export function ActionBar({
     raise ? defaultCost(raise, sizings) : 0
   );
   const [sheet, setSheet] = useState(false);
+  const [ladder, setLadder] = useState(false);
+  const ladderRef = useRef<HTMLDivElement>(null);
 
   // A new decision point invalidates the chosen size, the legal range has
   // moved and the old number may not even be legal any more.
   useEffect(() => {
     setSheet(false);
+    setLadder(false);
     setCost(raise ? defaultCost(raise, sizings) : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decisionKey]);
+
+  /*
+   * Esc and a click outside close the ladder without betting.
+   *
+   * The distinction is the whole safety property of a popover that sits over
+   * the board: opening it must never be a commitment, so every way out of it
+   * that is not a button inside it leaves the chips where they are. Dragging
+   * the slider does not commit either, for the same reason.
+   */
+  useEffect(() => {
+    if (!ladder) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLadder(false);
+    };
+    const onDown = (event: PointerEvent) => {
+      if (!ladderRef.current?.contains(event.target as Node)) setLadder(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [ladder]);
 
   if (actions.length === 0) return null;
 
@@ -94,20 +130,6 @@ export function ActionBar({
 
   return (
     <div className="w-full">
-      {raise && !narrow && (
-        <div className="mx-auto mb-2.5 w-full max-w-2xl">
-          <SizingPanel
-            raise={raise}
-            sizings={sizings}
-            cost={cost}
-            pot={pot}
-            toCall={toCall}
-            stack={stack}
-            onChange={setCost}
-          />
-        </div>
-      )}
-
       <div
         className={
           narrow
@@ -120,7 +142,12 @@ export function ActionBar({
             key={action.type}
             action={action.type}
             data-testid={`action-${action.type}`}
-            onClick={() => onAct(action)}
+            // Folding or calling with the ladder open is an answer to it, so
+            // it closes rather than hanging over the next player's turn.
+            onClick={() => {
+              setLadder(false);
+              onAct(action);
+            }}
             className={
               narrow ? "min-w-0 flex-1" : "flex-1 sm:min-w-[8rem] sm:flex-none"
             }
@@ -129,18 +156,107 @@ export function ActionBar({
           </ActionButton>
         ))}
 
-        {commit && (
-          <ActionButton
-            action={commit.type}
-            data-testid={`action-${commit.type}`}
-            onClick={() => (narrow ? setSheet(true) : onAct(commit))}
-            className={
-              narrow ? "min-w-0 flex-1" : "flex-1 sm:min-w-[9rem] sm:flex-none"
-            }
-          >
-            {narrow ? (commit.type === "bet" ? "Bet…" : "Raise…") : commit.label}
-          </ActionButton>
-        )}
+        {commit &&
+          (narrow ? (
+            <ActionButton
+              action={commit.type}
+              data-testid={`action-${commit.type}`}
+              onClick={() => setSheet(true)}
+              className="min-w-0 flex-1"
+            >
+              {commit.type === "bet" ? "Bet…" : "Raise…"}
+            </ActionButton>
+          ) : (
+            /*
+             * The split button. Two controls in one shape because they are two
+             * halves of one decision: the left commits at the size already
+             * chosen, the right asks for a different one. `group-hover` lifts
+             * both halves together, otherwise hovering one opens a visible
+             * seam down the middle of what should read as a single button.
+             */
+            <div ref={ladderRef} className="group relative flex-none">
+              {ladder && raise && (
+                /*
+                 * One surface, not two.
+                 *
+                 * The panel and its confirm button used to be separate boxes
+                 * with a gap between them, and because the popover grows
+                 * upward from the split button, that gap landed exactly on the
+                 * coach line: the confirm read as a detached button sitting on
+                 * top of "calling is −EV". The wrapper carries the border and
+                 * the opaque ground now, and `SizingPanel` goes bare inside it.
+                 */
+                <div
+                  className={`absolute bottom-full right-0 z-40 mb-2 w-[21rem] max-w-[calc(100vw-1.5rem)] border p-3 ${RADIUS.surface}`}
+                  role="dialog"
+                  aria-label="Choose a size"
+                  style={{
+                    borderColor: LINE.gold,
+                    background:
+                      "radial-gradient(120% 120% at 50% 0%, #16402c 0%, #0b2218 70%)",
+                    boxShadow: "0 18px 45px rgba(0,0,0,0.72)",
+                  }}
+                >
+                  <SizingPanel
+                    bare
+                    raise={raise}
+                    sizings={sizings}
+                    cost={cost}
+                    pot={pot}
+                    toCall={toCall}
+                    stack={stack}
+                    onChange={setCost}
+                    // A rung is a decision, not a setting: clicking "¾ pot"
+                    // means bet three quarters, and making the player then
+                    // find the confirm button is the third click this popover
+                    // exists to remove. The slider is the opposite, it moves
+                    // through dozens of values on the way to one.
+                    onPick={(next) => {
+                      setLadder(false);
+                      onAct(sized(raise, next));
+                    }}
+                  />
+                  <ActionButton
+                    action={raise.type}
+                    data-testid="sizing-confirm"
+                    onClick={() => {
+                      setLadder(false);
+                      onAct(sized(raise, cost));
+                    }}
+                    className="mt-2 w-full"
+                  >
+                    {sized(raise, cost).label}
+                  </ActionButton>
+                </div>
+              )}
+
+              <div className="flex items-stretch">
+                <ActionButton
+                  action={commit.type}
+                  data-testid={`action-${commit.type}`}
+                  onClick={() => onAct(commit)}
+                  className="min-w-[9rem] rounded-r-none border-r-0 group-hover:-translate-y-0.5"
+                >
+                  {commit.label}
+                </ActionButton>
+                <ActionButton
+                  action={commit.type}
+                  data-testid="sizing-open"
+                  aria-label="Choose a size"
+                  aria-expanded={ladder}
+                  onClick={() => setLadder((was) => !was)}
+                  className="rounded-l-none group-hover:-translate-y-0.5"
+                  // Inline, not `px-3`: `ActionButton` already carries
+                  // `px-4 sm:px-6`, and two utilities setting the same property
+                  // are resolved by stylesheet order rather than by class
+                  // order, so the wider one would silently win.
+                  style={{ paddingLeft: "0.7rem", paddingRight: "0.7rem" }}
+                >
+                  {ladder ? "▾" : "▴"}
+                </ActionButton>
+              </div>
+            </div>
+          ))}
       </div>
 
       {raise && narrow && sheet && (
@@ -181,6 +297,8 @@ function SizingPanel({
   toCall,
   stack,
   onChange,
+  onPick,
+  bare = false,
 }: {
   raise: TableAction;
   sizings: SizingOption[];
@@ -189,6 +307,19 @@ function SizingPanel({
   toCall: number;
   stack: number;
   onChange: (cost: number) => void;
+  /**
+   * Drop the panel's own border and ground because a parent is already
+   * providing them. The desktop popover is one surface with the confirm button
+   * inside it; the phone sheet still wants the panel to be its own object.
+   */
+  bare?: boolean;
+  /**
+   * Called after `onChange` when a preset rung is chosen, never when the
+   * slider moves. Optional, and absent in the phone sheet, where the confirm
+   * button is already the only way out and acting on a rung would fire the
+   * moment a thumb brushed one.
+   */
+  onPick?: (cost: number) => void;
 }) {
   const min = raise.min ?? raise.cost;
   const max = raise.max ?? raise.cost;
@@ -207,8 +338,23 @@ function SizingPanel({
 
   return (
     <div
-      className={`border p-3 ${RADIUS.surface}`}
-      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.42)" }}
+      className={bare ? "" : `border p-3 ${RADIUS.surface}`}
+      style={{
+        borderColor: bare ? undefined : LINE.gold,
+        /*
+         * Near-opaque, and a shadow, because this panel no longer sits in the
+         * flow on dark page background: it floats over the felt, and the felt
+         * under it is the hero's own hole cards and nameplate. At the old
+         * `rgba(0,0,0,0.42)` a king of diamonds read straight through "Raise
+         * to" and the rung labels, which made the control look broken rather
+         * than transparent. The sheet on a phone has always been opaque for
+         * exactly this reason.
+         */
+        background: bare
+          ? undefined
+          : "radial-gradient(120% 120% at 50% 0%, #16402c 0%, #0b2218 70%)",
+        boxShadow: bare ? undefined : "0 18px 45px rgba(0,0,0,0.72)",
+      }}
     >
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">
@@ -250,7 +396,10 @@ function SizingPanel({
           size="sm"
           testIdPrefix="sizing"
           value={preview.cost}
-          onChange={onChange}
+          onChange={(next) => {
+            onChange(next);
+            onPick?.(next);
+          }}
           options={sizings.map((option) => ({
             value: option.cost,
             label: option.label,

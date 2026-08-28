@@ -22,6 +22,21 @@ import { pct } from "../../lib/format";
 import { GRID_CELLS, GRID_LABELS } from "../../poker/model/range";
 import type { TableHandReport } from "../../poker/table/contract";
 import { RangeGrid } from "./RangeGrid";
+/**
+ * The derivations that belong to this tab.
+ *
+ * All four used to be sections of a `Math` tab four clicks and fifteen screens
+ * away from the chart they explain. They render inside the disclosure the
+ * caller opens, next to the number that raised the question: the bucket ladder
+ * beside the bucket bars, the Bayes worked example beside the three-tier
+ * narrowing strip it moves.
+ */
+import {
+  BayesWorked,
+  HandClasses,
+  MultiwayCompounding,
+  WhatTheTableLearned,
+} from "./derivations";
 import {
   BUCKET_COUNT,
   CELL_TOTAL,
@@ -149,11 +164,19 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                   </span>
                 </div>
 
-                {/* Chart on the left at its natural size, the numbers it
-                    summarises beside it — one opponent should not leave half
-                    the panel empty, and four should not stack four charts of
-                    different widths. */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
+                {/*
+                 * Chart on the left, everything that reads it on the right.
+                 *
+                 * The left track was 28rem, which drew a 470px square in a
+                 * 1000px panel and left the right-hand half of every opponent
+                 * card empty, and the chart then offered a Zoom button to undo
+                 * the shortage the layout had invented. 44rem uses the width
+                 * that was already there, and the tier meters, the bucket
+                 * ladder and the two paragraphs that interpret them sit beside
+                 * the chart instead of under it, so an opponent is about one
+                 * screen rather than two.
+                 */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] lg:gap-6">
                   <RangeGrid
                     testId={`grid-${v.seat}`}
                     title={`${seatName(v.seat)} — ${street.label}`}
@@ -295,6 +318,14 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
             and how much narrower it got when they raised.
           </Why>
         </HowCalculated>
+
+        <HowCalculated label="What A Cell Is, Once There Is A Board">
+          <HandClasses report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
+
+        <HowCalculated label="Why A Second Opponent Costs More Than The First">
+          <MultiwayCompounding report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
       </Section>
 
       {/* ------------------------------------------------------------------ */}
@@ -373,6 +404,18 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           ))}
           <span className="font-mono">right-hand figure = P(strong)</span>
         </div>
+
+        <HowCalculated label="One Action, One Posterior">
+          <BayesWorked report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
+
+        {/* The strip above is what this table believed during this hand. This
+            is the other direction, what a table would come to believe about
+            the reviewer over the whole archive, and it belongs beside the
+            strip because it is the same arithmetic run on a longer record. */}
+        <HowCalculated label="What This Table Would Learn About You">
+          <WhatTheTableLearned report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
       </Section>
 
       {/* ------------------------------------------------------------------ */}
@@ -384,7 +427,9 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           <p className="text-sm text-ivory/55">This seat was dealt no cards.</p>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
+            {/* Same two tracks as the opponent charts above, so the two
+                13x13s on this tab are the same size and can be compared. */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] lg:gap-6">
               <RangeGrid
                 testId="grid-blockers"
                 title={`Combinations removed by ${cardText(heroHole)}`}

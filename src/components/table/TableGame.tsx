@@ -27,15 +27,18 @@ import { Button, ButtonLink, LINE, RADIUS, Rail, Tabs } from "../ui";
 import { ActionBar } from "./Actions";
 import { CoachPanel } from "./CoachPanel";
 import { SeatView } from "./Seat";
+import { TableChrome } from "./TableChrome";
 import { Thinking } from "./Thinking";
 import {
   ChipLayer,
-  POT_CENTRE,
   PotChips,
   TableStyles,
   boardTop,
+  feltSize,
+  potCentre,
   seatLayout,
   useNarrow,
+  useWide,
 } from "./chrome";
 
 const STREET_LABEL: Record<Street, string> = {
@@ -83,7 +86,9 @@ export default function TableGame() {
   } = useTable();
 
   const narrow = useNarrow();
-  const points = seatLayout(table.seats.length, narrow);
+  const wide = useWide();
+  const felt = feltSize(narrow, wide);
+  const points = seatLayout(table.seats.length, felt);
   const playing = table.status === "playing";
   const handOver = !playing && !!lastReport;
   const heroTurn = playing && heroSeat !== null && table.toAct === heroSeat;
@@ -172,14 +177,39 @@ export default function TableGame() {
           paddingRight: "max(0.5rem, env(safe-area-inset-right))",
         }}
       >
-        <TopBar
-          handNumber={table.handNumber}
-          seatCount={table.seats.length}
-          mode={mode}
-          onMode={setMode}
-          observer={options.observer}
-          narrow={narrow}
-        />
+        {/*
+         * Wide screens hang the mode switch and the hand rail in the app bar
+         * and keep nothing of the old header row but the heading, which stays
+         * as the document outline's first entry. Losing it would leave a screen
+         * reader's outline for the main activity of the product starting at
+         * "Hand #4", which is the bug `PageHeader` was written to fix.
+         *
+         * Below `lg` the bar is already full at four nav links, so the page
+         * keeps its own row.
+         */}
+        {wide ? (
+          <>
+            <h1 className="sr-only">
+              {options.observer ? "The table" : "Your table"}
+            </h1>
+            <TableChrome
+              handNumber={table.handNumber}
+              seatCount={table.seats.length}
+              mode={mode}
+              onMode={setMode}
+              observer={options.observer}
+            />
+          </>
+        ) : (
+          <TopBar
+            handNumber={table.handNumber}
+            seatCount={table.seats.length}
+            mode={mode}
+            onMode={setMode}
+            observer={options.observer}
+            narrow={narrow}
+          />
+        )}
 
         {/* ------------------------------ Table ----------------------------- */}
         {/*
@@ -192,17 +222,32 @@ export default function TableGame() {
          * clear a seat, the board and the hero, and only the rail knows how
          * much of the outer box it is taking.
          */}
-        <div className="pp-table mt-3 flex-1 sm:mt-4">
+        {/* `lg:mt-0`: at `lg` the row this was clearing is in the app bar, and
+            a margin under nothing is 16px of the budget for free. */}
+        <div className="pp-table mt-3 flex-1 sm:mt-4 lg:mt-0">
           <div className="pp-table-bed">
             {/* The dealer's arc, printed on the cloth. */}
             <div aria-hidden className="pp-table-arc" />
 
-            {/* Centre: the board, with the street and pot read out beneath it */}
+            {/*
+             * Centre: the board, with the street and pot read out beside it at
+             * `lg` and beneath it below that.
+             *
+             * Beside, because underneath cost a 34px row plus its gap directly
+             * under the community cards, and that row is what set the board's
+             * height in the no-overlap sum in `chrome.tsx`. Lifting it out
+             * takes the whole block from 150px to the height of one card, which
+             * is where the felt found the room to drop its seat arc into the
+             * middle of the cloth. Under `lg` the bed is not wide enough to
+             * hold five large cards and a pot readout side by side, so those
+             * widths keep the stack, and `chrome.tsx` keeps the geometry that
+             * goes with it.
+             */}
             <div
               className="absolute z-[5] flex w-full flex-col items-center gap-2 px-2 sm:gap-2.5"
               style={{
-                left: `${POT_CENTRE.x}%`,
-                top: `${boardTop(narrow)}%`,
+                left: `${potCentre(felt).x}%`,
+                top: `${boardTop(felt)}%`,
                 transform: "translate(-50%, 0)",
               }}
             >
@@ -224,7 +269,13 @@ export default function TableGame() {
                 })}
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Taken out of flow at `lg` rather than made a flex sibling of
+                  the cards: as a sibling the pair would be centred *with* the
+                  board, which slides the flop off the table's own axis. Pinned
+                  to 14rem right of centre it clears the widest board (5 × 5rem
+                  plus gaps) and the cards stay where the felt is drawn around
+                  them. */}
+              <div className="flex items-center gap-2 lg:absolute lg:left-1/2 lg:top-1/2 lg:ml-[14rem] lg:-translate-y-1/2 lg:flex-col lg:items-start lg:gap-1.5">
                 <span
                   className="rounded-full border px-3 py-1 font-display text-[0.6rem] font-semibold uppercase tracking-[0.25em] sm:px-4 sm:text-[0.68rem] sm:tracking-[0.3em]"
                   style={{
@@ -279,12 +330,58 @@ export default function TableGame() {
               />
             ))}
 
-            <ChipLayer chips={fx.chips} points={points} />
+            <ChipLayer
+              chips={fx.chips}
+              points={points}
+              centre={potCentre(felt)}
+            />
+
+            {/*
+             * The deciding bot's transcript, on a rail rather than on its chair.
+             *
+             * It hung off the thinking seat until this round, which read well
+             * and covered the flop: a chair on the top arc opens downward, and
+             * at four-handed the chair above the board *is* the one above the
+             * board. Every other direction runs into a neighbouring seat or off
+             * the cloth, so it lives here instead, in the one strip of felt that
+             * is guaranteed empty at every table size, below the board and to
+             * the left of the hero. The seat's name goes inside the panel so the
+             * narration is still attached to a player.
+             *
+             * The top is the board's own anchor plus a card (7rem) and a gap,
+             * so the rail cannot reach the community cards however tall the bed
+             * grows. `bottom` closes the box, which makes the panel's ceiling
+             * the space that is actually free rather than a number guessed here,
+             * and at the felt's floor height that is about 100px, which is what
+             * caps the transcript at three stages.
+             */}
+            {wide && thinkingSeat && (
+              <div
+                className="pointer-events-none absolute z-30 flex items-end"
+                style={{
+                  left: "1.5rem",
+                  width: "min(15rem, 24%)",
+                  top: `calc(${boardTop(felt)}% + 8.25rem)`,
+                  bottom: "1.25rem",
+                }}
+              >
+                <Thinking
+                  step={thinkingSeat.step}
+                  rail
+                  who={thinkingSeat.name}
+                  className="max-h-full"
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* ---------------------------- Controls ---------------------------- */}
-        <div className="mt-2 flex min-h-[4.25rem] flex-col justify-end gap-1.5 sm:mt-3 sm:min-h-[6rem] sm:gap-2">
+        {/* The old `sm:min-h-[6rem]` reserved room for the in-flow sizing
+            panel, which is now a popover over the felt. Left in place it was
+            44px of empty column directly above the buttons this round exists
+            to bring back on screen. */}
+        <div className="mt-2 flex min-h-[4.25rem] flex-col justify-end gap-1.5 sm:mt-3 sm:gap-2">
           <CoachPanel
             mode={mode}
             read={heroRead}
@@ -313,12 +410,13 @@ export default function TableGame() {
               narrow={narrow}
               onAct={act}
             />
-          ) : narrow && thinkingSeat ? (
+          ) : !wide && thinkingSeat ? (
             /*
-             * On a phone the narration does not fit beside the chair. It docks
-             * here, one live stage, and the gold-ringed seat is who is deciding.
-             * The extra "X is deciding" line used to stack on the transcript
-             * and steal a row the felt needed.
+             * Below `lg` the narration does not fit on the cloth at all: the
+             * felt is too narrow for the rail to clear the board. It docks
+             * here, one live stage, and the gold-ringed seat is who is
+             * deciding. The extra "X is deciding" line used to stack on the
+             * transcript and steal a row the felt needed.
              */
             <Thinking step={thinkingSeat.step} compact who={thinkingSeat.name} />
           ) : (
@@ -335,14 +433,19 @@ export default function TableGame() {
 // ---------------------------------------------------------------------------
 
 /**
- * The table's own header: what this page is, what it is showing you, and how to
- * change either.
+ * The table's own header, below `lg` only: what this page is, what it is
+ * showing you, and how to change either.
  *
  * `/table` had no `<h1>` at all, the main activity of the whole product opened
  * with a link labelled "← New table" and a chip reading "HAND #1". It also had
- * the only copy of the mode switch, whose three blurbs were `title=` attributes
- * and therefore invisible to every phone. Both fixed here: a real heading, and
- * the active mode's meaning printed under the control that sets it.
+ * the only copy of the mode switch, whose blurbs were `title=` attributes and
+ * therefore invisible to every phone. Both fixed here: a real heading, and the
+ * active mode's meaning printed under the control that sets it.
+ *
+ * From `lg` up this is not rendered at all and `TableChrome` puts the same
+ * controls in the app bar, because the row is worth ~114px and a 760px window
+ * has no 114px to spare between the felt and the buttons. It survives at the
+ * smaller widths because the bar there is already full of nav.
  */
 function TopBar({
   handNumber,

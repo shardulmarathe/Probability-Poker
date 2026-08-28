@@ -16,6 +16,7 @@
 
 import type { CSSProperties } from "react";
 import { PlayingCard } from "../PlayingCard";
+import { LINE } from "../ui";
 import { money } from "../../lib/format";
 import type { SeatFx } from "../../store/TableContext";
 import type { PositionName } from "../../poker/table/position";
@@ -27,13 +28,11 @@ import {
   BeliefBar,
   ChipStack,
   SpeechBubble,
-  ThoughtPocket,
   bubbleAlign,
   chipStacks,
   useNarrow,
   type SeatPoint,
 } from "./chrome";
-import { Thinking } from "./Thinking";
 
 export interface SeatViewProps {
   seat: TableSeat;
@@ -117,26 +116,23 @@ export function SeatView(props: SeatViewProps) {
       data-seat-reveal={props.reveal ? "1" : "0"}
     >
       {/*
-       * While a bot is deciding, its chair carries the transcript of the
-       * decision rather than a one-line thought bubble. `Thinking` narrates the
-       * real pipeline, range construction, shard counts, the sizes actually
-       * priced, and it is mounted exactly where the bubble was, hanging off
-       * the seat that is thinking, so the narration stays attached to the
-       * player it belongs to. `ThoughtPocket` supplies only the placement.
+       * A chair says what it did, and nothing else.
+       *
+       * It used to carry the whole decision transcript while the bot was
+       * thinking, hung off the seat by a `ThoughtPocket`. That kept the
+       * narration attached to its player and, on the top arc, printed it
+       * straight over the community cards, because a top-arc chair opens
+       * downward toward the pot and the transcript is an opaque panel a
+       * quarter of the felt tall. `TableGame` docks it on a rail on the cloth
+       * now, named, and what is left here is the one-line bubble it always was.
        */}
-      {props.fx.thinking && !compact ? (
-        <ThoughtPocket side={side} align={align} clearance={hasCommit}>
-          <Thinking step={props.fx.thinking} />
-        </ThoughtPocket>
-      ) : (
-        props.fx.bubble && (
-          <SpeechBubble
-            text={props.fx.bubble}
-            side={side}
-            align={align}
-            clearance={hasCommit}
-          />
-        )
+      {props.fx.bubble && (
+        <SpeechBubble
+          text={props.fx.bubble}
+          side={side}
+          align={align}
+          clearance={hasCommit}
+        />
       )}
 
       {hero ? (
@@ -242,16 +238,37 @@ function Commit({
  * The signed result of the finished hand. Gold for a profit, muted red for a
  * loss, the same two colours the felt already uses for a win and for an
  * all-in, so it needs no legend.
+ *
+ * `beside` is the showdown case, where this prints next to the seat's stack.
+ * At the same size and weight those two numbers read as one statement, and a
+ * seat that rebought showed "Textbook Tara  $1000  \u2212$1000", which looks like
+ * arithmetic that does not add up rather than like the two different facts it
+ * is: what she has in front of her, and what this hand cost her. A hairline
+ * rule and a step down in size separate them without a label, which is the
+ * only option, because at 8.5rem wide the chair has room for neither word.
  */
-function Net({ net, className }: { net: number | null; className?: string }) {
+function Net({ net, beside }: { net: number | null; beside?: boolean }) {
   if (net === null || net === 0) return null;
   return (
     <span
-      className={`${className ?? ""} font-mono`}
-      style={{ color: net > 0 ? "#e2c563" : "#e58a8a" }}
+      className={`inline-flex items-baseline gap-1.5 font-mono ${
+        beside ? "ml-1.5" : ""
+      }`}
     >
-      {net > 0 ? "+" : "\u2212"}
-      {money(Math.abs(net))}
+      {beside && (
+        <span
+          aria-hidden
+          className="h-[0.85em] w-px self-center"
+          style={{ background: LINE.gold }}
+        />
+      )}
+      <span
+        className={beside ? "text-[0.85em]" : undefined}
+        style={{ color: net > 0 ? "#e2c563" : "#e58a8a" }}
+      >
+        {net > 0 ? "+" : "\u2212"}
+        {money(Math.abs(net))}
+      </span>
     </span>
   );
 }
@@ -332,7 +349,7 @@ function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, 
           {narrow && (
             <span className="shrink-0 font-mono text-sm text-ivory/80">
               <Stack seat={seat} tight settled={settled} />
-              <Net net={net} className="ml-1" />
+              <Net net={net} beside />
             </span>
           )}
         </div>
@@ -345,7 +362,7 @@ function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, 
                 {money(seat.streetCommit)} in
               </span>
             )}
-            <Net net={net} />
+            <Net net={net} beside />
           </div>
         )}
       </div>
@@ -425,7 +442,7 @@ function FullSeat({
         </div>
         <div className="font-mono text-xs text-ivory/75">
           <Stack seat={seat} settled={settled} />
-          <Net net={net} className="ml-1" />
+          <Net net={net} beside />
         </div>
         {/* Study's addition is the *live* read, not the static one. The
             archetype names the style in a line; the full blurb lives on hover

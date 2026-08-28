@@ -41,6 +41,21 @@ export function useNarrow(query = "(max-width: 767px)"): boolean {
   return narrow;
 }
 
+/**
+ * Whether the table is running its wide layout, Tailwind's `lg` and up.
+ *
+ * A second seam rather than a wider `useNarrow`, because three things change at
+ * `lg` and none of them change at 768px: the mode switch moves into the app
+ * bar (the header slot is `hidden lg:flex`, and rendering the switch in both
+ * places would put two controls with the same `data-testid` on the page), the
+ * page-level `TopBar` disappears with it, and the bot's transcript gets a side
+ * rail on the cloth. Between 768px and 1024px the felt is too narrow for that
+ * rail to sit clear of the board, so that band keeps the phone's arrangement.
+ */
+export function useWide(): boolean {
+  return !useNarrow("(max-width: 1023px)");
+}
+
 // ---------------------------------------------------------------------------
 // Seat geometry
 // ---------------------------------------------------------------------------
@@ -51,34 +66,83 @@ export interface SeatPoint {
   y: number;
 }
 
-/** Middle of the board, the target every chip flies to. */
-export const POT_CENTRE: SeatPoint = { x: 50, y: 48 };
+/**
+ * Which felt is being laid out. Every number below is keyed off this.
+ *
+ * Three rather than two, and the middle one is not a compromise between the
+ * other two, it is the layout this table shipped with. `wide` gets the reshaped
+ * arc because it is the only width where the street and pot pills fit beside
+ * the board instead of under it, and that 38px is what pays for the arc coming
+ * down. Between 768px and 1024px they do not fit (five large cards plus a pot
+ * readout is wider than the bed), so the board stays 150px tall there, and a
+ * 150px board under a lowered arc does not clear the hero. That band therefore
+ * keeps the geometry it has always had, which is proven and which nothing this
+ * round is trying to fix.
+ */
+export type FeltSize = "phone" | "mid" | "wide";
+
+/** The seam, given the two media queries the table already watches. */
+export const feltSize = (narrow: boolean, wide: boolean): FeltSize =>
+  narrow ? "phone" : wide ? "wide" : "mid";
 
 /**
- * Top edge of the centre column (board, then the street and pot pills).
+ * Middle of the board, the target every chip flies to.
+ *
+ * Follows `boardTop`, so it is per-felt for the same reason that is: the wide
+ * board now sits half the cloth down. A single figure left the chips landing in
+ * the empty green a hundred pixels above the flop, which reads as the animation
+ * being broken rather than as a pot being pushed.
+ */
+export const potCentre = (felt: FeltSize): SeatPoint => ({
+  x: 50,
+  y: felt === "wide" ? 60 : 48,
+});
+
+/**
+ * Top edge of the board.
  *
  * Anchored by its top rather than centred for the same reason the seats are:
  * the seat directly above it grows downward as Study mode adds a read, and the
  * one thing that must not move is where the board starts.
  *
- * These percentages and `MIN_FELT` below are one calculation, not two. At four
- * and six-handed a seat sits directly above the board, so the felt has to hold
- * a full stack, seat, board, pot, hero, without overlap:
+ * These percentages, `ARCS` below and the `.pp-table` floor in index.css are
+ * one calculation, not three. At four and six-handed a seat sits directly above
+ * the board, so the cloth has to hold a full stack, seat, board, hero, without
+ * any two of them touching. Against a bed of height H, on the wide felt:
  *
- *   board top   0.40H  >=  0.02H + 177 (seat) + 10   ->  H >= 492
- *   hero top    0.84H - 56  >=  0.40H + 150 + 15     ->  H >= 502
+ *   board top   0.50H       >=  0.12H + 177 (seat) + 10   ->  H >= 492
+ *   hero top    0.87H - 56  >=  0.50H + 112 (board) + 15  ->  H >= 495
+ *   hero foot   0.87H + 56  <=  H                         ->  H >= 431
  *
- * Hence a 32rem floor on wide screens. Below it the page scrolls, which is the
- * honest failure: a short window gets a scrollbar, never a seat on top of the
- * flop.
+ * so the bed has to be 495px, and index.css never lets it under 504: 31.5rem
+ * plus the rail while the page is height-locked, 32rem plus the rail when it is
+ * not. Below that the page scrolls, which is the honest failure: a short window
+ * gets a scrollbar, never a seat on top of the flop. `mid` runs the same
+ * sum against a 150px board and its own arc, and lands on H >= 502, which is
+ * why it is unchanged: the same floor already covers it.
+ *
+ * Two figures moved on `wide` this round and both moved the same way. The board
+ * is 112px rather than 150px because the street and pot pills now sit to its
+ * right instead of under it, and the arc dropped from a 0.02H crown to 0.12H,
+ * which is where the reclaimed 38px went. The board itself moved from 0.40H to
+ * 0.50H: the felt's old fault was a top-heavy ellipse over an empty lower
+ * third, and the fix is to put the community cards *in* that third rather than
+ * to shrink anything.
+ *
+ * The design this round was handed asked for a 0.20H crown over a 0.34H board.
+ * That is 74px of cloth for a 177px chair at the floor, so at four-handed the
+ * seat above the board would have printed straight through the flop, which is
+ * the exact bug this comment has existed to prevent. The arc is as low as the
+ * arithmetic allows instead.
  *
  * A phone runs the same sum against a compact seat (~130px) and a narrower
  * board, and lands on a 25rem floor. Its board sits lower in the felt than the
- * desktop's: a phone's control bar is short, so the felt ends up ~650px tall,
- * and a board anchored high leaves one enormous void between the pot and the
- * hero instead of a little breathing room on either side of it.
+ * wide one's used to: a phone's control bar is short, so the felt ends up ~650px
+ * tall, and a board anchored high leaves one enormous void between the pot and
+ * the hero instead of a little breathing room on either side of it.
  */
-export const boardTop = (narrow: boolean): number => (narrow ? 42 : 40);
+export const boardTop = (felt: FeltSize): number =>
+  felt === "wide" ? 50 : felt === "phone" ? 42 : 40;
 
 /**
  * Seat anchors for an `n`-handed table, seat 0 first.
@@ -95,12 +159,29 @@ export const boardTop = (narrow: boolean): number => (narrow ? 42 : 40);
  * felt) and downward (into the community cards) as its contents change. Pinning
  * the top edge makes a seat grow in one direction only, which is what lets
  * Study mode add a read and a blurb without moving anything else.
+ *
+ * The wide arc is flatter and wider than the other two (`ry` 20 against 26 and
+ * 28, `rx` 46 against 42 and 41) and its centre sits lower. That is the whole
+ * shape change this round: a tall narrow ellipse crowded every chair into the
+ * top third of the cloth and left the bottom third empty, so the table read as
+ * a small board floating in green rather than as players sitting around one.
+ * `cy - ry` is capped at 0.12 by the no-overlap sum in `boardTop` above, and
+ * 32/20 is the lowest, flattest pair that reaches it.
+ *
+ * `rx` is bounded by the felt's width rather than its height: a full chair is
+ * 8.5rem wide, so at six-handed the outermost pair sits at 10.2% and 89.8% and
+ * hangs 68px either side of that, which still clears both edges of the bed at
+ * 1024px. Anything wider puts a chair on the rail.
  */
-export function seatLayout(n: number, narrow: boolean): SeatPoint[] {
-  const rx = narrow ? 42 : 41;
-  const ry = narrow ? 26 : 28;
-  const cy = narrow ? 28 : 30;
-  const points: SeatPoint[] = [{ x: 50, y: narrow ? 86 : 84 }];
+const ARCS: Record<FeltSize, { rx: number; ry: number; cy: number; hero: number }> = {
+  phone: { rx: 42, ry: 26, cy: 28, hero: 86 },
+  mid: { rx: 41, ry: 28, cy: 30, hero: 84 },
+  wide: { rx: 46, ry: 20, cy: 32, hero: 87 },
+};
+
+export function seatLayout(n: number, felt: FeltSize): SeatPoint[] {
+  const { rx, ry, cy, hero } = ARCS[felt];
+  const points: SeatPoint[] = [{ x: 50, y: hero }];
   const k = n - 1;
   for (let j = 0; j < k; j++) {
     const rad = ((180 - ((j + 1) * 180) / (k + 1)) * Math.PI) / 180;
@@ -289,38 +370,18 @@ export function SpeechBubble({
   );
 }
 
-/**
- * Where a bot's thinking hangs off its chair.
- *
- * Placement only, no skin, no border, no background. What used to live here
- * was a cream speech bubble that paraphrased the decision in one line; the
- * transcript that replaced it (`Thinking`) brings its own surface and its own
- * account of the pipeline, and it is a panel rather than a bubble, so wrapping
- * it in a second bordered box would be two frames around one thing.
- *
- * `pointer-events-none` because it hangs over the cloth and the seats beneath
- * it: it is something you read, never something you press.
+/*
+ * `ThoughtPocket` used to live here: the placement box that hung a bot's whole
+ * decision transcript off its own chair. It is gone, and the reason is
+ * arithmetic rather than taste. A chair on the top arc opens downward, toward
+ * the pot, so the transcript, an opaque panel roughly 250px tall, landed
+ * squarely on the flop, and at four-handed the chair it hung from is the one
+ * directly above the board. There is no direction it could open in that clears
+ * both the community cards and the neighbouring chairs; the cloth is simply
+ * full. `TableGame` docks it in the bottom-left of the bed instead, below the
+ * board and beside the hero, and names the seat inside the panel so the
+ * narration is still attached to a player.
  */
-export function ThoughtPocket({
-  side,
-  align = "center",
-  clearance = false,
-  children,
-}: {
-  side: "top" | "bottom";
-  align?: BubbleAlign;
-  clearance?: boolean;
-  children: React.ReactNode;
-}) {
-  const pos = offset(side, clearance);
-  return (
-    <div
-      className={`pp-bubble pointer-events-none absolute z-30 w-[min(20rem,62vw)] ${ALIGN[align]} ${pos}`}
-    >
-      {children}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Chips
@@ -456,14 +517,17 @@ export function PotChips({
 export function ChipLayer({
   chips,
   points,
+  centre,
 }: {
   chips: { id: number; seat: number }[];
   points: SeatPoint[];
+  /** Where the chips land. `potCentre`, passed in so the layer stays dumb. */
+  centre: SeatPoint;
 }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
       {chips.map((chip) => {
-        const from = points[chip.seat] ?? POT_CENTRE;
+        const from = points[chip.seat] ?? centre;
         return (
           <span
             key={chip.id}
@@ -472,8 +536,8 @@ export function ChipLayer({
               {
                 "--sx": `${from.x}%`,
                 "--sy": `${from.y}%`,
-                "--px": `${POT_CENTRE.x}%`,
-                "--py": `${POT_CENTRE.y}%`,
+                "--px": `${centre.x}%`,
+                "--py": `${centre.y}%`,
               } as React.CSSProperties
             }
           />

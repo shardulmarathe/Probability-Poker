@@ -20,6 +20,17 @@
  * simulations per decision, so it runs off the first paint rather than in
  * render, and every panel that depends on it degrades to a stated absence
  * rather than to an approximation made out of numbers that mean something else.
+ *
+ * ## The three derivations at the foot of the two sections
+ *
+ * All collapsed. The EV columns raise two questions this tab used to answer on
+ * a different tab fifteen screens away — how a number in a column called "Model
+ * loss" was arrived at, and what a bet is worth beyond the α it has to clear —
+ * so `ExpectedValue` and `FoldEquityAlphaMdf` hang off the per-move section
+ * that prints them. `RiverEquilibrium` hangs off the EV Loss section, under the
+ * costliest-decision callout: that callout names the line that priced better
+ * against a read, and equilibrium is the other yardstick, the one that holds
+ * against an opponent who knew the strategy in advance.
  */
 
 import { useEffect, useState } from "react";
@@ -35,6 +46,11 @@ import type {
   TableHandReport,
 } from "../../poker/table/contract";
 import { STREET_LABEL, readsAfter, requiredEquity, seatResult } from "./derive";
+import {
+  ExpectedValue,
+  FoldEquityAlphaMdf,
+  RiverEquilibrium,
+} from "./derivations";
 import {
   Calc,
   EmptyPanel,
@@ -365,6 +381,13 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
             Two panels, two labels, no arithmetic between them.
           </Why>
         </HowCalculated>
+
+        {/* The costliest-decision callout above names the line that priced
+            better against the read. This is the other yardstick for the same
+            move, and it is the one a read cannot flatter. */}
+        <HowCalculated label="Equilibrium, And What It Would Have Done">
+          <RiverEquilibrium report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
       </Section>
 
       {/* ------------------------------------------------------------------ */}
@@ -508,13 +531,25 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
             that move's own pot. They need no simulation and no read — like pot
             odds, they are the half of the decision that is pure arithmetic. What
             the bet is actually <em>worth</em> needs one more thing, the equity
-            against the hands that do not fold, and that is on the Math tab.
+            against the hands that do not fold, and that is the next panel down.
           </Lead>
           <Why>
             Pot odds are the half of the decision that never needs a computer.
             Getting 3 to 1 means 25%; everything else is working out whether the
             hand is better than that.
           </Why>
+        </HowCalculated>
+
+        {/* Against the EV columns in every card above. The first works the
+            general form on this hand's own pot and pot share; the second is the
+            half of a bet the showdown formula never counts, which is exactly
+            the thing the α line printed against each bet stops short of. */}
+        <HowCalculated label="Expected Value, Worked On This Hand">
+          <ExpectedValue report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
+
+        <HowCalculated label="Fold Equity, α and MDF">
+          <FoldEquityAlphaMdf report={report} focus={focus} seatName={seatName} />
         </HowCalculated>
       </Section>
 

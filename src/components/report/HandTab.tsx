@@ -3,8 +3,17 @@
  *
  * The factual layer: the board, who sat where and what it cost them, how the
  * pot was cut up and why, the order the chips went in, and how the equity moved
- * street by street. Nothing here is advice. Everything on the other three tabs
- * is derived from what this one shows.
+ * street by street. Nothing here is advice. Everything on the other tabs is
+ * derived from what this one shows.
+ *
+ * ## Why there are derivations on a factual tab
+ *
+ * Four of them, all collapsed. They used to be a fifteen-screen Math tab, which
+ * meant a reader who wondered what the `±` on an equity bar was doing there had
+ * to leave the bar, find the tab, and scroll past nine unrelated sections to
+ * reach the answer. Each one now hangs off the figure that raises it, shut
+ * until asked: the ± and the field-versus-pairwise gap on the head-to-head
+ * panel, the runout distribution under the "Final hand" column.
  */
 
 import { useMemo } from "react";
@@ -18,6 +27,12 @@ import {
   seatResult,
   streetEquities,
 } from "./derive";
+import {
+  EquityLadder,
+  MadeHandDistribution,
+  MonteCarloPrecision,
+  MultiwayCompounding,
+} from "./derivations";
 import {
   CardRow,
   Calc,
@@ -170,8 +185,13 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                     <td className="py-2 pr-3 font-mono text-xs text-ivory/60">
                       {positionOf(s.seat, report.button, report.seatCount)}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs text-ivory/80">
-                      {cardText(s.hole)}
+                    {/* Glyph cards, not `cardText`. The same two cards are drawn
+                        as cards 300px above this row, and printing them here as
+                        "Ah Kd" made the reader translate between two notations
+                        for one fact. `xs` is a fixed 1.55rem chip, small enough
+                        that it does not set the row height. */}
+                    <td className="py-2 pr-3">
+                      <CardRow cards={s.hole} size="xs" empty="not shown" />
                     </td>
                     <td className="py-2 pr-3 text-xs text-ivory/70">
                       {s.final?.name ?? (s.status === "folded" ? "mucked" : "—")}
@@ -200,6 +220,13 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
           is the one place where hindsight is the point. At the table those hands
           stay face down.
         </p>
+
+        {/* The "Final hand" column reports the one category the deck produced.
+            This is the distribution it was drawn from, which is the question
+            that column raises and never answers. */}
+        <HowCalculated label="What This Hand Could Become">
+          <MadeHandDistribution report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
       </Section>
 
       {/* ------------------------------------------------------------------ */}
@@ -458,6 +485,22 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             your real cards never enter it and it comes out the same whether you
             held aces or 7-2.
           </Why>
+        </HowCalculated>
+
+        {/* Three derivations, all shut, all anchored to something printed a few
+            hundred pixels up: the `±` suffix on a sampled bar, the line the
+            bars would trace if you drew one street after another, and the gap
+            between "vs field" and every pairwise number beside it. */}
+        <HowCalculated label="Monte Carlo Precision, And The ± On Every Estimate">
+          <MonteCarloPrecision report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
+
+        <HowCalculated label="Equity As Information Arrives">
+          <EquityLadder report={report} focus={focus} seatName={seatName} />
+        </HowCalculated>
+
+        <HowCalculated label="Multiway Is Not Heads-Up">
+          <MultiwayCompounding report={report} focus={focus} seatName={seatName} />
         </HowCalculated>
       </Section>
     </div>

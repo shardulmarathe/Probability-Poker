@@ -32,6 +32,12 @@
  * its own horizontal scroller for anyone who wants to read it cell by cell.
  * Shape by default, detail on demand, and the page itself never scrolls
  * sideways in either mode.
+ *
+ * Desktop: none of that applies, and the control is hidden.
+ * ---------------------------------------------------------
+ * From 1024px the chart gets a 44rem column of its own, ~50px cells, which is
+ * bigger than zoom ever made it. Leaving the button there would have offered
+ * the reader a way to shrink the chart labelled "Zoom".
  */
 
 import { memo, useState } from "react";
@@ -42,11 +48,16 @@ const RANKS = "AKQJT98765432";
 export function RangeGridStyles() {
   return (
     <style>{`
-/* A chart wider than about 28rem stops being a chart and becomes wallpaper:
-   the cells outgrow their labels and the shape gets harder to read, not
-   easier. The cap lets the grid fill a phone and a narrow column alike, and
-   keeps it the same size in a 1200px panel. */
+/* The cap keeps the grid from stretching to whatever width it is handed. It
+   used to be 28rem everywhere, on the argument that a wider chart becomes
+   wallpaper, and that argument held while the chart sat in a single column
+   with prose underneath it. In the two-column layout the Ranges tab now uses
+   it did the opposite: a 470px square floating in a 1500px panel with the
+   right half empty, and a Zoom button offered to fix the problem the layout
+   had created. 44rem is 704px, ~50px cells, which is the size a hand chart is
+   printed at everywhere else in poker. */
 .rg-wrap { position: relative; max-width: 28rem; }
+@media (min-width: 1024px) { .rg-wrap { max-width: 44rem; } }
 .rg-scroll { overflow: visible; }
 .rg-scroll--zoom { overflow-x: auto; overflow-y: hidden; padding-bottom: 0.35rem; }
 .rg {
@@ -110,6 +121,22 @@ export function RangeGridStyles() {
 .rg-cell:hover .rg-v, .rg-cell:focus .rg-v { display: block; }
 .rg--zoom .rg-v { display: block; }
 .rg--zoom .rg-cell:hover, .rg--zoom .rg-cell:focus { transform: scale(1.3); }
+/* Above 1024px the fitted chart (704px) is already larger than the zoomed one
+   (13 x 2.15rem = 464px), so the control is hidden there. The state can still
+   be on, set at phone width and carried into a resized window, and a grid
+   stuck at 464px with no visible way back would be the worse bug: at this
+   width zoom simply resolves to fit. */
+@media (min-width: 1024px) {
+  .rg-zoom-btn { display: none; }
+  .rg-scroll--zoom { overflow: visible; }
+  .rg--zoom {
+    grid-template-columns: 0.95rem repeat(13, minmax(0, 1fr));
+    width: 100%;
+    font-size: 0.66rem;
+  }
+  .rg--zoom .rg-v { display: none; }
+  .rg--zoom .rg-cell:hover, .rg--zoom .rg-cell:focus { transform: scale(2.6); }
+}
 @media (prefers-reduced-motion: reduce) {
   .rg-cell { transition: none; }
 }
@@ -218,7 +245,7 @@ function RangeGridImpl({
           type="button"
           onClick={() => setZoom((z) => !z)}
           aria-pressed={zoom}
-          className="min-h-[30px] shrink-0 rounded-md border px-2 py-1 font-display text-[0.6rem] uppercase tracking-wider transition"
+          className="rg-zoom-btn min-h-[30px] shrink-0 rounded-md border px-2 py-1 font-display text-[0.6rem] uppercase tracking-wider transition"
           style={{
             borderColor: zoom ? "rgba(201,162,39,0.6)" : "rgba(244,237,228,0.16)",
             background: zoom ? "rgba(201,162,39,0.18)" : "rgba(0,0,0,0.3)",

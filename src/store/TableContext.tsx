@@ -13,11 +13,14 @@
  *   1. One animated sequence at a time, released in a `finally`. A rejected
  *      decision or a wedged worker must not leave the table locked forever.
  *   2. Modes gate rendering only. Nothing here consults `mode` before deciding
- *      anything, the bots' information set is identical in Fair, Coach and
- *      Study, so a hand studied is the same hand as a hand played. `mode` is
- *      read in exactly two places, and both are display: the human's coach
- *      equity, and how much of a bot's narration is filled in (see "the
- *      information boundary" in `performBot`). Neither reaches the engine.
+ *      anything, the bots' information set is identical in Fair, Drill, Coach
+ *      and Study, so a hand studied is the same hand as a hand played. `mode`
+ *      is read in exactly two places, and both are display: whether the human's
+ *      coach equity is worth running at all, and how much of a bot's narration
+ *      is filled in (see "the information boundary" in `performBot`). Neither
+ *      reaches the engine. Drill's verdict deliberately reads no mode at all,
+ *      it is priced on every hero action in all four and `CoachPanel` decides
+ *      whether it is printed.
  *
  * The provider outlives the felt: `/review`, `/profile` and `/replay` are
  * mounted inside it too, because the hand history lives here and a separately
@@ -40,6 +43,7 @@ import {
   loadSetup,
   saveSetup,
   startingStack,
+  DRILL_THRESHOLD_BB,
   type TableMode,
   type TableSetup as TableOptions,
 } from "../lib/tableOptions";
@@ -47,6 +51,7 @@ import {
   asyncTableDecider,
   closesAction,
   equityRequest,
+  evByAction,
   handActions,
   readsFromActions,
   sizedCandidates,
@@ -158,6 +163,23 @@ export interface HeroRead {
   opponents: number[];
 }
 
+/**
+ * What Drill has to say about a move already made, or null when it has nothing.
+ *
+ * Silence is the common case and it is the point of the mode: a trainer that
+ * narrates every hand teaches you to read the narration, not the spot. This is
+ * only ever populated when the action taken cost more than `DRILL_THRESHOLD_BB`
+ * big blinds against the model.
+ *
+ * `better` is the action itself rather than a sentence, because how an action
+ * is spoken is the view's business, and the store has no opinion on wording.
+ */
+export interface DrillVerdict {
+  better: TableAction;
+  /** Chips the move taken gave up against `better`, always positive. */
+  loss: number;
+}
+
 interface TableContextValue {
   table: Table;
   options: TableOptions;
@@ -170,6 +192,10 @@ interface TableContextValue {
   /** Public reads, seat-keyed, the bots' information set, not a privileged one. */
   reads: Record<number, BeliefDistribution>;
   heroRead: HeroRead | null;
+  /** Drill's read on the move just made. Priced in every mode, printed in one. */
+  drillVerdict: DrillVerdict | null;
+  /** Put the verdict away. It is advice, not an alert; it must be closable. */
+  dismissDrill: () => void;
   history: TableHandReport[];
   lastReport: TableHandReport | null;
   /** How much the bots have learned about this player, for the UI to state. */
@@ -461,6 +487,51 @@ function planStages(
 }
 
 // ---------------------------------------------------------------------------
+// Drill
+// ---------------------------------------------------------------------------
+
+/**
+ * Price the move the human just made against the best one available.
+ *
+ * `evByAction` is the same pricer Study's EV chips print from, deliberately: a
+ * player who switches Drill on after a session in Study must not be told a
+ * different story about the same spot by a second, privately written valuer.
+ *
+ * The action taken is priced alongside the legal set rather than looked up in
+ * it, because a sized raise ("Raise to $150") is not one of the actions
+ * `legalActions` returned, that one carries the minimum. Labels that do collide
+ * carry the same cost and therefore the same EV, so the overwrite is a no-op.
+ *
+ * Null is the answer in three cases, and all three are silence rather than a
+ * guess: no estimate arrived before the human acted (they were faster than one
+ * Monte Carlo run), there was nothing to choose between, or the loss is inside
+ * `DRILL_THRESHOLD_BB`, which is roughly the width of the interval the equity
+ * itself was measured to. Interrupting for that would be teaching sampling
+ * error.
+ */
+function priceDrill(
+  read: HeroRead | null,
+  choices: TableAction[],
+  taken: TableAction,
+  bigBlind: number
+): DrillVerdict | null {
+  if (!read || choices.length === 0) return null;
+  const evs = evByAction(
+    [...choices, taken],
+    read.equity,
+    read.pot,
+    read.toCall
+  );
+  let better = choices[0];
+  for (const option of choices) {
+    if (evs[option.label] > evs[better.label]) better = option;
+  }
+  const loss = evs[better.label] - evs[taken.label];
+  if (loss <= DRILL_THRESHOLD_BB * bigBlind) return null;
+  return { better, loss };
+}
+
+// ---------------------------------------------------------------------------
 
 export function TableProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<TableOptions>(loadSetup);
@@ -500,9 +571,17 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const [thinking, setThinking] = useState<Record<number, ThinkStep | null>>({});
   const [chips, setChips] = useState<ChipFx[]>([]);
   const [heroRead, setHeroRead] = useState<HeroRead | null>(null);
+  const [drillVerdict, setDrillVerdict] = useState<DrillVerdict | null>(null);
 
   const tableRef = useRef(table);
   tableRef.current = table;
+  // Read the same way `tableRef` is. `act` has to price the move against the
+  // estimate that was live at the decision, and it clears that estimate in the
+  // same call; listing `heroRead` as a dependency instead would rebuild `act`
+  // on every Monte Carlo result and hand the action bar a new callback
+  // mid-decision.
+  const heroReadRef = useRef<HeroRead | null>(null);
+  heroReadRef.current = heroRead;
   // Read the same way `tableRef` is, and for the same reason: the bot loop is a
   // long-lived async sequence that must see the mode as it is *now*, and putting
   // `options` in its dependency list would rebuild `drive`, and re-fire the
@@ -741,6 +820,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       setBubbles({});
       setThinking({});
       setHeroRead(null);
+      setDrillVerdict(null);
       if (next.status === "playing") {
         const { sb, bb } = blindSeats(next.button, next.seats.length);
         spawnChip(sb);
@@ -785,6 +865,28 @@ export function TableProvider({ children }: { children: ReactNode }) {
       if (t.status !== "playing" || t.toAct === null) return;
       if (t.seats[t.toAct].kind !== "human") return;
       const seat = t.toAct;
+      /*
+       * Drill's verdict is priced here, before the move is applied, because
+       * this is the last moment the pot, the price and the estimate all still
+       * describe the decision that was actually faced.
+       *
+       * Written unconditionally, and that is the design: no mode is consulted,
+       * every mode pays the same handful of multiplications, and `CoachPanel`
+       * alone decides whether the result is printed. Gating it on `mode` here
+       * would put a rendering choice on the path an action takes into the
+       * engine, which is the one thing this file may not do.
+       *
+       * Set on every hero action, so it also clears itself, a verdict from the
+       * previous decision can never sit underneath the current one.
+       */
+      setDrillVerdict(
+        priceDrill(
+          heroReadRef.current,
+          legalActions(t, seat, t.config),
+          action,
+          t.config.bigBlind
+        )
+      );
       setHeroRead(null);
       runExclusive(async () => {
         await perform(seat, action);
@@ -793,6 +895,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
     },
     [drive, perform, runExclusive]
   );
+
+  const dismissDrill = useCallback(() => setDrillVerdict(null), []);
 
   /*
    * Why these two queue instead of returning.
@@ -925,10 +1029,15 @@ export function TableProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(id);
   }, [paused, options.observer, busy, table.status, table.handNumber, nextHand]);
 
-  // ---- Coach / Study equity for the human ----------------------------------
+  // ---- Coach / Drill / Study equity for the human --------------------------
   //
   // Display only. It runs when the human is on the clock and is thrown away the
   // moment they act, so a stale number can never be shown next to a live board.
+  //
+  // Fair Play is the only mode that skips it. Drill needs this number even
+  // though it prints nothing while you decide, it is what the verdict is priced
+  // from once you have acted, and there is no second chance to measure a
+  // decision after the cards have moved on.
   const heroTurn =
     heroSeat !== null && table.status === "playing" && table.toAct === heroSeat;
   const heroKey = heroTurn
@@ -1021,6 +1130,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
       fx,
       reads,
       heroRead,
+      drillVerdict,
+      dismissDrill,
       history,
       lastReport: table.lastReport,
       memory,
@@ -1039,6 +1150,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
       fx,
       reads,
       heroRead,
+      drillVerdict,
+      dismissDrill,
       history,
       memory,
       forgetMe,

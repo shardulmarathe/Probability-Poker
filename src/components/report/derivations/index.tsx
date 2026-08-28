@@ -22,6 +22,14 @@
  * own `EmptyPanel` saying which record is missing, never `null` and never a
  * fabricated number: a hand restored from storage has no decision trail, and
  * silence there reads as "there was nothing to compute", which is false.
+ *
+ * ## The rule the maths obeys
+ *
+ * Every figure quoted in a derivation is pulled out of the report rather than
+ * invented for the example, so the arithmetic can be checked against the tables
+ * on the tab around it. Where the hand did not produce a number, nobody was
+ * ever priced, no action moved a belief, the derivation says so instead of
+ * falling back to a textbook illustration that never happened.
  */
 
 import type { TableHandReport } from "../../../poker/table/contract";

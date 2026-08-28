@@ -154,7 +154,16 @@ export default function Profile() {
           }
         />
 
-        {/* ------------------------ Whose profile ------------------------ */}
+        {/*
+         * ------------------------ Whose profile ------------------------
+         *
+         * `seatCount` is the widest table the *archive* holds, never the table
+         * sitting now. The picker therefore lists chairs that have played, so
+         * a four-handed archive read at a six-max table no longer offers Seat 5
+         * and Seat 6 and then profiles them from nothing. The fix is in
+         * `useProfile.ts`; filtering here would have left the same wrong number
+         * in every other consumer of the view.
+         */}
         {seatCount > 1 && !empty && (
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="font-display text-sm font-semibold tracking-wide text-ivory/70">

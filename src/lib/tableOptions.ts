@@ -29,6 +29,12 @@ import { MAX_SEATS, MIN_SEATS } from "../poker/table/position";
  * the action you took cost you more than `DRILL_THRESHOLD_BB` big blinds
  * against the model. That distinction is the whole mode — a trainer that
  * narrates every hand teaches you to read the narration, not the spot.
+ *
+ * Drill judges folds, checks and calls only, and the blurb says so rather than
+ * promising a verdict on every move. The forward-looking pricer it uses has no
+ * fold equity, so it cannot value a bet without being biased against it; see
+ * `priceDrill` in `store/TableContext.tsx` for why silence is the right answer
+ * there rather than a confident and backwards one.
  */
 export type TableMode = "fair" | "drill" | "coach" | "study";
 
@@ -41,7 +47,7 @@ export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
   {
     id: "drill",
     name: "Drill",
-    blurb: "Silent until you misplay one, then it says what was better.",
+    blurb: "Says nothing until a fold, check or call costs you chips.",
   },
   {
     id: "coach",

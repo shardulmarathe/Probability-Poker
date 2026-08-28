@@ -515,15 +515,39 @@ function priceDrill(
   taken: TableAction,
   bigBlind: number
 ): DrillVerdict | null {
-  if (!read || choices.length === 0) return null;
-  const evs = evByAction(
-    [...choices, taken],
-    read.equity,
-    read.pot,
-    read.toCall
-  );
-  let better = choices[0];
-  for (const option of choices) {
+  if (!read) return null;
+
+  /*
+   * Drill speaks only about fold, check and call, and it is silent the moment
+   * a bet or a raise is involved on either side of the comparison.
+   *
+   * `evByAction` prices through `actionEv`, and `actionEv` has no fold equity,
+   * its own header in `poker/ev.ts` says so: "a bet wins two different ways and
+   * `actionEv` only counts one of them". For a call that closes the action that
+   * is exact, the pot is the pot and nobody is folding to it. For a bet it is
+   * not merely imprecise, it is biased in one direction, because the entire
+   * P(fold) · Pot term is missing. A river bluff with no showdown equity prices
+   * at minus the bet every time, so Drill would have announced "checking was
+   * better" to a player who had just found a correct bluff, and it would have
+   * done it in the one mode whose whole promise is that it stays quiet unless
+   * you are wrong. Coaching that is confidently backwards is worse than no
+   * coaching, and the bots do not price this way either: they use
+   * `evWithFoldEquity` against the range that continues.
+   *
+   * `coach/evLoss.ts` reaches the same conclusion from the same fact and calls
+   * it out in its own header. The honest scope is the passive decisions, which
+   * is also where the leaks this mode exists to catch actually live: calling
+   * too wide, and folding out of a pot that was laying the price.
+   */
+  const passive = (action: TableAction) =>
+    action.type !== "bet" && action.type !== "raise";
+  if (!passive(taken)) return null;
+  const judged = choices.filter(passive);
+  if (judged.length === 0) return null;
+
+  const evs = evByAction([...judged, taken], read.equity, read.pot, read.toCall);
+  let better = judged[0];
+  for (const option of judged) {
     if (evs[option.label] > evs[better.label]) better = option;
   }
   const loss = evs[better.label] - evs[taken.label];

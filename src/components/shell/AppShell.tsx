@@ -115,7 +115,22 @@ export default function AppShell() {
             </span>
           </NavLink>
 
-          <nav aria-label="Main" className="min-w-0 shrink-0">
+          {/*
+           * `flex-1` below `lg`, `flex-none` at and above it.
+           *
+           * The nav has to stay the shrinkable item wherever the header slot is
+           * `display: none`, which is every width under 1024px and every route
+           * that hangs nothing. Making it `shrink-0` outright, as an earlier
+           * pass here did, left the row with nothing that could give: brand,
+           * nav and the account control were all rigid, the `overflow-x-auto`
+           * on the list below could never form a scroll region because a
+           * `shrink-0` parent resolves to its content's max-content width, and
+           * the effect that scrolls the current tab into view became dead code.
+           * At 320px, or at 390px with a raised browser font size, that pushes
+           * Sign in past the right edge, which is the overlap the comment on
+           * the wordmark says was already fixed once.
+           */}
+          <nav aria-label="Main" className="min-w-0 flex-1 lg:flex-none">
             <ul
               ref={navRef}
               className="flex min-w-0 items-center gap-1 overflow-x-auto sm:gap-2"

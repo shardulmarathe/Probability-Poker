@@ -20,12 +20,12 @@ import { money } from "../../lib/format";
 import { TABLE_MODES, type TableMode } from "../../lib/tableOptions";
 import { findProfile } from "../../poker/model/profiles";
 import { positionOf } from "../../poker/table/position";
-import { useTable } from "../../store/TableContext";
+import { useTable, type DrillVerdict } from "../../store/TableContext";
 import type { Street } from "../../types";
 import { PageHeader } from "../shell";
 import { Button, ButtonLink, LINE, RADIUS, Rail, Tabs } from "../ui";
 import { ActionBar } from "./Actions";
-import { CoachPanel } from "./CoachPanel";
+import { CoachPanel, DrillLine } from "./CoachPanel";
 import { SeatView } from "./Seat";
 import { TableChrome } from "./TableChrome";
 import { Thinking } from "./Thinking";
@@ -83,6 +83,8 @@ export default function TableGame() {
     act,
     nextHand,
     setMode,
+    drillVerdict,
+    dismissDrill,
   } = useTable();
 
   const narrow = useNarrow();
@@ -389,6 +391,7 @@ export default function TableGame() {
             actions={legalActions}
             seats={table.seats}
             narrow={narrow}
+            handOver={handOver}
           />
 
           {handOver ? (
@@ -399,6 +402,8 @@ export default function TableGame() {
               madeHands={madeHands}
               observer={options.observer}
               onNext={nextHand}
+              drill={mode === "drill" ? drillVerdict : null}
+              onDismissDrill={dismissDrill}
             />
           ) : heroTurn && legalActions.length > 0 ? (
             <ActionBar
@@ -533,6 +538,8 @@ function ResultStrip({
   madeHands,
   observer,
   onNext,
+  drill,
+  onDismissDrill,
 }: {
   names: string[];
   winners: [number, number][];
@@ -541,6 +548,16 @@ function ResultStrip({
   madeHands: Map<number, string>;
   observer: boolean;
   onNext: () => void;
+  /**
+   * Drill's verdict on the hand that just ended, if it had one to give.
+   *
+   * It renders here rather than in its own row above: the one-screen lock has
+   * no height for both, and clipping this block means clipping "Deal me
+   * another". It also reads better, the strip already says what happened and
+   * this says what it cost.
+   */
+  drill: DrillVerdict | null;
+  onDismissDrill: () => void;
 }) {
   const label = winners
     .map(([id, amount]) => `${names[id]} ${money(amount)}`)
@@ -581,6 +598,11 @@ function ResultStrip({
         {withHand && (
           <div className="font-cormorant text-sm italic text-ivory/60">
             with {withHand}
+          </div>
+        )}
+        {drill && (
+          <div className="mt-1.5 max-w-full">
+            <DrillLine verdict={drill} onDismiss={onDismissDrill} />
           </div>
         )}
       </div>

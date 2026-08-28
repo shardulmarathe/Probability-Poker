@@ -36,6 +36,17 @@ export interface CoachPanelProps {
   actions: TableAction[];
   seats: TableSeat[];
   narrow: boolean;
+  /**
+   * The hand has finished and `ResultStrip` is on screen.
+   *
+   * Drill's verdict moves inside that strip when it is, so the two do not stack
+   * into a column the one-screen lock has no room for: at 1024x730 a 33px coach
+   * row plus a two-line result block is taller than the space under the felt's
+   * floor, and because the lock also clips, "Deal me another" was not merely
+   * pushed down but unreachable. They belong together anyway, the verdict is
+   * about the hand the strip is reporting.
+   */
+  handOver?: boolean;
 }
 
 export function CoachPanel({
@@ -45,6 +56,7 @@ export function CoachPanel({
   actions,
   seats,
   narrow,
+  handOver = false,
 }: CoachPanelProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -88,7 +100,7 @@ export function CoachPanel({
    * verdict existing at all means it is worth saying.
    */
   if (mode === "drill") {
-    if (active || !drillVerdict) return null;
+    if (active || !drillVerdict || handOver) return null;
     return (
       <Shell tight testId="drill-panel">
         <DrillLine verdict={drillVerdict} onDismiss={dismissDrill} />
@@ -297,15 +309,29 @@ function Details({
  * else is deciding is noise. It also clears itself the moment the human acts
  * again, so a verdict can never sit under the wrong spot.
  */
-function DrillLine({
+export function DrillLine({
   verdict,
   onDismiss,
 }: {
   verdict: DrillVerdict;
   onDismiss: () => void;
 }) {
+  /*
+   * Announced, because this line is the entire mode.
+   *
+   * `Thinking` already marks the bots' running commentary `role="status"
+   * aria-live="polite"`, so without this a screen-reader user was read every
+   * stage of every opponent's transcript and told nothing at all about their
+   * own mistake, which is the one sentence on the felt addressed to them.
+   * `polite` rather than `assertive`: the hand is over by the time it appears,
+   * so it can wait for a pause rather than interrupting one.
+   */
   return (
-    <div className="flex w-full min-w-0 items-center justify-between gap-3">
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex w-full min-w-0 items-center justify-between gap-3"
+    >
       <span
         data-testid="drill-verdict"
         className="min-w-0 truncate font-cormorant text-[0.95rem] italic text-ivory/75"

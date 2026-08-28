@@ -12,9 +12,11 @@ dist-ssr
 # five directories before this pattern caught all of them.
 docs/*-shots/
 
-# macOS/sync artefacts — duplicate copies tsc compiles but nothing imports
-* [0-9].ts
-* [0-9].tsx
+# macOS/sync artefacts — duplicate copies tsc compiles but nothing imports.
+# Extension-agnostic: the .md, .css and .mjs copies were slipping through the
+# two patterns that named an extension, and so showed up in every git status.
+* [0-9].*
+LICENSE [0-9]
 
 # local scratch notes
 future.md

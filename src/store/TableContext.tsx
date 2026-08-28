@@ -733,11 +733,14 @@ export function TableProvider({ children }: { children: ReactNode }) {
       setDealtCount(i + 1);
       if (await sleep(T.dealStep)) {
         /*
-         * A minutes-late deal beat is the same interruption as a pause: let
-         * the existing resume effect pick up once this stale sequence releases.
+         * Starvation is not a pause. A pause means stop; a starved timer means
+         * these beats are stale, and the honest answer is to stop *animating*
+         * and show the rest at once. Returning early here left community cards
+         * hidden while the engine had already dealt them, so a player could be
+         * asked to act on a flop they could not see.
          */
-        resumeRef.current = true;
-        return false;
+        setDealtCount(toLen);
+        return true;
       }
     }
     return true;
@@ -754,13 +757,25 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
       say(seat, action.label);
       if (action.cost > 0) spawnChip(seat);
-      const actionStarved = await sleep(action.cost > 0 ? T.chip : T.noChip);
       /*
-       * Nothing has reached the engine yet, so abandoning this stale animation
-       * leaves the same move owed. The resume effect releases the busy lock
-       * first and then gives that turn back to the normal driver.
+       * Pause and starvation are not the same interruption, and conflating them
+       * dropped a human's click.
+       *
+       * A pause (navigated away, unmounted) means stop: nothing has reached the
+       * engine, the move is still owed, and `performBot` will recompute it from
+       * `(seed, hand number, action count, seat)` on resume. That is safe for a
+       * bot. It is NOT safe for the human, because nothing recomputes a human's
+       * choice: `act` returns early, the resume effect calls `drive`, and
+       * `drive` stops because the human still owns the turn. The player pressed
+       * Fold and watched nothing happen.
+       *
+       * A starved timer means something else entirely: the move is fine, the
+       * animation beats around it are just minutes stale. So starvation now
+       * skips the remaining choreography and completes the move, which is both
+       * correct for the human and harmless for a bot.
        */
-      if (pausedRef.current || !aliveRef.current || actionStarved) {
+      const starved = await sleep(action.cost > 0 ? T.chip : T.noChip);
+      if (pausedRef.current || !aliveRef.current) {
         resumeRef.current = true;
         return false;
       }
@@ -768,18 +783,20 @@ export function TableProvider({ children }: { children: ReactNode }) {
       applyAction(next, seat, action);
       commit(next);
 
-      const settleStarved = await sleep(T.settle);
       /*
-       * Here the move is already committed, so resuming continues from the
-       * engine's new actor; it never recomputes or changes the decision that
-       * was just applied.
+       * Past this line the move is committed, so bailing can only ever leave
+       * the *table* half-drawn: a bubble still showing and community cards the
+       * engine has dealt still face down, which is how a player ended up being
+       * asked to act on a flop they could not see. Finish the presentation
+       * either way, immediately if the timers are starved.
        */
-      if (pausedRef.current || !aliveRef.current || settleStarved) {
-        resumeRef.current = true;
-        return false;
-      }
+      const settleStarved = starved || (await sleep(T.settle));
       say(seat, null);
-      if (!(await dealUpTo(before, next.board.length))) return false;
+      if (settleStarved) {
+        setDealtCount(next.board.length);
+        return true;
+      }
+      await dealUpTo(before, next.board.length);
       return true;
     },
     [commit, dealUpTo, say, spawnChip]

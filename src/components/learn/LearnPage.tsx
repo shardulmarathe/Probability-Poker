@@ -38,20 +38,27 @@
  * out of step with the router.
  */
 
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { PageBody, PageHeader } from "../shell";
 import { Reveal, Tabs } from "../ui";
 import { CONCEPTS, type ConceptId } from "./concepts";
 
 export default function LearnPage() {
   const [params, setParams] = useSearchParams();
+  const { hash } = useLocation();
 
   // Derived, not mirrored. A `useState` seeded from the query string is two
   // sources of truth that disagree the first time somebody presses Back, and an
   // unknown `?c=` value falls through to the first concept rather than rendering
   // an empty page.
-  const active =
-    CONCEPTS.find((c) => c.id === params.get("c")) ?? CONCEPTS[0];
+  //
+  // The hash is read as a fallback because this page used to BE seven `#`
+  // anchors, and those are exactly the links a reader would have bookmarked or
+  // sent to someone. Ignoring them does not 404, which would at least be
+  // honest; it silently serves Monte Carlo to somebody who asked for Bayes.
+  // The ids were chosen to match the old anchor names for this reason.
+  const requested = params.get("c") || hash.replace(/^#/, "");
+  const active = CONCEPTS.find((c) => c.id === requested) ?? CONCEPTS[0];
 
   const select = (id: ConceptId) => {
     const next = new URLSearchParams(params);

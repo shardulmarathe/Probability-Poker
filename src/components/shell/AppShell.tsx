@@ -30,6 +30,15 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { FeltBackground } from "../ui";
 import { AccountMenu } from "./AccountMenu";
 
+/**
+ * The id a route portals its own header controls into.
+ *
+ * Exported so the one caller cannot drift from the one definition: a typo here
+ * is not a crash, it is a silently empty header and a control the user cannot
+ * find.
+ */
+export const HEADER_SLOT_ID = "pp-header-slot";
+
 const NAV = [
   { to: "/table", label: "Table" },
   { to: "/review", label: "Review" },
@@ -106,7 +115,7 @@ export default function AppShell() {
             </span>
           </NavLink>
 
-          <nav aria-label="Main" className="min-w-0 flex-1">
+          <nav aria-label="Main" className="min-w-0 shrink-0">
             <ul
               ref={navRef}
               className="flex min-w-0 items-center gap-1 overflow-x-auto sm:gap-2"
@@ -131,6 +140,28 @@ export default function AppShell() {
               ))}
             </ul>
           </nav>
+
+          {/*
+           * Where a route hangs its own controls.
+           *
+           * The table's mode switch and its "4-handed · Hand #1" rail used to
+           * live in a second header row below the felt's own heading, and those
+           * two rows were 114px of the 240px that pushed Fold and Call off the
+           * bottom of a 1440x760 screen. They belong here: the bar is already
+           * paid for on every route.
+           *
+           * A slot rather than a prop because this component cannot read the
+           * table. `AppShell` is the layout route and `TableProvider` mounts
+           * *inside* its `<Outlet />` (see App.tsx), so `useTable()` here would
+           * throw on `/` and `/learn`. The table portals into this node
+           * instead, which keeps the provider exactly where it is and leaves
+           * the node empty on every route that has nothing to hang.
+           */}
+          <div
+            id={HEADER_SLOT_ID}
+            data-testid="header-slot"
+            className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex"
+          />
 
           <AccountMenu className="shrink-0" />
         </div>

@@ -19,10 +19,18 @@ import { MAX_SEATS, MIN_SEATS } from "../poker/table/position";
  * How much the interface reveals while a hand is live.
  *
  * This gates rendering only, never the engine. The bots' information set is
- * identical in all three modes, so switching to Study cannot change how they
- * play, and a hand studied is the same hand as a hand played.
+ * identical in every mode, so switching to Study cannot change how they play,
+ * and a hand studied is the same hand as a hand played.
+ *
+ * The four are a ladder of how much help you are taking, quietest first, so
+ * moving one step right is always a step toward more information and never a
+ * sideways preference. Drill is the one that says nothing until you are wrong:
+ * the equity behind it is computed either way, it is simply not printed unless
+ * the action you took cost you more than `DRILL_THRESHOLD_BB` big blinds
+ * against the model. That distinction is the whole mode — a trainer that
+ * narrates every hand teaches you to read the narration, not the spot.
  */
-export type TableMode = "fair" | "coach" | "study";
+export type TableMode = "fair" | "drill" | "coach" | "study";
 
 export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
   {
@@ -31,9 +39,14 @@ export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
     blurb: "Nothing revealed. Just poker — can you beat the math?",
   },
   {
+    id: "drill",
+    name: "Drill",
+    blurb: "Silent until you misplay one, then it says what was better.",
+  },
+  {
     id: "coach",
     name: "Coach",
-    blurb: "Your equity, pot odds, and outs shown while you decide.",
+    blurb: "Your equity, the price, and the verdict, while you decide.",
   },
   {
     id: "study",
@@ -41,6 +54,17 @@ export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
     blurb: "Everything: all hole cards, every read, live EV.",
   },
 ];
+
+/**
+ * How wrong an action has to be before Drill breaks its silence, in big blinds.
+ *
+ * In big blinds rather than chips because the same mistake at $5/$10 and at
+ * $50/$100 is the same mistake, and a threshold in chips would make Drill
+ * chatty at one stake and mute at another. Half a big blind is roughly the
+ * width of the Monte Carlo interval on a marginal spot, so anything under it
+ * is inside the noise and interrupting for it would be teaching sampling error.
+ */
+export const DRILL_THRESHOLD_BB = 0.5;
 
 /** Stack depths in big blinds. Depth changes correct strategy more than
  *  almost anything else, 20bb is nearly all preflop, 200bb is all postflop. */

@@ -16,7 +16,7 @@ export function Rail({ children }: { children: ReactNode }) {
   return (
     <span
       className={`whitespace-nowrap border px-2.5 py-1 font-mono text-[0.55rem] uppercase tracking-[0.2em] text-ivory/60 sm:text-[0.6rem] ${RADIUS.marker}`}
-      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.35)" }}
+      style={{ borderColor: LINE.gold, background: SURFACE.sunk }}
     >
       {children}
     </span>
@@ -32,7 +32,7 @@ export function Tag({
   tone?: Tone;
 }) {
   const skin: Record<Tone, { bg: string; bd: string }> = {
-    neutral: { bg: "rgba(0,0,0,0.3)", bd: LINE.quiet },
+    neutral: { bg: SURFACE.sunk, bd: LINE.quiet },
     gold: { bg: "rgba(201,162,39,0.15)", bd: "rgba(201,162,39,0.45)" },
     good: { bg: "rgba(95,185,143,0.12)", bd: "rgba(95,185,143,0.4)" },
     bad: { bg: "rgba(210,74,74,0.12)", bd: "rgba(210,74,74,0.4)" },
@@ -73,7 +73,7 @@ export function Meter({
       </div>
       <div
         className="h-2 w-full overflow-hidden rounded-full"
-        style={{ background: "rgba(0,0,0,0.45)" }}
+        style={{ background: SURFACE.tray }}
       >
         <div
           className="h-full rounded-full transition-[width] duration-300"

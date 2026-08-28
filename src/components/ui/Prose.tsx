@@ -6,7 +6,7 @@
  */
 
 import { useState, type ReactNode } from "react";
-import { LINE, RADIUS, TONE } from "./tokens";
+import { LINE, RADIUS, SURFACE, TONE } from "./tokens";
 
 /** The opening sentence of an explanation. */
 export function Lead({ children }: { children: ReactNode }) {
@@ -34,7 +34,7 @@ export function Calc({ children }: { children: ReactNode }) {
   return (
     <div
       className={`my-3 overflow-x-auto border px-3 py-3 font-mono text-[0.72rem] leading-relaxed text-ivory/90 sm:px-4 sm:text-[0.8rem] ${RADIUS.control}`}
-      style={{ borderColor: "rgba(201,162,39,0.25)", background: "rgba(0,0,0,0.35)" }}
+      style={{ borderColor: "rgba(201,162,39,0.25)", background: SURFACE.sunk }}
     >
       {children}
     </div>
@@ -150,7 +150,7 @@ export function Reveal({
       className={boxed ? `mt-5 overflow-hidden border ${RADIUS.control}` : "mt-3"}
       style={
         boxed
-          ? { borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }
+          ? { borderColor: LINE.gold, background: SURFACE.sunk }
           : undefined
       }
     >

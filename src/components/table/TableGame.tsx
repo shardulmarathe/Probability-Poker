@@ -23,7 +23,7 @@ import { positionOf } from "../../poker/table/position";
 import { useTable, type DrillVerdict } from "../../store/TableContext";
 import type { Street } from "../../types";
 import { PageHeader } from "../shell";
-import { Button, ButtonLink, LINE, RADIUS, Rail, Tabs } from "../ui";
+import { Button, ButtonLink, LINE, RADIUS, Rail, SURFACE, Tabs } from "../ui";
 import { ActionBar } from "./Actions";
 import { CoachPanel, DrillLine } from "./CoachPanel";
 import { SeatView } from "./Seat";
@@ -283,7 +283,7 @@ export default function TableGame() {
                   style={{
                     borderColor: "rgba(201,162,39,0.4)",
                     color: "#e2c563",
-                    background: "rgba(0,0,0,0.4)",
+                    background: SURFACE.tray,
                   }}
                 >
                   {STREET_LABEL[table.street]}
@@ -293,7 +293,7 @@ export default function TableGame() {
                   className="pp-pot-glow flex items-center gap-2 rounded-full border py-1 pl-2 pr-3 sm:pl-2.5 sm:pr-4"
                   style={{
                     borderColor: "rgba(201,162,39,0.45)",
-                    background: "rgba(0,0,0,0.45)",
+                    background: SURFACE.tray,
                   }}
                 >
                   {/* The pot is chips before it is a number. */}

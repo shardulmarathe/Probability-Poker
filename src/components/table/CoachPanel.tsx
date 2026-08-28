@@ -26,7 +26,7 @@ import type { TableAction } from "../../poker/table/rules";
 import { useTable, type DrillVerdict, type HeroRead } from "../../store/TableContext";
 import type { TableMode } from "../../lib/tableOptions";
 import type { TableSeat } from "../../poker/table/state";
-import { LINE, RADIUS, Stat, TONE } from "../ui";
+import { LINE, RADIUS, SURFACE, Stat, TONE } from "../ui";
 
 export interface CoachPanelProps {
   mode: TableMode;
@@ -443,7 +443,7 @@ function Chip({
       className={`border px-1.5 py-0.5 font-mono text-[0.62rem] ${RADIUS.marker}`}
       style={{
         borderColor: LINE.quiet,
-        background: "rgba(0,0,0,0.35)",
+        background: SURFACE.sunk,
         color: tone ? TONE[tone] : TONE.neutral,
       }}
     >
@@ -475,7 +475,7 @@ function Shell({
       className={`relative mx-auto flex w-full max-w-3xl items-center border ${
         tight ? "px-3 py-1.5" : "px-3.5 py-2"
       } ${RADIUS.surface}`}
-      style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
+      style={{ borderColor: LINE.gold, background: SURFACE.tray }}
     >
       {children}
     </div>

@@ -232,13 +232,20 @@ export default function HandReview() {
               compact
               title="Hand review"
               lede={
-                // Both facts, not one: a showdown reached on the turn is a
-                // table that got all in early, and "showdown" alone would drop
-                // the street the old lede stated.
+                /*
+                 * Both facts where there are two, one where there is only one.
+                 * A hand folded out on the flop is worth saying that way, but
+                 * `endStreet` is itself "showdown" whenever the hand reached
+                 * one, so the same template produced "showdown on the
+                 * showdown". The street adds nothing there and the stutter
+                 * reads as a bug.
+                 */
                 report
                   ? `${era(report)}Hand #${report.handNumber} · ${report.seatCount}-handed · ${
-                      report.wentToShowdown ? "showdown" : "folded out"
-                    } on the ${STREET_LABEL[report.endStreet].toLowerCase()}`
+                      report.endStreet === "showdown"
+                        ? "showdown"
+                        : `${report.wentToShowdown ? "showdown" : "folded out"} on the ${STREET_LABEL[report.endStreet].toLowerCase()}`
+                    }`
                   : "Every finished hand, opened up."
               }
               actions={

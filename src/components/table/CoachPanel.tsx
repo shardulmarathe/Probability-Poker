@@ -197,9 +197,17 @@ export function CoachPanel({
               className={`absolute bottom-full left-0 right-0 z-30 mb-2 border p-3.5 ${RADIUS.surface}`}
               style={{
                 borderColor: LINE.goldStrong,
-                // Very nearly opaque. This lands on top of five playing cards,
-                // and a ±1.4% interval read against a card face is not read.
-                background: "rgba(6,22,15,0.96)",
+                /*
+                 * Opaque, not nearly opaque. This lands on top of the hero's
+                 * own hole cards, and card faces are the brightest thing on
+                 * the screen: at 0.96 alpha a king of diamonds was still
+                 * legible straight through a ±1.1% interval, which makes both
+                 * of them harder to read than either would be alone. Same
+                 * ground as the sizing popover, because they are the same kind
+                 * of object and appear in the same place.
+                 */
+                background:
+                  "radial-gradient(120% 120% at 50% 0%, #16402c 0%, #0b2218 70%)",
                 boxShadow: "0 24px 60px rgba(0,0,0,0.65)",
               }}
             >

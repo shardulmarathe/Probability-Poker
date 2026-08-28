@@ -2,12 +2,17 @@ import { memo } from "react";
 import { SUIT_IS_RED, SUIT_SYMBOL, rankChar } from "../poker/cards";
 import type { Card } from "../types";
 
-type Size = "sm" | "md" | "lg" | "xl";
+type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
 // Card dimensions are fluid: they shrink on narrow phones (so rows of cards
 // never overflow) and settle at their full size on larger screens. Corner
 // pips are sized in `em`, so they scale automatically with the card's font.
 const SIZES: Record<Size, string> = {
+  // Table-row size: fits inside a line of body text without setting the row
+  // height, which is what lets a hand be shown as cards in the same cell that
+  // used to print `3s 5s` in mono. Fixed rather than fluid — it sits in a data
+  // table, and a card that changes height with the viewport reflows the row.
+  xs: "h-[1.55rem] w-[1.15rem] text-[0.62rem] rounded-[0.2rem]",
   sm: "h-[clamp(2.75rem,9vw,3rem)] w-[clamp(2rem,6.7vw,2.25rem)] text-[clamp(0.75rem,2.4vw,1rem)] rounded-lg",
   md: "h-[clamp(4.5rem,15vw,6rem)] w-[clamp(3.25rem,10.8vw,4.25rem)] text-[clamp(1.25rem,4.6vw,1.875rem)] rounded-lg sm:rounded-xl",
   lg: "h-[clamp(5rem,17vw,7rem)] w-[clamp(3.5rem,12.2vw,5rem)] text-[clamp(1.4rem,5.2vw,2.25rem)] rounded-xl sm:rounded-2xl",
@@ -75,7 +80,10 @@ function PlayingCardImpl({
   const rank = rankChar(card.rank);
   const suit = SUIT_SYMBOL[card.suit];
 
-  if (size === "sm") {
+  // Rank over suit, no centre pip and no second corner: at this size the three
+  // marks of the full layout collide into a smudge. `xs` is a legible token,
+  // not a miniature of the card.
+  if (size === "xs" || size === "sm") {
     return (
       <div
         className={`pp-card ${shape} relative flex flex-col items-center justify-center font-semibold`}

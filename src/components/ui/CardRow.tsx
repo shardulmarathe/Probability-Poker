@@ -13,7 +13,7 @@ export function CardRow({
 }: {
   label?: string;
   cards: number[];
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   /** What to say when there are none. Name the reason, not the absence. */
   empty?: string;
 }) {

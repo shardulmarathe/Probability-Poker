@@ -247,16 +247,17 @@ function Done({ line, rail }: { line: ThinkLine; rail?: boolean }) {
       </p>
       {/*
        * The detail wraps rather than truncating. These lines are the counts the
-       * narration exists to show, a clipped "1,225 of 1,326 combos surv…" is
-       * worse than one that takes a second line. The rail is the exception, and
-       * for the same reason: there, a second line is one fewer stage on screen.
+       * narration exists to show, and a clipped "1,225 of 1,326 combos surv…"
+       * is worse than one that takes a second line.
+       *
+       * On the rail there is no width for either, so a finished stage drops its
+       * detail entirely and keeps its title. That is the same trade the rest of
+       * this round makes: a completed stage is context, the live stage is what
+       * is being read, and half a number cut off mid-word teaches nothing while
+       * still costing the line. `Current` prints its detail in full.
        */}
-      {line.detail && (
-        <p
-          className={`font-mono text-[0.55rem] leading-snug text-ivory/28 ${
-            rail ? "truncate" : ""
-          }`}
-        >
+      {line.detail && !rail && (
+        <p className="font-mono text-[0.55rem] leading-snug text-ivory/28">
           {line.detail}
         </p>
       )}
@@ -296,9 +297,12 @@ function Current({
             {step.step + 1}/{step.total}
           </span>
         </p>
+        {/* Wraps, now that a finished stage above it costs one line instead of
+            two. This is the number the reader came for, and it is the only
+            detail on the rail, so it gets to finish its sentence. */}
         {step.detail && (
           <p
-            className="truncate font-mono text-[0.55rem] leading-snug"
+            className="font-mono text-[0.55rem] leading-snug"
             style={{ color: TONE.gold }}
           >
             {step.detail}

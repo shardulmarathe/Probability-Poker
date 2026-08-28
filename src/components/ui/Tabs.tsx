@@ -102,6 +102,13 @@ export function Tabs<T extends string | number>({
    * reveal the hint has already committed the choice, so the reader can only
    * ever read about the option after picking it. Showing it on commit turns
    * that from a trap into a confirmation, and it costs no layout height.
+   *
+   * The four seconds is a fallback, not the usual path. Verified on an emulated
+   * iPad (`hover: none`, `pointer: coarse`): a tap leaves the control focused,
+   * so `group-focus-within` holds the hint open past this timer and it clears
+   * when the reader taps away. That is the behaviour you want — a focused
+   * control should keep its own description available — and the timer only
+   * matters where focus is not retained.
    */
   const [justPicked, setJustPicked] = useState<T | null>(null);
   useEffect(() => {

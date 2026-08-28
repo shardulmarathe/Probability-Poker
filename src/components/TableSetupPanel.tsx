@@ -1,6 +1,5 @@
 /**
- * The table you are about to sit down at, and the only teaching surface the
- * product gets before the cards come out.
+ * The table you are about to sit down at.
  *
  * Everything here edits one `TableSetup` and persists it, so the choice
  * survives a reload and the game reads exactly what was chosen. The opponent
@@ -8,15 +7,31 @@
  * nothing like a table of five nits, and being able to *see* the roster before
  * the cards come out is what makes that a lesson rather than a surprise.
  *
- * Two things that used to be invisible are now on the screen. The mode blurbs
- * ("Nothing revealed. Just poker") lived only in `title=` attributes, which no
- * touch device has ever shown to anyone. And what stack depth *means*, the
- * single choice here that changes correct strategy most, was a comment in
- * `lib/tableOptions.ts` that only a developer could read. Both are printed
- * under the control that sets them, always visible, no modal and no tour.
+ * It is closed by default now. Open, this panel was 943px of form — nineteen
+ * controls, nine permanent blurbs and 239 words standing between the landing
+ * page and a single card. The overwhelming majority of arrivals want the table
+ * they already have, and the ones who do not are not helped by being shown a
+ * radiogroup they have to read before they can decline it. So the closed state
+ * is a sentence stating the four things that actually change how the hand plays
+ * — seats, depth, mode, and who is in the other chairs — and one control that
+ * opens the editor. Nothing was removed; every control and every blurb is one
+ * click away.
+ *
+ * The summary names the opponents rather than counting them. "Table
+ * configured" would be the useless version: the difference between Wildfire Wes
+ * and Nickel Nate is the difference between two games, and a player who cannot
+ * see which one they are about to play has not been told anything.
+ *
+ * Two things that used to be invisible are still on the screen, just not all at
+ * once. The mode blurbs ("Nothing revealed. Just poker") and what stack depth
+ * *means* both lived only in `title=` attributes or source comments, which no
+ * touch device and no player has ever seen. They are now the `Tabs` hints,
+ * shown on hover and on keyboard focus over the option they describe, which
+ * keeps them attached to their control instead of stacking four permanent
+ * italic sentences down the left column.
  */
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   MAX_SEATS,
@@ -24,8 +39,6 @@ import {
   STACK_DEPTHS,
   TABLE_MODES,
   botsNeeded,
-  fitLineup,
-  loadSetup,
   saveSetup,
   startingStack,
   type StackDepth,
@@ -34,11 +47,11 @@ import {
 import {
   BOT_ARCHETYPES,
   BOT_PROFILES,
-  randomLineup,
   type BuiltArchetype,
 } from "../poker/model/profiles";
 import { money } from "../lib/format";
-import { Button, LINE, Panel, RADIUS, Rail, Tabs } from "./ui";
+import type { TableSetupHandle } from "./setup/useTableSetup";
+import { Button, LINE, Panel, RADIUS, Rail, Reveal, Tabs } from "./ui";
 
 const SEAT_COUNTS = Array.from(
   { length: MAX_SEATS - MIN_SEATS + 1 },
@@ -73,196 +86,239 @@ const DEPTH_HINTS: Record<number, string> = {
   200: "Deep. Almost every decision is postflop, and an early mistake compounds down three streets.",
 };
 
-export default function TableSetupPanel() {
+/**
+ * "Textbook Tara" → "Tara".
+ *
+ * The epithet is the personality and the given name is what you would call
+ * them at the table. Six of these have to sit on one line at 390px, and
+ * "Textbook Tara, Callin' Carla, Wildfire Wes, Riverboat Rey" does not; the
+ * given names do, and they are still unambiguous across the seven archetypes.
+ */
+function shortName(id: BuiltArchetype): string {
+  const full = BOT_PROFILES[id].name;
+  return full.slice(full.lastIndexOf(" ") + 1);
+}
+
+/**
+ * The closed panel's one sentence.
+ *
+ * Only the settings that change how the hand plays, in the order a player would
+ * ask about them: how many of us, how deep, how much is the interface telling
+ * me, and who am I up against.
+ */
+function describeSetup(setup: TableSetup): string {
+  const mode = TABLE_MODES.find((m) => m.id === setup.mode);
+  return [
+    `${setup.seatCount} seats`,
+    `${setup.stackBb}bb`,
+    mode?.name ?? setup.mode,
+    // Only when true: an observer table has no seat for you, and that is not
+    // something to discover after pressing the button that says "deal".
+    ...(setup.observer ? ["you sit out"] : []),
+    setup.lineup.map(shortName).join(", "),
+  ].join(" · ");
+}
+
+export default function TableSetupPanel({ table }: { table: TableSetupHandle }) {
   const navigate = useNavigate();
-  const [setup, setSetupState] = useState<TableSetup>(loadSetup);
-
-  /** Every edit re-fits the lineup to the seat count and persists. */
-  const update = useCallback((patch: Partial<TableSetup>) => {
-    setSetupState((cur) => {
-      const merged = { ...cur, ...patch };
-      const next: TableSetup = {
-        ...merged,
-        lineup: fitLineup(
-          merged.lineup,
-          botsNeeded(merged),
-          merged.seatCount * 7919
-        ),
-      };
-      saveSetup(next);
-      return next;
-    });
-  }, []);
-
-  const randomise = useCallback(() => {
-    setSetupState((cur) => {
-      const next: TableSetup = {
-        ...cur,
-        lineup: randomLineup(botsNeeded(cur), Date.now() >>> 0).map(
-          (p) => p.id as BuiltArchetype
-        ),
-      };
-      saveSetup(next);
-      return next;
-    });
-  }, []);
-
-  const setBot = useCallback((index: number, id: BuiltArchetype) => {
-    setSetupState((cur) => {
-      const lineup = [...cur.lineup];
-      lineup[index] = id;
-      const next = { ...cur, lineup };
-      saveSetup(next);
-      return next;
-    });
-  }, []);
+  const { setup, update, setBot, randomise } = table;
+  const [editing, setEditing] = useState(false);
 
   const stack = startingStack(setup);
   const bots = botsNeeded(setup);
 
   return (
-    <Panel
-      id="setup"
-      testId="setup"
-      title="Choose your table"
-      subtitle="Four choices, and each one changes how the hand plays. Nothing here is a preference."
-      actions={
-        <Rail>
-          {setup.seatCount} seats · {money(stack)} stacks
-        </Rail>
-      }
-    >
-      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
-        <div className="flex flex-col gap-6">
-          <Field label="Seats">
-            <Tabs
-              label="Number of seats"
-              as="options"
-              layout="wrap"
-              showHint
-              testIdPrefix="seats"
-              value={setup.seatCount}
-              onChange={(n) => update({ seatCount: n })}
-              options={SEAT_COUNTS.map((n) => ({
-                value: n,
-                label: String(n),
-                hint: SEAT_HINTS[n],
-              }))}
-            />
-          </Field>
-
-          <Field
-            label="Stack depth"
-            aside={`${setup.stackBb} big blinds — ${money(stack)} at ${money(setup.smallBlind)}/${money(setup.bigBlind)}`}
-          >
-            <Tabs
-              label="Stack depth in big blinds"
-              as="options"
-              layout="wrap"
-              showHint
-              testIdPrefix="stack"
-              value={setup.stackBb}
-              onChange={(d) => update({ stackBb: d as StackDepth })}
-              options={STACK_DEPTHS.map((d) => ({
-                value: d,
-                label: `${d}bb`,
-                hint: DEPTH_HINTS[d],
-              }))}
-            />
-          </Field>
-
-          <Field label="What the table shows you">
-            <Tabs
-              label="What the table shows you"
-              as="options"
-              layout="wrap"
-              showHint
-              testIdPrefix="mode"
-              value={setup.mode}
-              onChange={(m) => update({ mode: m })}
-              options={TABLE_MODES.map((m) => ({
-                value: m.id,
-                label: m.name,
-                hint: m.blurb,
-              }))}
-            />
-          </Field>
-
-          <label
-            data-testid="observer-toggle"
-            className={`flex cursor-pointer items-start gap-3 border p-3 transition hover:border-gold/40 ${RADIUS.control}`}
-            style={{ borderColor: LINE.quiet, background: "rgba(0,0,0,0.28)" }}
-          >
-            <input
-              type="checkbox"
-              checked={setup.observer}
-              onChange={(e) => update({ observer: e.target.checked })}
-              className="mt-0.5 h-4 w-4 accent-[#c9a227]"
-            />
-            <span>
-              <span className="font-display text-sm text-ivory">
-                Sit out and watch instead
-              </span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-ivory/55">
-                No seat for you. The bots play each other with every hand face
-                up — the fastest way to watch a style get punished.
-              </span>
-            </span>
-          </label>
+    <Panel id="setup" testId="setup">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold tracking-wide text-gold-soft sm:text-xl">
+            {editing ? "Choose your table" : "Your table"}
+          </h2>
+          {editing ? (
+            <p className="mt-1 text-sm leading-relaxed text-ivory/55">
+              Four choices, and each one changes how the hand plays. Nothing
+              here is a preference.
+            </p>
+          ) : (
+            <p
+              data-testid="setup-summary"
+              className="mt-1 font-mono text-[0.72rem] leading-relaxed text-ivory/65 sm:text-[0.78rem]"
+            >
+              {describeSetup(setup)}
+            </p>
+          )}
         </div>
 
-        {/* ------------------------- The roster ------------------------- */}
-        <div className="flex flex-col">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <div className="min-w-0">
-              <p className="font-display text-sm font-semibold tracking-wide text-ivory">
-                Who you're playing
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-ivory/50">
-                {bots} opponent{bots === 1 ? "" : "s"}. Each plays a fixed,
-                measurable style — the percentages in their descriptions are the
-                ones they actually hit.
-              </p>
+        <div className="flex shrink-0 items-center gap-2">
+          {editing && <Rail>{money(stack)} stacks</Rail>}
+          <Button
+            size="sm"
+            variant="quiet"
+            data-testid="setup-change"
+            aria-expanded={editing}
+            aria-controls="setup-editor"
+            onClick={() => setEditing((open) => !open)}
+          >
+            {editing ? "Done" : "Change"}
+          </Button>
+        </div>
+      </div>
+
+      {editing && (
+        <div id="setup-editor" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+            <div className="flex flex-col gap-6">
+              <Field label="Seats">
+                <Tabs
+                  label="Number of seats"
+                  as="options"
+                  layout="wrap"
+                  showHint
+                  hintAs="tooltip"
+                  testIdPrefix="seats"
+                  value={setup.seatCount}
+                  onChange={(n) => update({ seatCount: n })}
+                  options={SEAT_COUNTS.map((n) => ({
+                    value: n,
+                    label: String(n),
+                    hint: SEAT_HINTS[n],
+                  }))}
+                />
+              </Field>
+
+              <Field
+                label="Stack depth"
+                aside={`${setup.stackBb} big blinds — ${money(stack)} at ${money(setup.smallBlind)}/${money(setup.bigBlind)}`}
+              >
+                <Tabs
+                  label="Stack depth in big blinds"
+                  as="options"
+                  layout="wrap"
+                  showHint
+                  hintAs="tooltip"
+                  testIdPrefix="stack"
+                  value={setup.stackBb}
+                  onChange={(d) => update({ stackBb: d as StackDepth })}
+                  options={STACK_DEPTHS.map((d) => ({
+                    value: d,
+                    label: `${d}bb`,
+                    hint: DEPTH_HINTS[d],
+                  }))}
+                />
+              </Field>
+
+              <Field label="What the table shows you">
+                <Tabs
+                  label="What the table shows you"
+                  as="options"
+                  layout="wrap"
+                  showHint
+                  hintAs="tooltip"
+                  testIdPrefix="mode"
+                  value={setup.mode}
+                  onChange={(m) => update({ mode: m })}
+                  options={TABLE_MODES.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                    hint: m.blurb,
+                  }))}
+                />
+              </Field>
+
+              <label
+                data-testid="observer-toggle"
+                className={`flex cursor-pointer items-start gap-3 border p-3 transition hover:border-gold/40 ${RADIUS.control}`}
+                style={{ borderColor: LINE.quiet, background: "rgba(0,0,0,0.28)" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={setup.observer}
+                  onChange={(e) => update({ observer: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-[#c9a227]"
+                />
+                <span>
+                  <span className="font-display text-sm text-ivory">
+                    Sit out and watch instead
+                  </span>
+                  {/* The consequence, printed the moment it becomes a
+                      consequence. Unchecked, this was two lines describing a
+                      table nobody had asked for; checked, it is the one thing
+                      the reader needs to know about the table they now have,
+                      which is the rule the rest of the app follows for a
+                      warning about *this* state. */}
+                  {setup.observer && (
+                    <span className="mt-0.5 block text-xs leading-relaxed text-ivory/55">
+                      No seat for you. The bots play each other with every hand
+                      face up — the fastest way to watch a style get punished.
+                    </span>
+                  )}
+                </span>
+              </label>
             </div>
-            <Button size="sm" variant="quiet" onClick={randomise} data-testid="randomise">
-              ⟳ Shuffle
-            </Button>
+
+            {/* ------------------------- The roster ------------------------- */}
+            <div className="flex flex-col">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="min-w-0 font-display text-sm font-semibold tracking-wide text-ivory">
+                  Who you're playing
+                  <span className="ml-2 font-mono text-[0.68rem] font-normal text-ivory/45">
+                    {bots} opponent{bots === 1 ? "" : "s"}
+                  </span>
+                </p>
+                <Button
+                  size="sm"
+                  variant="quiet"
+                  onClick={randomise}
+                  data-testid="randomise"
+                >
+                  ⟳ Shuffle
+                </Button>
+              </div>
+
+              <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+                {setup.lineup.map((id, i) => (
+                  <BotPicker
+                    key={i}
+                    index={i}
+                    value={id}
+                    onChange={(next) => setBot(i, next)}
+                  />
+                ))}
+              </div>
+
+              {/* The blurbs under each pick stay on screen — reading them IS
+                  choosing an opponent. What does not is the paragraph above
+                  them promising the numbers are real, which is a claim about
+                  the engine rather than about this table. */}
+              <Reveal tone="quiet" label="How literal are these descriptions?">
+                Each plays a fixed, measurable style — the percentages in their
+                descriptions are the ones they actually hit.
+              </Reveal>
+            </div>
           </div>
 
-          <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
-            {setup.lineup.map((id, i) => (
-              <BotPicker
-                key={i}
-                index={i}
-                value={id}
-                onChange={(next) => setBot(i, next)}
-              />
-            ))}
+          <div className="mt-8">
+            <Button
+              data-testid="deal-me-in"
+              variant="primary"
+              size="lg"
+              full
+              onClick={() => {
+                saveSetup(setup);
+                navigate("/table");
+              }}
+            >
+              {setup.observer ? "Watch the table" : "Deal me in"}
+              <span aria-hidden className="text-gold">
+                →
+              </span>
+            </Button>
+            <p className="mt-2.5 text-center text-xs text-ivory/40">
+              Your table is remembered on this device.
+            </p>
           </div>
         </div>
-      </div>
-
-      <div className="mt-8">
-        <Button
-          data-testid="deal-me-in"
-          variant="primary"
-          size="lg"
-          full
-          onClick={() => {
-            saveSetup(setup);
-            navigate("/table");
-          }}
-        >
-          {setup.observer ? "Watch the table" : "Deal me in"}
-          <span aria-hidden className="text-gold">
-            →
-          </span>
-        </Button>
-        <p className="mt-2.5 text-center text-xs text-ivory/40">
-          Your table is remembered on this device. Change it any time from the
-          landing page.
-        </p>
-      </div>
+      )}
     </Panel>
   );
 }

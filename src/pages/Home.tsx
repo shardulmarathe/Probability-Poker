@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { PlayingCard } from "../components/PlayingCard";
 import TableSetupPanel from "../components/TableSetupPanel";
+import { useTableSetup } from "../components/setup/useTableSetup";
 import { ButtonLink } from "../components/ui";
 import { makeCard } from "../poker/cards";
 
@@ -38,7 +39,23 @@ const CONCEPTS: Concept[] = [
   },
 ];
 
+/**
+ * The landing page, and the one decision it is allowed to ask for.
+ *
+ * It used to offer three calls to action pointing at two destinations: "Deal me
+ * in" in the hero, "Set up the table first ↓" beside it, and a second "Deal me
+ * in" at the foot of a 943px setup form. Two of those went to `/table` and the
+ * third scrolled 800px down the same page, so the first thing the product asked
+ * a new arrival was which of three buttons meant "start". There is one now. The
+ * table it will deal is summarised directly underneath it, with a `Change` that
+ * opens the full editor — a caption on the decision rather than a second one.
+ */
 export default function Home() {
+  // Shared with the panel below rather than owned by it, so the hero's label
+  // cannot promise to deal you in to a table you have set yourself to sit out
+  // of. See `setup/useTableSetup.ts`.
+  const table = useTableSetup();
+
   return (
     <main className="relative overflow-x-hidden font-sans text-ivory">
       <div className="relative z-10 mx-auto max-w-6xl px-4 pb-14 pt-6 sm:px-6 sm:pt-10">
@@ -75,17 +92,11 @@ export default function Home() {
               style={{ animationDelay: "320ms" }}
             >
               <ButtonLink to="/table" variant="primary" size="lg" testId="hero-deal">
-                Deal me in
+                {table.setup.observer ? "Watch the table" : "Deal me in"}
                 <span aria-hidden className="text-gold">
                   →
                 </span>
               </ButtonLink>
-              <a
-                href="#setup"
-                className="font-display text-sm tracking-wide text-gold/80 underline-offset-4 transition hover:text-gold hover:underline"
-              >
-                Set up the table first ↓
-              </a>
             </div>
 
           </div>
@@ -99,8 +110,12 @@ export default function Home() {
         </div>
 
         {/* --------------------------- Set up ------------------------------ */}
-        <div className="pp-fade-up mt-12 sm:mt-16" style={{ animationDelay: "420ms" }}>
-          <TableSetupPanel />
+        {/* Deliberately close to the hero. Closed it is one line of type, and
+            at 12rem of clearance it read as a separate section the eye had to
+            decide about; at 8 it reads as the caption to the button above it,
+            which is the only job it has before someone presses `Change`. */}
+        <div className="pp-fade-up mt-8 sm:mt-10" style={{ animationDelay: "420ms" }}>
+          <TableSetupPanel table={table} />
         </div>
 
         {/* -------------------------- The engine --------------------------- */}

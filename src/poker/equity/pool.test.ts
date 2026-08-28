@@ -24,6 +24,7 @@ import {
   type AnyShardResult,
   type MultiwayShardJob,
   type ShardJob,
+  type WorkerMessage,
 } from "../../workers/equity.worker";
 import { encodeCard, encodeCards } from "../core/card";
 import { makeRng } from "../core/rng";
@@ -392,6 +393,11 @@ const fake = {
   behavior: "reply" as Behavior,
   /** Constructor throws from this build index on; `Infinity` = never. */
   throwFrom: Infinity,
+  /**
+   * Milliseconds a worker spends fetching and compiling its module graph before
+   * it can answer anything, the real cost the pool used to charge to the shard.
+   */
+  bootMs: 0,
   built: 0,
   live: 0,
   /** Shard seeds each worker was handed, in dispatch order. */
@@ -401,23 +407,28 @@ const fake = {
 function resetFake(): void {
   fake.behavior = "reply";
   fake.throwFrom = Infinity;
+  fake.bootMs = 0;
   fake.built = 0;
   fake.live = 0;
   fake.routed = [];
 }
 
 /**
- * Speaks the real worker's protocol, a `ShardJob` in, a structured-cloned
- * `ShardResult` back on `onmessage`, but answers on a timer so shards land in
- * an order the pool did not choose. It can also be told to stay silent or to
- * die, the two failure modes the pool has to survive.
+ * Speaks the real worker's protocol: a `ready` announcement once the module
+ * graph has notionally loaded, then a `ShardJob` in and a structured-cloned
+ * `ShardResult` back on `onmessage`, answered on a timer so shards land in an
+ * order the pool did not choose. It can also be told to boot slowly, to stay
+ * silent or to die, the three failure modes the pool has to survive, and only
+ * the first of them is survivable by waiting.
  */
 class FakeWorker {
-  onmessage: ((e: { data: AnyShardResult }) => void) | null = null;
+  onmessage: ((e: { data: WorkerMessage }) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
   private readonly slot: number;
   private held: AnyShardResult[] = [];
   private dead = false;
+  private booted = false;
+  private queued: AnyShardJob[] = [];
 
   constructor(_url: URL, _opts?: { type?: string }) {
     // What Chrome does when the page's CSP forbids the worker URL.
@@ -427,10 +438,26 @@ class FakeWorker {
     this.slot = fake.built++;
     fake.live++;
     fake.routed[this.slot] = [];
+    // A real worker cannot answer, or announce itself, until its module graph
+    // has loaded; jobs posted before that sit on the port. Modelling the wait
+    // is the whole point of this fake now.
+    setTimeout(() => {
+      if (this.dead) return;
+      this.booted = true;
+      this.onmessage?.({ data: { ready: true } });
+      const waiting = this.queued;
+      this.queued = [];
+      for (const job of waiting) this.answer(job);
+    }, fake.bootMs);
   }
 
   postMessage(job: AnyShardJob): void {
     fake.routed[this.slot].push(job.seed);
+    if (this.booted) this.answer(job);
+    else this.queued.push(job);
+  }
+
+  private answer(job: AnyShardJob): void {
     if (fake.behavior === "silent") return;
     if (fake.behavior === "error") {
       setTimeout(() => {
@@ -579,6 +606,46 @@ describe("equity pool — worker path", () => {
     expect(fake.built).toBe(4); // the shards really were dispatched...
     expect(fake.routed.flat()).toHaveLength(4);
     expect(fake.live).toBe(0); // ...and the deadline retired the pool
+  });
+
+  /*
+   * The bug: a worker that is merely still loading is not a worker that has
+   * failed, and the pool used to be unable to tell the difference.
+   *
+   * `SHARD_TIMEOUT_MS` started at `postMessage`, which for the first job a
+   * worker ever gets is before the worker has executed a line. The browser is
+   * still fetching and compiling the module graph behind `equity.worker.ts`,
+   * and on a loaded machine that outruns the 400ms a *shard* is allowed. The
+   * deadline then retired four healthy workers, and since `MAX_POOL_BUILDS` is
+   * 2 the second occurrence latched `unavailable`, so every decision for the
+   * rest of the page ran on the main thread. Observed in a Rosetta-translated
+   * Chrome against the dev server as "shard 1 timed out" followed by "worker
+   * pool failed twice", both inside the first two decisions of the session.
+   *
+   * A 600ms boot is past both the boot grace and the old shard deadline, so
+   * before the fix this test found `fake.live` at 0 and the pool gone.
+   */
+  it("waits out a slow boot in-process without retiring the pool", async () => {
+    const pool = await freshPool(5);
+    fake.bootMs = 600;
+    const j = smallJob(0xb007);
+
+    // The decision itself is not held hostage to the boot: it falls back.
+    await expect(pool.runEquity(j)).resolves.toEqual(runEquitySync(j));
+    expect(fake.built).toBe(4);
+    expect(fake.routed.flat()).toHaveLength(4); // the shards were dispatched...
+    expect(fake.live).toBe(4); // ...and nothing was terminated for being slow
+    expect(warnings.some((w) => String(w[0]).includes("failed twice"))).toBe(
+      false
+    );
+
+    // And a boot is paid once: the next decision finds the pool warm, uses the
+    // same four workers, and needs no rebuild.
+    await new Promise((r) => setTimeout(r, 700));
+    await expect(pool.runEquity(j)).resolves.toEqual(runEquitySync(j));
+    expect(fake.built).toBe(4);
+    expect(fake.live).toBe(4);
+    expect(fake.routed.flat()).toHaveLength(8);
   });
 
   it("rebuilds the pool once after a worker error", async () => {

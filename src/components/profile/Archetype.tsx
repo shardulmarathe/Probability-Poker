@@ -10,6 +10,13 @@
  *
  * The thresholds and the reasons both come from `archetype.ts`. Nothing here
  * decides anything about style; it decides how much to insist on it.
+ *
+ * "What decided it" is the one part that folds away. It is the audit trail for
+ * a verdict the reader has not questioned yet, three lines of monospace under
+ * the label they actually came for, and printing it always was a third of this
+ * card's height spent answering an unasked question. It stays open while the
+ * read is provisional, because then the audit trail *is* the warning: a guess
+ * that hides its reasoning reads as a fact.
  */
 
 import {
@@ -18,7 +25,7 @@ import {
   STYLE_BLURBS,
   type StyleVerdict,
 } from "../../poker/coach/archetype";
-import { Note, Tag } from "../ui";
+import { Note, Reveal, Tag } from "../ui";
 
 /** Where a read stops being a coin flip. Presentation only. */
 const USABLE_CONFIDENCE = 0.4;
@@ -103,19 +110,27 @@ export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
       </Note>
 
       {/* ------------------------ Reasons ----------------------- */}
-      <div className="mt-4">
-        <p className="mb-1.5 font-display text-sm font-semibold tracking-wide text-ivory/70">
-          What decided it
-        </p>
-        <ul className="space-y-1">
-          {verdict.reasons.map((reason, i) => (
-            <li key={i} className="flex gap-2 text-[0.78rem] leading-relaxed text-ivory/60">
-              <span className="text-gold-soft/60">·</span>
-              <span className="font-mono">{reason}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {verdict.reasons.length > 0 && (
+        <Reveal
+          label="What decided it"
+          // The first reason is the one the classifier weighed most, so the
+          // closed row still names the cut the verdict turned on rather than
+          // sitting there saying only that more text exists.
+          summary={verdict.reasons[0]}
+          defaultOpen={verdict.provisional}
+          tone="quiet"
+          testId="archetype-reasons"
+        >
+          <ul className="space-y-1">
+            {verdict.reasons.map((reason, i) => (
+              <li key={i} className="flex gap-2 text-[0.78rem] leading-relaxed text-ivory/60">
+                <span className="text-gold-soft/60">·</span>
+                <span className="font-mono">{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+      )}
     </div>
   );
 }

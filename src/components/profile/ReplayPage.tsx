@@ -14,8 +14,17 @@
  * The tab bar used to be a near byte-for-byte copy of the hand review's,
  * inlined here, same gradient, same sticky wrapper, same active treatment
  * written out a second time. It is now `Tabs` + `StickyTabs` from the design
- * system, which also means the tab blurbs ("Change one decision") are printed
- * under the row instead of hidden in a `title=` attribute no phone shows.
+ * system.
+ *
+ * Those tab blurbs ("Change one decision") started life in `title=` attributes,
+ * which no phone has ever shown to anyone, and the fix was to print the active
+ * one permanently under the row. That was half right. The blurb is a line of
+ * italic prose describing a tab whose label is already on screen and already
+ * selected, sitting in a sticky bar directly above the thing the reader came to
+ * look at. It is now `hintAs="tooltip"`, which is emphatically not a return to
+ * `title=`: `Tabs` renders a real element on hover *and* on focus-within, so it
+ * reaches a keyboard and a tap, and every tab's own blurb is reachable rather
+ * than only the selected one's.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -94,10 +103,15 @@ export default function ReplayPage() {
     return (
       <main className="relative overflow-x-hidden text-ivory" data-testid="replay">
         <PageBody width="narrow">
-          <PageHeader
-            title="Hand replay"
-            lede="Every hand is a function of its seed, so any hand you have played can be dealt again exactly."
-          />
+          {/*
+           * No lede on the empty page. It read "Every hand is a function of
+           * its seed, so any hand you have played can be dealt again exactly",
+           * which is background about a feature nobody can use yet: there are
+           * no hands. The empty state below says the one thing that is
+           * actionable, and the seed is named in the header of every replay
+           * that actually has a hand behind it.
+           */}
+          <PageHeader title="Hand replay" />
           <div className="mt-10">
             <EmptyState
               title="Nothing archived to replay yet"
@@ -220,6 +234,7 @@ export default function ReplayPage() {
             label="Replay views"
             layout="fill"
             showHint
+            hintAs="tooltip"
             testIdPrefix="replay-tab"
             value={tab}
             onChange={setTab}
@@ -233,9 +248,10 @@ export default function ReplayPage() {
         </StickyTabs>
 
         {/*
-         * No heading here. The tab above is the heading, and its hint is the
-         * lede, printing "Step through / Rebuilt from the seed" underneath a
-         * tab reading "Step through" said the same thing three times.
+         * No heading here. The tab above is the heading, and printing "Step
+         * through / The hand exactly as it was dealt" underneath a tab reading
+         * "Step through" said the same thing twice before the panel it labels
+         * had a chance to say it once.
          */}
         <div className="mt-5" data-testid="replay-panel" data-tab={tab}>
           {tab === "step" && (

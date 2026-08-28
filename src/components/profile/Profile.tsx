@@ -18,6 +18,29 @@
  * a heading, a hairline and content; metrics are grouped by whitespace. The
  * only remaining surfaces are the ones where the container is genuinely the
  * object: the style verdict, and the empty state.
+ *
+ * That argument had a second half it had not got to. Removing the boxes made
+ * the page cheaper to look at without making it shorter: six sections, all
+ * expanded, came to 3,473px, and a reader asking the only question this page
+ * exists to answer, "how am I doing, and what should I fix", had to scroll
+ * past a six-row positional table, a cumulative curve and a per-street
+ * breakdown to reach the ranked leaks that are the answer. Boxes were never
+ * the clutter; simultaneity was.
+ *
+ * So the page now paints its answer and offers the rest. Open: the session
+ * headline, the tracker line, the style verdict with its confidence caveat,
+ * the two EV totals and the top three leaks. Behind a `Reveal`: the positional
+ * table, the curve, the per-street split and leaks four onward, each with a
+ * `summary` that states its own headline number while closed, because a folded
+ * section that says nothing makes the reader open it to discover it was not
+ * worth opening.
+ *
+ * Nothing about the arithmetic moved. Every summary above is derived from
+ * `stats` and `session`, which are computed exactly as before, on the same
+ * schedule, over the same `EV_WINDOW`. Deferring the *computation* to the
+ * moment a section opens would be the obvious next step and the wrong one: the
+ * closed summaries need those numbers, so it would trade a scroll for a
+ * spinner and make the summary lie until it was expanded.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,11 +56,24 @@ import {
   EmptyState,
   Group,
   Rail,
+  Reveal,
   Tabs,
 } from "../ui";
 import { ArchetypeCard } from "./Archetype";
-import { LeakByStreet, LeakList, LeakTotals, LossCurve } from "./Leaks";
-import { SessionHeadline, TrackerByPosition, TrackerOverall } from "./Tracker";
+import {
+  LeakByStreet,
+  LeakByStreetSummary,
+  LeakList,
+  LeakTotals,
+  LossCurve,
+  LossCurveSummary,
+} from "./Leaks";
+import {
+  SessionHeadline,
+  TrackerByPosition,
+  TrackerByPositionSummary,
+  TrackerOverall,
+} from "./Tracker";
 import { useProfileArchive } from "./useProfile";
 
 /**
@@ -204,11 +240,13 @@ export default function Profile() {
         ) : (
           <div className="mt-10 space-y-12">
             {/*
-             * No lede here, and none on "How you play" either. Six sections
-             * each opening heading-then-explanatory-sentence is the templated
-             * rhythm the failure catalog calls out; a lede earns its place only
-             * where the heading genuinely cannot say the thing, the pricing
-             * window, the ranking basis, what a sample can support.
+             * No lede here, and none on "How you play" or on the style verdict
+             * either. A section opening heading-then-explanatory-sentence, over
+             * and over, is the templated rhythm the failure catalog calls out;
+             * a lede earns its place only where the heading genuinely cannot
+             * say the thing. Two survive on this page, and both state scope
+             * rather than restate a title: the pricing window, and the basis
+             * the leaks are ranked on.
              */}
             <Group title="This session">
               <SessionHeadline stats={stats} />
@@ -217,19 +255,32 @@ export default function Profile() {
             <div className="grid gap-12 lg:grid-cols-2">
               <Group title="How you play">
                 <TrackerOverall stats={stats} />
+                {/*
+                 * The positional split was its own full-width section, which
+                 * gave a six-by-eight table of percentages the same weight on
+                 * the page as the six numbers it is a breakdown of. It is the
+                 * same six stats, so it belongs under them, and it opens.
+                 */}
+                <Reveal
+                  label="The same six, by position"
+                  summary={<TrackerByPositionSummary stats={stats} />}
+                  tone="quiet"
+                  testId="reveal-by-position"
+                >
+                  <TrackerByPosition stats={stats} />
+                </Reveal>
               </Group>
 
-              <Group
-                title="Your style, from the outside"
-                lede="And how much of it the sample can actually support."
-              >
+              {/*
+               * The lede here read "And how much of it the sample can actually
+               * support", which is what the confidence meter directly below it
+               * says, in a number, with a bar. Two ways of saying one thing is
+               * one too many when the second one is quantified.
+               */}
+              <Group title="Your style, from the outside">
                 <ArchetypeCard verdict={verdict} />
               </Group>
             </div>
-
-            <Group title="The same six, by position">
-              <TrackerByPosition stats={stats} />
-            </Group>
 
             <Group
               title="What your mistakes cost"
@@ -256,33 +307,51 @@ export default function Profile() {
                   number on — that needs a hand you took past the blinds.
                 </EmptyState>
               ) : (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   <LeakTotals session={session} />
+                  {/*
+                   * These two were headings with content permanently under
+                   * them, roughly 380px of chart and table between the totals
+                   * and the ranked leaks. Both answer a follow-up question
+                   * ("when did it happen", "on which street"), and neither is
+                   * the question the page is for. The heading text is now the
+                   * toggle's label, so the words on screen are unchanged when
+                   * closed; the `summary` beside each carries the number the
+                   * chart or table would have been read for anyway.
+                   */}
                   <div>
-                    <h3 className="font-display text-sm font-semibold tracking-wide text-ivory/75">
-                      Chips given away, accumulating
-                    </h3>
-                    <div className="mt-3">
+                    <Reveal
+                      label="Chips given away, accumulating"
+                      summary={<LossCurveSummary session={session} />}
+                      tone="quiet"
+                      testId="reveal-loss-curve"
+                    >
                       <LossCurve session={session} />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-display text-sm font-semibold tracking-wide text-ivory/75">
-                      Where it went, by street
-                    </h3>
-                    <div className="mt-3">
+                    </Reveal>
+                    <Reveal
+                      label="Where it went, by street"
+                      summary={<LeakByStreetSummary session={session} />}
+                      tone="quiet"
+                      testId="reveal-by-street"
+                    >
                       <LeakByStreet session={session} />
-                    </div>
+                    </Reveal>
                   </div>
                 </div>
               )}
             </Group>
 
+            {/*
+             * The lede kept its first clause, which names the ranking basis
+             * and the sample it ranked over, and lost its second, "Open any of
+             * them and play the hand again differently", which described the
+             * button labelled "Play it again" sitting in every row below it.
+             */}
             <Group
               title="Your biggest leaks"
               lede={`Ranked by the model's EV, over ${session?.decisionCount ?? 0} priced decision${
                 session?.decisionCount === 1 ? "" : "s"
-              }. Open any of them and play the hand again differently.`}
+              }.`}
             >
               {session ? (
                 <LeakList session={session} onReplay={openReplay} />

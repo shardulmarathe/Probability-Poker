@@ -25,7 +25,7 @@
  * on the screen, where a first-time player can read them.
  */
 
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { LINE, RADIUS, SURFACE, TONE } from "./tokens";
 
 export interface TabOption<T extends string | number> {
@@ -91,6 +91,29 @@ export function Tabs<T extends string | number>({
   const active = options.find((o) => o.value === value);
   const tips = showHint && hintAs === "tooltip";
 
+  /*
+   * The chosen option shows its own hint for a moment, so a touch device gets
+   * the text at all.
+   *
+   * Hover and focus alone are a pointer affordance, and this component's own
+   * header is about the bug where an explanation existed only in a `title=`
+   * that no touch device ever showed anyone. A tooltip that only opens on
+   * hover repeats that bug in a new shape: on a phone the tap that would
+   * reveal the hint has already committed the choice, so the reader can only
+   * ever read about the option after picking it. Showing it on commit turns
+   * that from a trap into a confirmation, and it costs no layout height.
+   */
+  const [justPicked, setJustPicked] = useState<T | null>(null);
+  useEffect(() => {
+    if (justPicked === null) return;
+    const id = window.setTimeout(() => setJustPicked(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [justPicked]);
+  const pick = (next: T) => {
+    onChange(next);
+    if (tips) setJustPicked(next);
+  };
+
   const row =
     layout === "fill"
       ? "flex gap-1"
@@ -148,7 +171,7 @@ export function Tabs<T extends string | number>({
                 option.testId ??
                 (testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined)
               }
-              onClick={() => onChange(option.value)}
+              onClick={() => pick(option.value)}
               className={`${tips ? "w-full" : cell} ${metrics} ${RADIUS.control} border font-display font-semibold tracking-wide transition disabled:cursor-not-allowed disabled:opacity-30`}
               style={{
                 borderColor: on ? "rgba(201,162,39,0.6)" : idleBorder,
@@ -168,16 +191,25 @@ export function Tabs<T extends string | number>({
           if (!tipId) return control;
 
           // Hover *and* focus-within, so the blurb is reachable from a keyboard
-          // and not only from a mouse. No React state: an open/closed boolean
-          // per option would re-render the whole row on every pointer move
-          // across a control that lives in the header of every table hand.
+          // and not only from a mouse, plus a brief forced open on commit so a
+          // touch device sees it at all. The hover and focus halves stay in CSS
+          // rather than state: an open/closed boolean per option would
+          // re-render the whole row on every pointer move across a control that
+          // lives in the header of every table hand.
+          const shown = justPicked === option.value;
           return (
             <span key={`${uid}-w-${i}`} className={`group relative ${cell}`}>
               {control}
               <span
                 role="tooltip"
                 id={tipId}
-                className="pointer-events-none invisible absolute left-1/2 top-[calc(100%+0.5rem)] z-50 w-56 -translate-x-1/2 border px-2.5 py-2 text-left font-cormorant text-[0.9rem] italic leading-snug text-ivory/80 opacity-0 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+                /* The hook the block variant carried. Switching a row to
+                   tooltips must not silently delete a test's only handle on
+                   the hint text. */
+                data-testid={testIdPrefix ? `${testIdPrefix}-hint` : undefined}
+                className={`pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-50 w-56 -translate-x-1/2 border px-2.5 py-2 text-left font-cormorant text-[0.9rem] italic leading-snug text-ivory/80 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
+                  shown ? "visible opacity-100" : "invisible opacity-0"
+                }`}
                 style={{
                   borderColor: LINE.gold,
                   background: "rgba(6,20,13,0.97)",

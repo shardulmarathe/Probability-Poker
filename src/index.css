@@ -320,7 +320,21 @@ body {
  * that both fits and stays legal, so a short window goes back to scrolling.
  * Scrolling is a worse experience; overlapping cards is a broken one.
  */
-@media (min-width: 768px) and (min-height: 730px) {
+/*
+ * 1024px, not 768px, and the width matters as much as the height.
+ *
+ * The lock may only engage where the header controls have actually left the
+ * page. `TableChrome` portals the mode switch and the hand rail into the app
+ * bar at `lg` and no earlier, because below that the bar is already full at
+ * four nav links. Between 768px and 1023px the page therefore still carries
+ * `TopBar`, and locking the height there cost the column two rows it had not
+ * budgeted for: at 800x730 the felt's own floor plus TopBar plus the controls
+ * overflow the viewport, and because the lock also sets `overflow: hidden`,
+ * Fold and Call were not merely below the fold, they were unreachable. A
+ * scrollbar is a worse experience than a locked screen; an unreachable Fold
+ * button is a broken one.
+ */
+@media (min-width: 1024px) and (min-height: 730px) {
   .pp-shell main.pp-screen,
   .pp-screen {
     height: calc(100svh - var(--pp-header-h));

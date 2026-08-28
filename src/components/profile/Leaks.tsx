@@ -12,6 +12,15 @@
  * never share a bar, a colour, a column or a total. The ranking is by model
  * loss alone; hindsight sits beside it, dimmer and dashed, labelled as the
  * results-oriented number it is.
+ *
+ * Half of what is in here now opens rather than shouts. The page used to print
+ * two totals, a paragraph about the totals, a curve, a per-street table and ten
+ * priced leaks in one column, and the leak that actually cost the most was
+ * indistinguishable from the ninth one down. Three leaks are shown; everything
+ * else is a `Reveal` whose closed row still carries its own number, because a
+ * folded section that says nothing forces the reader to open it to find out
+ * whether it was worth opening. Every one of those numbers comes off the
+ * `session` the page has already computed, so nothing is priced late.
  */
 
 import { useMemo } from "react";
@@ -21,7 +30,15 @@ import type {
   SessionEvLoss,
 } from "../../poker/coach/evLoss";
 import { money } from "../../lib/format";
-import { Button, EmptyState, HowCalculated, RADIUS, Scroller, Tag } from "../ui";
+import {
+  Button,
+  EmptyState,
+  HowCalculated,
+  RADIUS,
+  Reveal,
+  Scroller,
+  Tag,
+} from "../ui";
 
 /** Gold for what was knowable; slate for what only the cards knew. */
 const MODEL_COLOR = "#e2c563";
@@ -87,15 +104,30 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
         </div>
       </div>
 
-      <p
-        className={`mt-3 border-l-2 px-3 py-2 text-[0.75rem] leading-relaxed text-ivory/65 ${RADIUS.control}`}
-        style={{ borderColor: "#c9a227", background: "rgba(201,162,39,0.06)" }}
-        data-testid="never-sum"
+      {/*
+       * The rule is in the label, the argument is behind it.
+       *
+       * This was a permanent callout, and the sentence it was making, "these
+       * are never added", is a rule about the two boxes above rather than a
+       * warning about the state the reader is in. Its own heading can carry
+       * it, so the heading is the control: someone who already knows the rule
+       * reads five words instead of three lines, and someone who does not gets
+       * the whole argument on one tap. The `never-sum` hook moves with it onto
+       * the toggle, so it is still addressable when the body is folded.
+       */}
+      <Reveal
+        label="These two are never added"
+        summary="a fold that would have won is not a mistake"
+        tone="quiet"
+        testId="never-sum"
       >
-        These two are different questions about the same decisions, not two parts
-        of one bill. They are never added, and the leaks below are ranked by the
-        model number alone — a fold that would have won is not a mistake.
-      </p>
+        <p className="text-[0.8rem] leading-relaxed text-ivory/65">
+          These two are different questions about the same decisions, not two
+          parts of one bill. They are never added, and the leaks below are
+          ranked by the model number alone — a fold that would have won is not a
+          mistake.
+        </p>
+      </Reveal>
     </div>
   );
 }
@@ -124,6 +156,25 @@ const W = 100;
 const H = 40;
 
 /**
+ * The curve's endpoint, for the closed row of the reveal it lives in.
+ *
+ * Runs the same accumulation the chart does, off the same `session`, so the
+ * summary cannot drift from the line it stands in for. Cheap: one pass over
+ * hands already in memory, nothing sampled, nothing re-priced.
+ */
+export function LossCurveSummary({ session }: { session: SessionEvLoss }) {
+  const points = cumulative(session.hands);
+  if (points.length === 0) return <>nothing priced yet</>;
+  const last = points[points.length - 1];
+  return (
+    <>
+      {chips(last.model)} model · {chips(last.hindsight)} hindsight over{" "}
+      {points.length} hand{points.length === 1 ? "" : "s"}
+    </>
+  );
+}
+
+/**
  * Chips given away, accumulating over the session.
  *
  * Two lines, drawn in one box because they share an axis, kept apart by weight
@@ -137,7 +188,17 @@ export function LossCurve({ session }: { session: SessionEvLoss }) {
     ...points.map((p) => Math.max(p.model, p.hindsight))
   );
 
-  if (points.length === 0) return null;
+  // Says so rather than rendering nothing. The curve now lives inside a
+  // reveal, and a reveal that opens onto an empty box reads as a broken
+  // control; the old `return null` was invisible only because the heading
+  // above it was always on screen to absorb the blame.
+  if (points.length === 0) {
+    return (
+      <p className="text-sm text-ivory/50" data-testid="loss-curve-empty">
+        No priced hands yet, so there is no curve to draw.
+      </p>
+    );
+  }
 
   const x = (i: number) =>
     points.length === 1 ? W / 2 : (i / (points.length - 1)) * W;
@@ -304,6 +365,16 @@ function LeakRow({
   );
 }
 
+/**
+ * Leaks shown before the reader asks for more.
+ *
+ * Eight priced leaks is roughly 1,100px of ranked bars, and the eighth is
+ * worth about a fifth of the first: past three, the list stops being a
+ * priority order and starts being a wall that buries the one decision worth
+ * replaying. The rest are one tap away, and the tap says what they cost.
+ */
+const LEAKS_SHOWN = 3;
+
 export function LeakList({
   session,
   limit = 8,
@@ -334,19 +405,49 @@ export function LeakList({
     );
   }
 
+  // Every bar is scaled against the worst leak overall, not against the worst
+  // one currently on screen, so opening the rest does not silently rescale the
+  // three the reader was already looking at.
   const worst = Math.abs(ranked[0].modelEvLoss);
+  const shown = ranked.slice(0, LEAKS_SHOWN);
+  const rest = ranked.slice(LEAKS_SHOWN);
+  const restTotal = rest.reduce((sum, d) => sum + Math.abs(d.modelEvLoss), 0);
+
+  const row = (decision: DecisionEvLoss) => (
+    <LeakRow
+      key={`${decision.handNumber}:${decision.index}`}
+      decision={decision}
+      worst={worst}
+      onReplay={onReplay}
+    />
+  );
+
   return (
     <div>
-      <div data-testid="leak-list" data-count={ranked.length}>
-        {ranked.map((decision) => (
-          <LeakRow
-            key={`${decision.handNumber}:${decision.index}`}
-            decision={decision}
-            worst={worst}
-            onReplay={onReplay}
-          />
-        ))}
+      {/*
+       * `data-count` stays the number of leaks found, not the number rendered,
+       * so anything reading it still learns what the analysis produced rather
+       * than what the disclosure happens to be showing. `data-shown` is the
+       * new, narrower fact.
+       */}
+      <div
+        data-testid="leak-list"
+        data-count={ranked.length}
+        data-shown={shown.length}
+      >
+        {shown.map(row)}
       </div>
+
+      {rest.length > 0 && (
+        <Reveal
+          label={`${rest.length} more, ranked`}
+          summary={`${chips(restTotal)} between them`}
+          tone="quiet"
+          testId="reveal-more-leaks"
+        >
+          <div data-testid="leak-list-rest">{rest.map(row)}</div>
+        </Reveal>
+      )}
 
       <HowCalculated label="Why two numbers, and why they are never added">
         <p className="mb-2">
@@ -376,12 +477,47 @@ export function LeakList({
   );
 }
 
-/** Per-street roll-up, both lenses, still side by side and still not summed. */
-export function LeakByStreet({ session }: { session: SessionEvLoss }) {
-  const rows = (["preflop", "flop", "turn", "river"] as const).filter(
+const STREETS = ["preflop", "flop", "turn", "river"] as const;
+
+/** Streets that actually cost something, in the order they are played. */
+function costlyStreets(session: SessionEvLoss) {
+  return STREETS.filter(
     (s) => session.byStreet[s].model < 0 || session.byStreet[s].hindsight < 0
   );
-  if (rows.length === 0) return null;
+}
+
+/**
+ * Which street is doing the damage, for the closed row of its reveal.
+ *
+ * The whole point of a per-street split is to answer one question, "where does
+ * it go wrong", and the table answers it by making the reader scan four rows
+ * of two columns. The worst street by the model lens is that answer, so it is
+ * what the folded row says.
+ */
+export function LeakByStreetSummary({ session }: { session: SessionEvLoss }) {
+  const rows = costlyStreets(session);
+  if (rows.length === 0) return <>nothing lost on any street</>;
+  const worst = rows.reduce((a, b) =>
+    session.byStreet[b].model < session.byStreet[a].model ? b : a
+  );
+  return (
+    <>
+      worst {STREET_SHORT[worst]} · {chips(session.byStreet[worst].model)} model
+    </>
+  );
+}
+
+/** Per-street roll-up, both lenses, still side by side and still not summed. */
+export function LeakByStreet({ session }: { session: SessionEvLoss }) {
+  const rows = costlyStreets(session);
+  // See `LossCurve`: inside a reveal, nothing is a bug rather than a blank.
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-ivory/50" data-testid="by-street-empty">
+        No street has cost you anything yet.
+      </p>
+    );
+  }
 
   return (
     <Scroller>

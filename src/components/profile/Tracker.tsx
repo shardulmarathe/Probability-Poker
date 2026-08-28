@@ -137,13 +137,47 @@ export function TrackerOverall({ stats }: { stats: PlayerStats }) {
   );
 }
 
+/** Positions the seat has actually occupied, in table order. */
+function livePositions(stats: PlayerStats): PositionName[] {
+  return POSITIONS.filter((p) => stats.byPosition[p].hands > 0);
+}
+
+/**
+ * The one line the by-position table is worth when it is folded away.
+ *
+ * A `Reveal` whose closed state says only "The same six, by position" is worse
+ * than no reveal at all: the reader has to open it to find out whether it is
+ * worth opening. Six rows of six percentages have exactly one headline, which
+ * seat is bleeding, so that is what the closed row prints. Kept to two facts
+ * because `Reveal` truncates its summary and this one sits in a half-width
+ * column: a summary that ends in an ellipsis has told the reader nothing.
+ *
+ * Computed from `stats`, which the page already holds, so nothing here is
+ * deferred along with the rendering, the closed row is never stale or blank.
+ */
+export function TrackerByPositionSummary({ stats }: { stats: PlayerStats }) {
+  const live = livePositions(stats);
+  if (live.length === 0) return <>no positional sample yet</>;
+
+  const net = (p: PositionName) => stats.byPosition[p].net;
+  const worst = live.reduce((a, b) => (net(b) < net(a) ? b : a));
+  const value = net(worst);
+
+  return (
+    <>
+      {live.length} position{live.length === 1 ? "" : "s"} ·{" "}
+      {value < 0 ? `worst ${worst} −$${-value}` : `${worst} +$${value}, none losing`}
+    </>
+  );
+}
+
 /**
  * The same stats by position. Positions the seat has never occupied are left
  * out entirely rather than shown as a row of dashes, at four-handed there is
  * no hijack, and printing one implies a gap in the sample that does not exist.
  */
 export function TrackerByPosition({ stats }: { stats: PlayerStats }) {
-  const live = POSITIONS.filter((p) => stats.byPosition[p].hands > 0);
+  const live = livePositions(stats);
   if (live.length === 0) {
     return (
       <p className="text-sm text-ivory/50">

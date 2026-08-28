@@ -163,12 +163,22 @@ export function Reveal({
           boxed ? "px-3 py-3 sm:px-4" : "py-1.5"
         }`}
       >
-        <span className="flex min-w-0 items-baseline gap-2.5">
+        {/*
+         * Wraps on a phone, stays on one line from `sm` up.
+         *
+         * The summary is the whole point of a closed row: it is the number you
+         * came for, and a closed section that says nothing is worse than an
+         * open one. At 390px a single truncating line clipped them mid-figure
+         * ("−$13816 model · −$25416 hind…"), which is the one outcome worse
+         * than either — a number cut in half reads as a broken number rather
+         * than an abbreviated one.
+         */}
+        <span className="flex min-w-0 flex-col items-start gap-x-2.5 gap-y-0.5 sm:flex-row sm:items-baseline">
           <span className="font-display text-[0.8rem] font-semibold tracking-wide text-gold-soft sm:text-sm">
             {label}
           </span>
           {summary && !open && (
-            <span className="min-w-0 truncate font-mono text-[0.68rem] text-ivory/45">
+            <span className="min-w-0 font-mono text-[0.68rem] leading-snug text-ivory/45 sm:truncate">
               {summary}
             </span>
           )}

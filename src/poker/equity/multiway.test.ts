@@ -597,6 +597,47 @@ describe("multiway — invariants", () => {
     ).toThrow(/cannot deal/);
   });
 
+  /*
+   * The one input `MAX_TUPLE_ATTEMPTS` exists for, and the only one that can
+   * make the tuple loop spin: two seats pinned to ranges whose single combo is
+   * the same combo. No disjoint field exists, so every proposal collides and
+   * nothing but the bound ends the loop. Drop the bound and this test does not
+   * fail, it hangs, which is the shape of the load-dependent freeze a rejection
+   * sampler produces and the reason the bound is worth a test of its own.
+   *
+   * The escape hatch is checked as well as the termination: falling back to a
+   * uniform deal must leave the estimate alone, so the run is compared against
+   * two genuinely flat seats. Same law, different draw sequence, hence a
+   * tolerance rather than equality - eight standard errors of the difference,
+   * which is loose enough never to flake and tight enough that a fallback
+   * dealing from the wrong pool, or dealing the seats dependently, would miss.
+   */
+  it("terminates on a field that admits no disjoint tuple at all", () => {
+    const hero = codes("Qs", "Qd");
+    const board = codes("Jh", "7c", "2d", "9s", "4h");
+    const pool = [...remainingPool(hero, board)];
+    const sims = 6000;
+
+    const pinned = emptyRange();
+    pinned[comboIndex(code("Ah"), code("Ad"))] = 1;
+    const impossible = runOverPool(hero, board, pool, [pinned, pinned.slice() as Range], sims, 0x101);
+
+    // It came back at all, and it came back with a complete run in it.
+    expect(impossible.simulations).toBe(sims);
+    expect(impossible.wins + impossible.ties + impossible.losses).toBe(sims);
+
+    const flat = () => {
+      const r = emptyRange();
+      for (let i = 0; i < pool.length; i++) {
+        for (let j = i + 1; j < pool.length; j++) r[comboIndex(pool[i], pool[j])] = 1;
+      }
+      return r;
+    };
+    const uniform = runOverPool(hero, board, pool, [flat(), flat()], sims, 0x101);
+    const se = Math.sqrt(0.25 / sims) * Math.SQRT2;
+    expect(Math.abs(impossible.equity - uniform.equity)).toBeLessThan(8 * se);
+  });
+
   it("merges shard counts by addition, in any order, to the same total", () => {
     const parts: MultiwayCounts[] = [0, 1, 2].map((i) => ({
       sims: 100 + i,

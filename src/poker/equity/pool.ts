@@ -9,6 +9,7 @@
  */
 
 import {
+  isWorkerReady,
   runMultiwayShard,
   runShard,
   type AnyShardJob,
@@ -17,6 +18,7 @@ import {
   type MultiwayShardResult,
   type ShardJob,
   type ShardResult,
+  type WorkerMessage,
 } from "../../workers/equity.worker";
 import { encodeCards } from "../core/card";
 import { hashSeed } from "../core/rng";
@@ -130,6 +132,61 @@ function multiwayTimeout(opponents: number): number {
   return SHARD_TIMEOUT_MS * Math.max(1, opponents);
 }
 
+/**
+ * How long a shard waits for its worker to finish booting before it gives up
+ * on the worker *for this decision only*.
+ *
+ * THE BUG THIS PREVENTS. The shard deadline used to start ticking at
+ * `postMessage`, and for the first job a worker ever receives that is before
+ * the worker has run a line of code: the browser is still fetching and
+ * compiling the module graph behind `equity.worker.ts` (a dozen separate
+ * requests against the dev server, one chunk in production). On a loaded
+ * machine that is routinely longer than the 400ms a *shard* is allowed, so the
+ * deadline fired on a perfectly healthy worker, `retire` terminated the whole
+ * pool, and because `MAX_POOL_BUILDS` is 2 the second occurrence latched
+ * `unavailable` for the life of the page. Every decision from the third on ran
+ * on the main thread, which is exactly the stutter the fallback's own comment
+ * warns about, and nothing in the UI said why.
+ *
+ * Measured against the dev server in a Rosetta-translated Chrome, which starves
+ * the renderer much as a busy machine does: `shard 1` - the first dispatch of
+ * the session - timed out, and so did `shard 5`, the first dispatch after the
+ * one permitted rebuild. Two warnings, and the pool was gone for good inside
+ * the first two decisions.
+ *
+ * A worker that has not booted is not a broken worker. Exceeding this grace
+ * costs the decision its shards, it falls back in-process, which is what the
+ * in-process path is for, and it costs tens of milliseconds. It does not
+ * terminate anything and does not count against `MAX_POOL_BUILDS`, so the next
+ * decision gets the workers that have since warmed up. Short on purpose for the
+ * same reason: waiting longer buys nothing a fallback that already works cannot
+ * give, and every millisecond of it is a bot sitting silent on the clock.
+ */
+const WORKER_BOOT_MS = 250;
+
+/**
+ * Boot state per worker, keyed off the worker itself so the pool stays a plain
+ * `Worker[]` and `retire` needs no changes. Entries die with their worker.
+ */
+const bootState = new WeakMap<
+  Worker,
+  { ready: boolean; waiters: Array<() => void> }
+>();
+
+/**
+ * Called for *any* message, not only the `ready` announcement: a shard result
+ * proves the worker is up just as well, and that keeps the pool correct against
+ * a cached worker bundle that predates the handshake.
+ */
+function markBooted(worker: Worker): void {
+  const state = bootState.get(worker);
+  if (!state || state.ready) return;
+  state.ready = true;
+  const waiting = state.waiters;
+  state.waiters = [];
+  for (const wake of waiting) wake();
+}
+
 function workerCount(): number {
   const cores =
     typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 0;
@@ -159,7 +216,10 @@ function ensureWorkers(): Worker[] | null {
         new URL("../../workers/equity.worker.ts", import.meta.url),
         { type: "module" }
       );
-      w.onmessage = (e: MessageEvent<AnyShardResult>) => {
+      bootState.set(w, { ready: false, waiters: [] });
+      w.onmessage = (e: MessageEvent<WorkerMessage>) => {
+        markBooted(w);
+        if (isWorkerReady(e.data)) return;
         const slot = pending.get(e.data.id);
         if (!slot) return;
         pending.delete(e.data.id);
@@ -209,6 +269,12 @@ function retire(err: unknown): void {
  * `R` is asserted, not checked: `id` is unique per dispatch, so the reply keyed
  * to it is necessarily the answer to the job just sent, and a job's type fixes
  * its reply's type. Nothing on the wire is trusted beyond that correlation.
+ *
+ * Two deadlines, because there are two ways to be late and they deserve
+ * different verdicts. Until the worker has announced itself, `WORKER_BOOT_MS`
+ * runs and expiring it abandons this shard while leaving the pool alone. Once
+ * it has, `timeoutMs` runs and expiring it means the worker took a job it could
+ * answer and did not, which is what `retire` is for. Only one is ever armed.
  */
 function dispatch<R extends AnyShardResult>(
   worker: Worker,
@@ -216,21 +282,58 @@ function dispatch<R extends AnyShardResult>(
   timeoutMs: number
 ): Promise<R> {
   return new Promise<R>((resolve, reject) => {
-    const timer = setTimeout(
-      () => retire(new Error(`equity: shard ${job.id} timed out`)),
-      timeoutMs
-    );
-    // Settling always cancels the deadline, so it can only fire while pending.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Settling always cancels whichever deadline is armed, so a deadline can
+    // only fire while this shard is genuinely outstanding.
+    let settled = false;
+    const settle = (): void => {
+      settled = true;
+      clearTimeout(timer);
+    };
+    const armShardDeadline = (): void => {
+      timer = setTimeout(
+        () => retire(new Error(`equity: shard ${job.id} timed out`)),
+        timeoutMs
+      );
+    };
+
+    const boot = bootState.get(worker);
+    if (!boot || boot.ready) {
+      armShardDeadline();
+    } else {
+      timer = setTimeout(() => {
+        // Drop the slot rather than rejecting through it: the worker may still
+        // boot and answer, and a reply with no slot is discarded for free.
+        settle();
+        pending.delete(job.id);
+        reject(
+          new Error(`equity: worker still booting, shard ${job.id} not waited on`)
+        );
+      }, WORKER_BOOT_MS);
+      boot.waiters.push(() => {
+        // The grace may already have expired and handed this shard to the
+        // in-process path. Arming a shard deadline for a reply nobody is
+        // waiting on any more would retire a healthy pool a beat later, which
+        // is the very failure this whole handshake exists to stop.
+        if (settled) return;
+        clearTimeout(timer);
+        armShardDeadline();
+      });
+    }
+
     pending.set(job.id, {
       resolve: (r) => {
-        clearTimeout(timer);
+        settle();
         resolve(r as R);
       },
       reject: (e) => {
-        clearTimeout(timer);
+        settle();
         reject(e);
       },
     });
+    // Posted before the worker is up on purpose: the browser queues messages on
+    // the port and delivers them once the module has evaluated, so the shard is
+    // already running by the time `ready` comes back.
     worker.postMessage(job);
   });
 }

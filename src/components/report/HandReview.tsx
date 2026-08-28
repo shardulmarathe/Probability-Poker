@@ -34,10 +34,10 @@
  * Thirteen controls in four stacked rows used to push the first sentence of
  * actual content to y=420 on an 874px screen, so half of the first screen of a
  * reading page was furniture. Two rows now: the hand and its navigation, then
- * the tabs and the seat the review is written from. The tab blurbs moved into
- * the panels they describe (they were pinned inside the sticky bar, costing
- * their height on every scroll position), and the seat chips became a `select`,
- * which is what four to six mutually exclusive options are.
+ * the tabs and the seat the review is written from. The tab blurbs left the
+ * sticky bar, where they were pinned for the whole length of a three-screen
+ * panel, and are now the tab row's own hints (see `TABS`), and the seat chips
+ * became a `select`, which is what four to six mutually exclusive options are.
  */
 
 import { useMemo, useState } from "react";
@@ -67,11 +67,27 @@ import { STREET_LABEL, seatResult } from "./derive";
 type TabId = "hand" | "ranges" | "play";
 
 /**
- * The blurbs used to live in `title=` attributes, which no touch device has
- * ever shown to anyone, and then under the tab row inside `StickyTabs`, where
+ * The blurbs, and the third place they have lived.
+ *
+ * They began as `title=` attributes, which no touch device has ever shown to
+ * anyone. They were then printed under the tab row inside `StickyTabs`, where
  * they were pinned to the top of the viewport for the whole length of a
- * three-screen panel. They print as the first line of the panel they describe:
- * read once, then scrolled past like any other sentence.
+ * three-screen panel. They were then moved into the first line of the panel
+ * itself, which fixed the pinning and left the sentence.
+ *
+ * They no longer earn that line. Three tabs, labelled with the three nouns a
+ * reader would have used, and each panel opens with a titled section that says
+ * the same thing again — "The Board", "Opponent Ranges", "Your Hand" — under a
+ * page header that already reads "Hand review". A fourth statement of which tab
+ * you are on is the noise the eye learns to skip, and it cost the first 44px of
+ * every panel to say it.
+ *
+ * So they are the tab row's own hints, shown on hover and on keyboard focus by
+ * `Tabs`, which is the control's supported way to carry an explanation that is
+ * not wanted permanently. Nothing is lost: the text is one pointer or one Tab
+ * key away, and it is still read out, because the copy below carrying
+ * `tab-blurb` describes the panel to assistive tech whether or not anyone is
+ * hovering a tab.
  */
 const TABS: { id: TabId; label: string; blurb: string }[] = [
   { id: "hand", label: "Hand", blurb: "What happened, and what it cost each seat." },
@@ -353,7 +369,13 @@ export default function HandReview() {
                       testIdPrefix="tab"
                       value={tab}
                       onChange={setTab}
-                      options={TABS.map((t) => ({ value: t.id, label: t.label }))}
+                      showHint
+                      hintAs="tooltip"
+                      options={TABS.map((t) => ({
+                        value: t.id,
+                        label: t.label,
+                        hint: t.blurb,
+                      }))}
                     />
                   </div>
                   {report.seats.length > 1 && (
@@ -415,12 +437,18 @@ export default function HandReview() {
               className="mt-4"
               data-testid="review-panel"
               role="tabpanel"
+              aria-describedby="review-tab-blurb"
               key={`${report.seed}:${focus}`}
             >
-              <p
-                className="mb-4 font-cormorant text-[0.95rem] italic leading-snug text-ivory/55"
-                data-testid="tab-blurb"
-              >
+              {/*
+               * The panel's description, off screen. A `tabpanel` with no
+               * accessible description is announced as "tab panel" and nothing
+               * else, and the sighted reader's copy of this sentence is now a
+               * tooltip on the tab, which a screen reader lands on only if it
+               * happens to move through the tab row first. One sentence, in the
+               * markup, attached to the thing it describes.
+               */}
+              <p id="review-tab-blurb" className="sr-only" data-testid="tab-blurb">
                 {blurb}
               </p>
               {tab === "hand" && (

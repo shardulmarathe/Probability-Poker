@@ -76,6 +76,27 @@ export interface MultiwayShardResult extends MultiwayCounts {
 export type AnyShardJob = ShardJob | MultiwayShardJob;
 export type AnyShardResult = ShardResult | MultiwayShardResult;
 
+/**
+ * Posted once, unprompted, the moment this module can answer a job.
+ *
+ * The pool needs to tell a worker that is still fetching and compiling its
+ * module graph from one that has loaded and gone quiet, because the honest
+ * response to the two is opposite: wait for the first, retire the second.
+ * Nothing on the wire distinguished them before this message existed, so the
+ * pool's shard deadline was timing healthy workers out mid-boot. See
+ * `equity/pool.ts`'s `WORKER_BOOT_MS`.
+ */
+export interface WorkerReady {
+  ready: true;
+}
+
+/** Everything a worker can send: one boot announcement, then shard results. */
+export type WorkerMessage = AnyShardResult | WorkerReady;
+
+export function isWorkerReady(msg: WorkerMessage): msg is WorkerReady {
+  return (msg as WorkerReady).ready === true;
+}
+
 export function isMultiwayJob(job: AnyShardJob): job is MultiwayShardJob {
   return (job as MultiwayShardJob).kind === "multiway";
 }
@@ -119,7 +140,7 @@ if (typeof self !== "undefined" && typeof document === "undefined") {
   // DOM types `self` as a Window, whose `postMessage` takes a target origin.
   // Narrow it to the dedicated-worker shape locally.
   const ctx = self as unknown as {
-    postMessage(result: AnyShardResult): void;
+    postMessage(message: WorkerMessage): void;
     addEventListener(
       type: "message",
       handler: (event: MessageEvent<AnyShardJob>) => void
@@ -128,4 +149,9 @@ if (typeof self !== "undefined" && typeof document === "undefined") {
   ctx.addEventListener("message", (event) =>
     ctx.postMessage(runAnyShard(event.data))
   );
+  // Announced after the handler is installed, never before: `ready` has to mean
+  // "a job posted now will be answered", not "this module is halfway through
+  // evaluating". Jobs that arrived during boot are already queued on the port
+  // behind this message, so nothing is lost by saying so late.
+  ctx.postMessage({ ready: true });
 }

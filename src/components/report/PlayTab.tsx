@@ -59,6 +59,7 @@ import {
   HowCalculated,
   Lead,
   Meter,
+  Reveal,
   Scroller,
   Section,
   Stat,
@@ -160,10 +161,10 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* ------------------------------------------------------------------ */}
-      <Section
-        title={isHero ? "Your Hand" : `${seatName(focus)}'s Hand`}
-        subtitle="The ledger"
-      >
+      {/* "The ledger" was a label for four stat tiles reading Moves made,
+          Chips in, Chips back, Net. It named the thing rather than adding to
+          it. */}
+      <Section title={isHero ? "Your Hand" : `${seatName(focus)}'s Hand`}>
         <StatGrid columns={4}>
           <Stat label="Moves made" value={moves.length} />
           <Stat label="Chips in" value={money(you?.invested ?? 0)} />
@@ -178,7 +179,11 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section title="EV Loss" subtitle="Two lenses, kept apart on purpose">
+      {/* The subtitle promised two lenses kept apart. The two cards directly
+          under it are the lenses, headed "Model EV loss · judges the decision"
+          and "Hindsight EV loss · judges the deal", and they are apart. The
+          reason they are apart is the disclosure at the foot of the section. */}
+      <Section title="EV Loss">
         {loss.status === "working" && (
           <div className="flex h-[7rem] flex-col items-center justify-center gap-3 text-sm text-ivory/55">
             <span className="h-2 w-2 animate-pulse rounded-full bg-gold-soft" />
@@ -391,7 +396,10 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section title="Every Move" subtitle="What it cost, and what it had to be worth">
+      {/* Every card below opens with the street, the action and the pot, and
+          then says in a sentence what the move had to be worth. The subtitle
+          was that sentence's table of contents. */}
+      <Section title="Every Move">
         {moves.length === 0 ? (
           <p className="text-sm text-ivory/55">{who} never acted this hand.</p>
         ) : (
@@ -612,12 +620,21 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
               </tbody>
             </table>
           </Scroller>
-          <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/45">
+          {/* Two tables on one tab print an equity column each and the two do
+              not match to the last point. That is worth explaining once, to the
+              reader who noticed, and it is not worth a permanent paragraph
+              under a table nobody has cross-checked yet — the mismatch is the
+              question, so the answer waits for it. */}
+          <Reveal
+            tone="quiet"
+            label="Why this equity column differs from the one above"
+            summary="live budget vs fixed budget"
+          >
             These are the engine's live numbers, at the sample budget the table
             actually used. The EV-loss panel re-prices the same spots on a fixed
             budget so every decision is compared on equal terms, which is why the
             two equity columns are close but not identical.
-          </p>
+          </Reveal>
         </Section>
       )}
     </div>

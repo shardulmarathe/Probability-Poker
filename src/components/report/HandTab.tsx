@@ -41,6 +41,7 @@ import {
   HowCalculated,
   Lead,
   Meter,
+  Reveal,
   Scroller,
   Section,
   Stat,
@@ -141,7 +142,10 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section title="Seats" subtitle="Cards, chips and how each one finished" wide>
+      {/* No subtitle: the seven column headings a line below it are "Cards,
+          chips and how each one finished", spelled out and each attached to the
+          column it names. */}
+      <Section title="Seats" wide>
         <Scroller>
           <table className="w-full text-sm">
             <thead>
@@ -215,11 +219,15 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             </tbody>
           </table>
         </Scroller>
-        <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/45">
+        {/* Face-up mucked cards are the one thing on this table a poker player
+            may read as a bug rather than a feature, so the answer stays on the
+            page — but it is an answer, and an answer belongs behind the
+            question. Nobody scanning a results table has asked it yet. */}
+        <Reveal tone="quiet" label="Why mucked hands are face up here">
           Every seat's cards are shown, including the ones that mucked — a review
           is the one place where hindsight is the point. At the table those hands
           stay face down.
-        </p>
+        </Reveal>
 
         {/* The "Final hand" column reports the one category the deck produced.
             This is the distribution it was drawn from, which is the question
@@ -304,7 +312,10 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section title="Action" subtitle="Every chip, in order">
+      {/* No subtitle. A list of streets in order, each holding a row per move
+          with the chips on the right, is not improved by "Every chip, in
+          order" printed above it. */}
+      <Section title="Action">
         {streets.length === 0 ? (
           <p className="text-sm text-ivory/55">No actions were recorded.</p>
         ) : (

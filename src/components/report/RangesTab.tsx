@@ -15,6 +15,20 @@
  * the cell number is their total weight and the chart cannot show the spread
  * inside it. The bucket meters beside each chart are there for exactly that
  * reason: they read the same range through the classifier the engine used.
+ *
+ * ## One opponent at a time
+ *
+ * Every opponent used to render at once, and an opponent is a 13x13 chart, two
+ * stacks of bars and two paragraphs. Five of them at a six-handed table is how
+ * this tab reached 6,700px, and the bug that costs is not the scrollbar: the
+ * street picker that decides what all five charts are showing scrolls off the
+ * top long before the reader reaches the second seat, so changing street means
+ * scrolling back up to a control they can no longer see. The seat is a choice
+ * like the street is, so it gets the control the street already has.
+ *
+ * Only the chosen seat's range is built. `rangeView` replays every action in
+ * the hand against all 1326 combinations, so the four views nobody was looking
+ * at were also most of what this tab spent its render on.
  */
 
 import { useMemo, useState } from "react";
@@ -58,6 +72,7 @@ import {
   Lead,
   Meter,
   RADIUS,
+  Reveal,
   Section,
   Tabs,
   Tag,
@@ -91,9 +106,25 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
     [report, street.actionsUpTo, focus]
   );
 
-  const views = useMemo(
-    () => opponents.map((seat) => rangeView(report, street, seat, heroHole)),
-    [report, street, opponents, heroHole]
+  /**
+   * The opponent on screen.
+   *
+   * Null until the reader picks one, and re-resolved against `opponents` on
+   * every render rather than corrected in an effect. The street picker changes
+   * who is still in the pot: a seat chosen on the river is not necessarily a
+   * seat that was still live on the flop, and holding the stale number would
+   * draw a chart for a range that does not exist at that street instead of
+   * falling back to a seat that does.
+   */
+  const [seatChoice, setSeatChoice] = useState<number | null>(null);
+  const seat =
+    seatChoice !== null && opponents.includes(seatChoice)
+      ? seatChoice
+      : (opponents[0] ?? null);
+
+  const view = useMemo(
+    () => (seat === null ? null : rangeView(report, street, seat, heroHole)),
+    [report, street, seat, heroHole]
   );
 
   /** The read on every seat at every street, the narrowing strip. */
@@ -116,10 +147,11 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* ------------------------------------------------------------------ */}
-      <Section
-        title="Opponent Ranges"
-        subtitle="13×13 chart · the weights the sampler drew from"
-      >
+      {/* The subtitle used to open "13×13 chart · ", which is a description of
+          the thing the reader is looking at. What survives is the half they
+          cannot see: that these weights are not an illustration of the model,
+          they are what the sampler drew from. */}
+      <Section title="Opponent Ranges" subtitle="The weights the sampler drew from">
         <Tabs
           label="Street"
           as="options"
@@ -141,122 +173,161 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           )}
         </div>
 
-        {views.length === 0 ? (
+        {view === null ? (
           <p className="mt-5 text-sm text-ivory/55">
             No opponent was still in the pot at this point.
           </p>
         ) : (
-          <div className="mt-5 space-y-4">
-            {views.map((v) => (
-              <div
-                key={v.seat}
-                data-testid={`range-card-${v.seat}`}
-                className={`min-w-0 border p-3 ${RADIUS.surface}`}
-                style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }}
-              >
-                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-display text-sm font-semibold tracking-wide text-gold-soft">
-                    {seatName(v.seat)}
-                  </span>
-                  <span className="font-mono text-[0.65rem] text-ivory/50">
-                    {v.liveCombos} of 1326 combos · {pct(v.liveCombos / 1326, 0)} of
-                    the deck
-                  </span>
-                </div>
+          <div className="mt-5">
+            {/*
+             * Which seat, in the same control the street uses.
+             *
+             * Directly above the card it swaps rather than up beside the street
+             * row: two identical chip rows stacked with nothing between them
+             * are two rows the reader has to guess the meaning of, and this one
+             * belongs to the chart it sits on top of. A single opponent is not
+             * a choice, so the row does not appear.
+             */}
+            {opponents.length > 1 && (
+              <div className="mb-3">
+                <Tabs
+                  label="Opponent"
+                  as="options"
+                  layout="scroll"
+                  size="sm"
+                  testIdPrefix="range-seat"
+                  options={opponents.map((s) => ({
+                    value: s,
+                    label: seatName(s),
+                  }))}
+                  value={view.seat}
+                  onChange={setSeatChoice}
+                />
+              </div>
+            )}
 
-                {/*
-                 * Chart on the left, everything that reads it on the right.
-                 *
-                 * The left track was 28rem, which drew a 470px square in a
-                 * 1000px panel and left the right-hand half of every opponent
-                 * card empty, and the chart then offered a Zoom button to undo
-                 * the shortage the layout had invented. 44rem uses the width
-                 * that was already there, and the tier meters, the bucket
-                 * ladder and the two paragraphs that interpret them sit beside
-                 * the chart instead of under it, so an opponent is about one
-                 * screen rather than two.
-                 */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] lg:gap-6">
-                  <RangeGrid
-                    testId={`grid-${v.seat}`}
-                    title={`${seatName(v.seat)} — ${street.label}`}
-                    values={v.grid}
-                    max={v.maxCell}
-                    dead={(cell) => v.cellCombos[cell] === 0}
-                    format={(cell) =>
-                      v.cellCombos[cell] === 0
-                        ? "blocked"
-                        : `${v.cellCombos[cell]}c · ${(v.grid[cell] * 100).toFixed(2)}%`
-                    }
-                    legend={{
-                      lo: "0%",
-                      hi: `${(v.maxCell * 100).toFixed(1)}%`,
-                      caption:
-                        "Shading and the bar across each cell both carry the same number — the chance this seat holds that exact class. Hatched cells are fully blocked. Tap a cell to read it.",
-                    }}
-                  />
+            {/* No `key`. This was one card in a list of five; as a single
+                element a key would only force a remount on every seat switch,
+                throwing away the chart's zoom state and any disclosure the
+                reader had opened beside it. */}
+            <div
+              data-testid={`range-card-${view.seat}`}
+              className={`min-w-0 border p-3 ${RADIUS.surface}`}
+              style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.28)" }}
+            >
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                <span className="font-display text-sm font-semibold tracking-wide text-gold-soft">
+                  {seatName(view.seat)}
+                </span>
+                <span className="font-mono text-[0.65rem] text-ivory/50">
+                  {view.liveCombos} of 1326 combos · {pct(view.liveCombos / 1326, 0)} of
+                  the deck
+                </span>
+              </div>
 
-                  <div className="min-w-0">
-                    <div className="space-y-2">
-                      {[0, 1, 2].map((t) => (
-                        <Meter
-                          key={t}
-                          label={<span className="capitalize">{TIER_NAMES[t]}</span>}
-                          value={v.tierWeight[t]}
-                          text={pct(v.tierWeight[t])}
-                          color={TIER_COLOR[t]}
-                        />
-                      ))}
-                    </div>
+              {/*
+               * Chart on the left, everything that reads it on the right.
+               *
+               * The left track was 28rem, which drew a 470px square in a
+               * 1000px panel and left the right-hand half of every opponent
+               * card empty, and the chart then offered a Zoom button to undo
+               * the shortage the layout had invented. 44rem uses the width
+               * that was already there, and the tier meters, the bucket
+               * ladder and the two paragraphs that interpret them sit beside
+               * the chart instead of under it, so an opponent is about one
+               * screen rather than two.
+               */}
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] lg:gap-6">
+                <RangeGrid
+                  testId={`grid-${view.seat}`}
+                  title={`${seatName(view.seat)} — ${street.label}`}
+                  values={view.grid}
+                  max={view.maxCell}
+                  dead={(cell) => view.cellCombos[cell] === 0}
+                  format={(cell) =>
+                    view.cellCombos[cell] === 0
+                      ? "blocked"
+                      : `${view.cellCombos[cell]}c · ${(view.grid[cell] * 100).toFixed(2)}%`
+                  }
+                  legend={{
+                    lo: "0%",
+                    hi: `${(view.maxCell * 100).toFixed(1)}%`,
+                    caption:
+                      "Shading and the bar across each cell both carry the same number — the chance this seat holds that exact class. Hatched cells are fully blocked. Tap a cell to read it.",
+                  }}
+                />
 
-                    <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/50">
-                      Half this read's weight sits in{" "}
-                      <span className="font-mono text-gold-soft">{v.half.combos}</span>{" "}
-                      combinations — {pct(v.half.fraction, 0)} of what the seat can
-                      still hold.
-                      {v.half.fraction > 0.42
-                        ? " Barely narrower than a coin toss over the deck: this seat has told the table almost nothing yet."
-                        : v.half.fraction > 0.2
-                          ? " A real lean, but a long way from a pinned range."
-                          : " Tight — the actions this seat took carry a lot of information."}
-                    </p>
-
-                    {board.length >= 3 && (
-                      <div
-                        className="mt-4 border-t pt-3"
-                        style={{ borderColor: "rgba(244,237,228,0.1)" }}
-                      >
-                        <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.2em] text-gold-soft/75">
-                          What that range is, on this board
-                        </p>
-                        <div className="space-y-1.5">
-                          {Array.from({ length: BUCKET_COUNT }, (_, b) => b)
-                            .filter((b) => v.buckets[b] > 0.005)
-                            .sort((a, b) => v.buckets[b] - v.buckets[a])
-                            .slice(0, 6)
-                            .map((b) => (
-                              <Meter
-                                key={b}
-                                label={bucketName(b)}
-                                value={v.buckets[b]}
-                                text={pct(v.buckets[b])}
-                              />
-                            ))}
-                        </div>
-                        <p className="mt-2 text-[0.68rem] leading-relaxed text-ivory/45">
-                          Every combination in the range, classified against{" "}
-                          <span className="font-mono">{cardText(board)}</span> —
-                          the nine rungs the engine works in. The three bars
-                          above are these same nine collapsed into thirds, not a
-                          separate pre-flop judgement, so the two cannot
-                          disagree.
-                        </p>
-                      </div>
-                    )}
+                <div className="min-w-0">
+                  <div className="space-y-2">
+                    {[0, 1, 2].map((t) => (
+                      <Meter
+                        key={t}
+                        label={<span className="capitalize">{TIER_NAMES[t]}</span>}
+                        value={view.tierWeight[t]}
+                        text={pct(view.tierWeight[t])}
+                        color={TIER_COLOR[t]}
+                      />
+                    ))}
                   </div>
+
+                  <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/50">
+                    Half this read's weight sits in{" "}
+                    <span className="font-mono text-gold-soft">{view.half.combos}</span>{" "}
+                    combinations — {pct(view.half.fraction, 0)} of what the seat can
+                    still hold.
+                    {view.half.fraction > 0.42
+                      ? " Barely narrower than a coin toss over the deck: this seat has told the table almost nothing yet."
+                      : view.half.fraction > 0.2
+                        ? " A real lean, but a long way from a pinned range."
+                        : " Tight — the actions this seat took carry a lot of information."}
+                  </p>
+
+                  {board.length >= 3 && (
+                    <div
+                      className="mt-4 border-t pt-3"
+                      style={{ borderColor: "rgba(244,237,228,0.1)" }}
+                    >
+                      <p className="mb-2 font-display text-[0.62rem] uppercase tracking-[0.2em] text-gold-soft/75">
+                        What that range is, on this board
+                      </p>
+                      <div className="space-y-1.5">
+                        {Array.from({ length: BUCKET_COUNT }, (_, b) => b)
+                          .filter((b) => view.buckets[b] > 0.005)
+                          .sort((a, b) => view.buckets[b] - view.buckets[a])
+                          .slice(0, 6)
+                          .map((b) => (
+                            <Meter
+                              key={b}
+                              label={bucketName(b)}
+                              value={view.buckets[b]}
+                              text={pct(view.buckets[b])}
+                            />
+                          ))}
+                      </div>
+                      {/* The reassurance that the three bars and the nine
+                          rungs cannot disagree is worth having and is not
+                          worth a permanent paragraph in the narrow column
+                          beside a chart: nobody arrives at this tab
+                          suspecting the two readings of the same range have
+                          come apart. The board is the part that is scope, so
+                          it stays visible as the summary. */}
+                      <Reveal
+                        tone="quiet"
+                        label="What the nine rungs are"
+                        summary={cardText(board)}
+                      >
+                        Every combination in the range, classified against{" "}
+                        <span className="font-mono">{cardText(board)}</span> —
+                        the nine rungs the engine works in. The three bars
+                        above are these same nine collapsed into thirds, not a
+                        separate pre-flop judgement, so the two cannot
+                        disagree.
+                      </Reveal>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         )}
 
@@ -337,15 +408,23 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
             `weak / medium / strong` read the table also keeps, moved by Bayes on
             the flat action table — it is recorded with every decision and read
             by the coach, but it is not what the sampler drew from. Saying so is
-            cheaper than letting the two be mistaken for each other. */}
-        <p className="mb-4 text-[0.7rem] leading-relaxed text-ivory/45">
+            cheaper than letting the two be mistaken for each other, and it is
+            cheaper still said once, when asked: the subtitle already tells the
+            reader these are three numbers a street, and the reader who wants to
+            know why there are two different reads on one tab is the reader who
+            opens this. */}
+        <Reveal
+          tone="quiet"
+          label="Why there are two reads on this tab"
+          summary="board-blind · three numbers a seat"
+        >
           A second, coarser read the table keeps alongside the ranges above:
           three numbers per seat, moved by Bayes after every public action. It
           ignores the board, so it is the one place a hand is still judged the
           way it looked before the flop — useful for watching a seat's story
           tighten, not for pricing a hand.
-        </p>
-        <div className="space-y-4">
+        </Reveal>
+        <div className="mt-4 space-y-4">
           {opponents.length === 0 && (
             <p className="text-sm text-ivory/55">No opponents to track.</p>
           )}
@@ -419,10 +498,10 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
       </Section>
 
       {/* ------------------------------------------------------------------ */}
-      <Section
-        title="Blockers"
-        subtitle={`${isHero ? "Your" : `${seatName(focus)}'s`} cards, and what they rule out`}
-      >
+      {/* No subtitle. "Your cards, and what they rule out" is the definition of
+          the word in the title, and whose cards they are is printed twice
+          below: on the chart's own heading and on the card row beside it. */}
+      <Section title="Blockers">
         {heroHole.length === 0 ? (
           <p className="text-sm text-ivory/55">This seat was dealt no cards.</p>
         ) : (

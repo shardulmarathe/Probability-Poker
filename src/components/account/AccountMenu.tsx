@@ -4,8 +4,19 @@
  *   not configured   Renders nothing. A deploy without `VITE_NEON_AUTH_URL` has
  *                    no account service, and an offer that cannot be accepted is
  *                    worse than no offer.
- *   signed out       A quiet gold "Sign in". Never a wall, never a modal on
- *                    load, the game is complete without it.
+ *   signed out       "Sign in", in the quiet treatment. Never a wall, never a
+ *                    modal on load, the game is complete without it.
+ *
+ *                    It used to wear `BUTTON.secondary`, a filled gold pill,
+ *                    which is the same weight this product gives a primary
+ *                    action, in the top-right corner of every route. That made
+ *                    the loudest control on the page the one thing a visitor
+ *                    has least reason to press: the archive already survives a
+ *                    reload in `localStorage`, so an account buys cross-device
+ *                    continuity and nothing else, and almost nobody opening a
+ *                    probability demo wants an account before they have seen a
+ *                    hand. Quiet, not hidden. Someone who came here to sign in
+ *                    still finds it exactly where it has always been.
  *   signed in        Initial, name, and the sync dot; opens a small panel with
  *                    where the hands are and a way out.
  *
@@ -74,7 +85,7 @@ export function AccountMenu({ className = "" }: AccountMenuProps) {
           type="button"
           onClick={() => setDialog(true)}
           data-testid="account-signin"
-          className={`${BUTTON.base} ${BUTTON.secondary} min-h-[34px] px-2 py-1.5 text-[0.7rem] sm:px-3 sm:text-xs`}
+          className={`${BUTTON.base} ${BUTTON.quiet} min-h-[34px] px-2 py-1.5 text-[0.7rem] sm:px-3 sm:text-xs`}
         >
           Sign in
         </button>

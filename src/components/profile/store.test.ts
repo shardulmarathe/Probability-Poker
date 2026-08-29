@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computeStats } from "../../poker/coach/stats";
 import { classifyStats } from "../../poker/coach/archetype";
 import { playSession } from "../../poker/replay/fixtures";
@@ -6,9 +6,14 @@ import { replayHand } from "../../poker/replay/reconstruct";
 import type { TableHandReport } from "../../poker/table/contract";
 import {
   MAX_STORED_HANDS,
+  clearArchive,
+  getArchiveScope,
+  loadArchive,
   mergeHands,
   normalizeArchive,
   normalizeReport,
+  saveArchive,
+  setArchiveScope,
 } from "./store";
 
 const BLINDS = { smallBlind: 5, bigBlind: 10 };
@@ -29,6 +34,67 @@ function tampered(
 ): Record<string, unknown> {
   return { ...stored(report), ...patch };
 }
+
+function installStorage(): void {
+  const values = new Map<string, string>();
+  (globalThis as { window?: unknown }).window = {
+    localStorage: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, String(value)),
+      removeItem: (key: string) => values.delete(key),
+    },
+  };
+}
+
+function uninstallStorage(): void {
+  delete (globalThis as { window?: unknown }).window;
+}
+
+describe("archive scope", () => {
+  beforeEach(installStorage);
+  afterEach(() => {
+    setArchiveScope("player");
+    uninstallStorage();
+  });
+
+  it("defaults to the player archive", () => {
+    expect(getArchiveScope()).toBe("player");
+  });
+
+  it("keeps player and demo hands separate", () => {
+    const playerHands = session(2, 100);
+    const demoHands = session(3, 200);
+
+    saveArchive({ ...normalizeArchive(null), hands: playerHands });
+    setArchiveScope("demo");
+    expect(loadArchive().hands).toEqual([]);
+    saveArchive({ ...normalizeArchive(null), hands: demoHands });
+    expect(loadArchive().hands.map((hand) => hand.seed)).toEqual(
+      demoHands.map((hand) => hand.seed)
+    );
+
+    setArchiveScope("player");
+    expect(loadArchive().hands.map((hand) => hand.seed)).toEqual(
+      playerHands.map((hand) => hand.seed)
+    );
+  });
+
+  it("clearing the demo leaves the player archive intact", () => {
+    const playerHands = session(2, 300);
+    const demoHands = session(2, 400);
+
+    saveArchive({ ...normalizeArchive(null), hands: playerHands });
+    setArchiveScope("demo");
+    saveArchive({ ...normalizeArchive(null), hands: demoHands });
+    clearArchive();
+    expect(loadArchive().hands).toEqual([]);
+
+    setArchiveScope("player");
+    expect(loadArchive().hands.map((hand) => hand.seed)).toEqual(
+      playerHands.map((hand) => hand.seed)
+    );
+  });
+});
 
 describe("normalizeReport", () => {
   it("round-trips a real report through JSON unchanged", () => {

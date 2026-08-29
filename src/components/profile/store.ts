@@ -17,6 +17,11 @@
  * report by an order of magnitude, a Monte Carlo audit trail per move, and
  * nothing the profile computes reads them: `computeStats`, `classifyStats` and
  * `analyzeHands` all work from `actions`, `seats`, `pots` and the board.
+ *
+ * The scripted demo has its own namespace rather than merging into the player
+ * archive because the profile's entire claim is "this is how YOU play". Mixing
+ * in 60 hands from a scripted driver would make the style verdict and every
+ * leak figure a lie.
  */
 
 import type { ActionType, Street } from "../../types";
@@ -31,7 +36,26 @@ import type {
 import { MAX_SEATS, MIN_SEATS } from "../../poker/table/position";
 import type { SeatStatus } from "../../poker/table/state";
 
-const STORAGE_KEY = "pp.profile.v1";
+export type ArchiveScope = "player" | "demo";
+
+const STORAGE_KEYS: Record<ArchiveScope, string> = {
+  player: "pp.profile.v1",
+  demo: "pp.demo.v1",
+};
+
+let archiveScope: ArchiveScope = "player";
+
+export function setArchiveScope(scope: ArchiveScope): void {
+  archiveScope = scope;
+}
+
+export function getArchiveScope(): ArchiveScope {
+  return archiveScope;
+}
+
+function storageKey(): string {
+  return STORAGE_KEYS[archiveScope];
+}
 
 /**
  * Hands kept. Roughly 1.5 KB each once decisions are stripped, so the whole
@@ -330,7 +354,7 @@ function dedupe(hands: TableHandReport[]): TableHandReport[] {
 export function loadArchive(): ProfileArchive {
   if (typeof window === "undefined") return EMPTY_ARCHIVE;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey());
     if (!raw) return EMPTY_ARCHIVE;
     return normalizeArchive(JSON.parse(raw));
   } catch {
@@ -343,7 +367,7 @@ export function saveArchive(archive: ProfileArchive): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
-      STORAGE_KEY,
+      storageKey(),
       JSON.stringify({
         ...archive,
         hands: archive.hands.slice(-MAX_STORED_HANDS).map(forStorage),
@@ -385,7 +409,7 @@ export function mergeSyncedHands(incoming: TableHandReport[]): ProfileArchive {
 export function clearArchive(): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(storageKey());
   } catch {
     /* nothing to do */
   }

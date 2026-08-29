@@ -35,10 +35,16 @@ export interface DemoSessionProps {
    * needs to re-read storage, and both happen at the same moment.
    */
   onLoaded: (result: DemoResult) => void;
+  /**
+   * Rendered beside an archive that exists but is too small to read, rather than
+   * inside the empty state. Same control, quieter framing: the reader has
+   * played, so the copy should not talk to them as though they have not.
+   */
+  thin?: boolean;
 }
 
 /** The offer, shown where the profile would otherwise be a dead end. */
-export function DemoSessionButton({ onLoaded }: DemoSessionProps) {
+export function DemoSessionButton({ onLoaded, thin = false }: DemoSessionProps) {
   const [progress, setProgress] = useState<number | null>(null);
 
   const run = useCallback(async () => {
@@ -63,7 +69,13 @@ export function DemoSessionButton({ onLoaded }: DemoSessionProps) {
   const running = progress !== null;
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-2">
+    <div
+      className={
+        thin
+          ? "mb-6 flex flex-wrap items-center gap-x-4 gap-y-2"
+          : "mt-6 flex flex-col items-center gap-2"
+      }
+    >
       <Button
         variant="quiet"
         size="md"
@@ -73,16 +85,24 @@ export function DemoSessionButton({ onLoaded }: DemoSessionProps) {
       >
         {running
           ? `Dealing ${Math.round(progress * DEMO_HANDS)} of ${DEMO_HANDS}…`
-          : `Or watch the table learn a bluffer (${DEMO_HANDS} hands)`}
+          : thin
+            ? `Watch the table learn a bluffer (${DEMO_HANDS} hands)`
+            : `Or watch the table learn a bluffer (${DEMO_HANDS} hands)`}
       </Button>
       {/* No promised duration. It is a couple of seconds of arithmetic and
           many more of rendering, and how many depends entirely on the machine,
           so the counter above says where it has got to instead of a number
           here saying where it should have got to by now. */}
-      <p className="max-w-md text-center text-xs leading-relaxed text-ivory/45">
+      <p
+        className={`text-xs leading-relaxed text-ivory/45 ${
+          thin ? "min-w-0 flex-1" : "max-w-md text-center"
+        }`}
+      >
         {running
           ? "Real hands, real engine — the same code the table runs."
-          : "Played for you, into a sandbox that never touches your own archive."}
+          : thin
+            ? `Below ${DEMO_HANDS} hands the read on you is still mostly the shared prior. This shows what it looks like once it is not.`
+            : "Played for you, into a sandbox that never touches your own archive."}
       </p>
     </div>
   );

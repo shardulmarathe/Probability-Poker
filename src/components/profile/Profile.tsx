@@ -60,6 +60,9 @@ import {
   Tabs,
 } from "../ui";
 import { ArchetypeCard } from "./Archetype";
+import { DemoBanner, DemoSessionButton } from "./DemoSession";
+import { getArchiveScope, setArchiveScope } from "./store";
+import type { DemoResult } from "../../poker/replay/demoSession";
 import {
   LeakByStreet,
   LeakByStreetSummary,
@@ -100,6 +103,7 @@ export default function Profile() {
     seatName,
     storedCount,
     reset,
+    refresh,
     smallBlind,
     bigBlind,
   } = useProfileArchive();
@@ -154,6 +158,30 @@ export default function Profile() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  /*
+   * The demo lives in component state rather than in storage, deliberately.
+   * A reload must land the reader back in their own archive: waking up inside
+   * somebody else's sixty hands, with no memory of having asked for them, is
+   * a worse first impression than the empty state this replaces.
+   */
+  const [demo, setDemo] = useState<DemoResult | null>(null);
+  const inDemo = getArchiveScope() === "demo";
+
+  const loadDemo = useCallback(
+    (result: DemoResult) => {
+      setDemo(result);
+      setSeat(result.heroSeat);
+      refresh();
+    },
+    [refresh, setSeat]
+  );
+
+  const exitDemo = useCallback(() => {
+    setArchiveScope("player");
+    setDemo(null);
+    refresh();
+  }, [refresh]);
 
   const empty = hands.length === 0;
 
@@ -221,6 +249,8 @@ export default function Profile() {
           </div>
         )}
 
+        {inDemo && <DemoBanner result={demo} onExit={exitDemo} />}
+
         {empty ? (
           <div className="mt-10">
             <EmptyState
@@ -235,6 +265,7 @@ export default function Profile() {
               how often you enter a pot, how you play each position, what your
               style looks like from the outside, and which decisions cost the
               most. A dozen hands is enough for the first read.
+              <DemoSessionButton onLoaded={loadDemo} />
             </EmptyState>
           </div>
         ) : (

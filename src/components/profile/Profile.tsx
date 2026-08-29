@@ -45,7 +45,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { classifyStats } from "../../poker/coach/archetype";
+import { MIN_CLASSIFY_HANDS, classifyStats } from "../../poker/coach/archetype";
 import { analyzeHands, type SessionEvLoss } from "../../poker/coach/evLoss";
 import { computeStats } from "../../poker/coach/stats";
 import { storageNotice, useSync } from "../account";
@@ -185,6 +185,18 @@ export default function Profile() {
 
   const empty = hands.length === 0;
 
+  /*
+   * Offer the demo for as long as the page cannot do its job, not only when the
+   * archive is empty.
+   *
+   * `MIN_CLASSIFY_HANDS` is the point below which the style verdict flags itself
+   * `provisional` and says so out loud ("24 hands is well under the 30 a label
+   * needs to mean anything"). A reader in that state is exactly who the demo is
+   * for, and offering it only at zero hands excluded them: play three hands out
+   * of curiosity and the way to see what the page is actually for disappeared.
+   */
+  const thin = !inDemo && hands.length > 0 && hands.length < MIN_CLASSIFY_HANDS;
+
   return (
     <main
       className="relative overflow-x-hidden text-ivory"
@@ -250,6 +262,8 @@ export default function Profile() {
         )}
 
         {inDemo && <DemoBanner result={demo} onExit={exitDemo} />}
+
+        {thin && <DemoSessionButton onLoaded={loadDemo} thin />}
 
         {empty ? (
           <div className="mt-10">

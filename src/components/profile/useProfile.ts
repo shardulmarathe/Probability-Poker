@@ -18,6 +18,7 @@ import type { TableHandReport } from "../../poker/table/contract";
 import { useTable } from "../../store/TableContext";
 import {
   clearArchive,
+  getArchiveScope,
   loadArchive,
   mergeHands,
   saveArchive,
@@ -49,6 +50,13 @@ export function useHandRecorder(): void {
 
   useEffect(() => {
     if (live.length === 0) return;
+    /*
+     * The demo archive is a sandbox and the recorder must stay out of it.
+     * Without this, hands played at the real table while the reader is looking
+     * at the demo would be written into the demo's own storage, and the two
+     * would stop being separable, which is the entire point of the separation.
+     */
+    if (getArchiveScope() === "demo") return;
     const archive = loadArchive();
     const hands = mergeHands(archive.hands, live);
 
@@ -77,6 +85,8 @@ export interface ProfileView extends ProfileArchive {
   seatCount: number;
   seatName: (seat: number) => string;
   reset: () => void;
+  /** Re-read the archive after something outside this hook wrote to it. */
+  refresh: () => void;
 }
 
 /** The archive plus this session, ready to hand to the coach modules. */
@@ -88,6 +98,15 @@ export function useProfileArchive(): ProfileView {
 
   const archive = useMemo(() => {
     const stored = loadArchive();
+    /*
+     * In the demo scope the reader is looking at sixty hands played by a
+     * scripted driver, and folding in whatever they happen to have played at
+     * the table this session would make the style verdict describe two
+     * different players at once.
+     */
+    if (getArchiveScope() === "demo") {
+      return { stored, hands: stored.hands, earlier: stored.hands.length };
+    }
     const thisSession = new Set(live.map((h) => h.seed));
     return {
       stored,
@@ -132,6 +151,13 @@ export function useProfileArchive(): ProfileView {
     setVersion((v) => v + 1);
   }, []);
 
+  /**
+   * Re-read storage. Needed because `localStorage` cannot announce a write, so
+   * anything that fills the archive from outside this hook, the demo session,
+   * has no other way to make the page notice.
+   */
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
   return {
     hands: archive.hands,
     smallBlind: table.config.smallBlind,
@@ -144,5 +170,6 @@ export function useProfileArchive(): ProfileView {
     seatCount,
     seatName,
     reset,
+    refresh,
   };
 }

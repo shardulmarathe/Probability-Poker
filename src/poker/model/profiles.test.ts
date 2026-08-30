@@ -117,14 +117,16 @@ function table(pot: number, stack = 1000): TableState {
 // ---------------------------------------------------------------------------
 
 describe("roster", () => {
-  it("has the seven built archetypes and no stub for mirror", () => {
+  it("lists every archetype the roster can seat, and no more", () => {
     expect([...BOT_ARCHETYPES].sort()).toEqual(
       ["lag", "maniac", "nit", "professor", "rock", "station", "tag"].sort()
     );
-    // `mirror` needs a learned player model, so it cannot exist as static data.
-    // Phase 2 removes it from the `Exclude` and the compiler demands the row.
-    expect(Object.keys(BOT_PROFILES)).not.toContain("mirror");
-    expect(findProfile("mirror")).toBeUndefined();
+    // `BuiltArchetype` is `BotArchetype` exactly, so the roster owes a row for
+    // every archetype the type admits. An archetype whose parameters came from
+    // a played session rather than from this file would break that identity,
+    // and this pair is what would fail rather than a seat shipping unbuilt.
+    expect(Object.keys(BOT_PROFILES).sort()).toEqual([...BOT_ARCHETYPES].sort());
+    expect(findProfile("nonexistent")).toBeUndefined();
   });
 
   it("keys match ids and presentation fields are distinct and non-empty", () => {

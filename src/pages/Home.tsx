@@ -66,7 +66,13 @@ export default function Home() {
               className="pp-fade-up font-display text-[clamp(3rem,6.5vw,4.75rem)] font-bold leading-[1.02] tracking-tight text-ivory"
               style={{ animationDelay: "80ms" }}
             >
-              Probability
+              {/*
+               * The space before the break is load-bearing. Accessible-name
+               * computation concatenates the text nodes and a `<br>`
+               * contributes nothing, so without it a screen reader announces
+               * "ProbabilityPoker" as one word.
+               */}
+              Probability{" "}
               <br />
               <span className="text-gold">Poker</span>
             </h1>
@@ -75,16 +81,17 @@ export default function Home() {
               className="pp-fade-up mt-5 font-cormorant text-[clamp(1.5rem,2.6vw,2.1rem)] italic text-ivory/85"
               style={{ animationDelay: "160ms" }}
             >
-              Can probability outperform human intuition?
+              The table learns how you play.
             </p>
 
             <p
               className="pp-fade-up mx-auto mt-4 max-w-lg text-[0.95rem] leading-relaxed text-ivory/60 lg:mx-0"
               style={{ animationDelay: "240ms" }}
             >
-              Play Texas Hold'em against bots that model your range, simulate the
-              runout, and take the highest-EV line every time. Then read back
-              exactly where your hand differed from theirs.
+              Play Texas Hold'em against bots that build a Bayesian read on your
+              seat specifically, update it after every hand, and price each
+              decision from it. Then read back what they learned about you, what
+              it cost, and the derivation of every number.
             </p>
 
             <div

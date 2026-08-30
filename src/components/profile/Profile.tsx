@@ -42,6 +42,7 @@ import {
   Tabs,
 } from "../ui";
 import { ArchetypeCard } from "./Archetype";
+import { CalibrationCard } from "./Calibration";
 import { DemoBanner, DemoSessionButton } from "./DemoSession";
 import { getArchiveScope, setArchiveScope } from "./store";
 import type { DemoResult } from "../../poker/replay/demoSession";
@@ -379,6 +380,13 @@ export default function Profile() {
              * which is, and it carries a link to the concept that derives the
              * number it broke.
              */}
+            {/*
+             * Renders nothing until a quantity has three estimates behind it,
+             * so the section is absent rather than empty for a reader who has
+             * not used the guess gates on the concepts page.
+             */}
+            <CalibrationCard />
+
             <Group
               title="What you keep doing"
               lede="Named patterns, ranked by what the habit costs rather than by the worst single hand."

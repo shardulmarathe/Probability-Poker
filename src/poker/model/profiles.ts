@@ -25,15 +25,16 @@ import type { SizingOption, TableAction } from "../table/rules";
 // ---------------------------------------------------------------------------
 
 /**
- * Archetypes that exist as static parameters.
+ * Archetypes that exist as static parameters, which is currently all of them.
  *
- * `mirror` is excluded on purpose: it copies a learned profile of the human
- * player, so it has no parameters until a session has been observed and cannot
- * be written down here. Deleting it from this `Exclude` is all Phase 2 needs -
- * the compiler will then demand the missing `BOT_PROFILES` entry rather than
- * letting a half-built archetype ship silently.
+ * Kept as a distinct name from `BotArchetype` rather than collapsed into it: an
+ * archetype whose parameters are derived from a played session rather than
+ * written down here (a seat that mirrors the human's own learned profile, say)
+ * would belong in `BotArchetype` and not in this set, and the roster below
+ * would then fail to compile until it was handled rather than shipping half
+ * built.
  */
-export type BuiltArchetype = Exclude<BotArchetype, "mirror">;
+export type BuiltArchetype = BotArchetype;
 
 /** Tightest to loosest. Order is the roster's display order. */
 export const BOT_ARCHETYPES: readonly BuiltArchetype[] = [

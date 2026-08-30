@@ -2,16 +2,26 @@
 
 [![CI](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml/badge.svg)](https://github.com/shardulmarathe/Probability-Poker/actions/workflows/ci.yml)
 
-> Can probability outperform human intuition?
+> The table learns how you play.
 
 **[Play it →](https://probabilitypoker.vercel.app)**
 
-An educational, probability-focused **No-Limit Texas Hold'em** table for 2-6
-seats, built for a Stanford probability course. You play against bots that make
-every decision from a **Bayesian range model over all 1,326 hole-card
-combinations**, **multiway Monte Carlo equity**, and **expected value with fold
-equity**, then review the hand in a dashboard that shows the derivation of
-every number.
+An educational **No-Limit Texas Hold'em** table for 2-6 seats, built for a
+Stanford probability course.
+
+The bots do not play a fixed strategy against you. Each one holds a **Bayesian
+range over all 1,326 hole-card combinations**, prices every action with
+**multiway Monte Carlo equity** and **expected value with fold equity**, and
+folds every finished hand into a likelihood model **scoped to your seat alone**.
+Play a bluff-heavy style for sixty hands and `P(bet | air)` on that seat moves
+0.136 to 0.553, with the air share of their read on you moving 34% to 89%. That
+is measured, not asserted: `lib/opponentMemory.test.ts` is the measurement, and
+`/profile` will run those sixty hands in three seconds so you can watch it
+happen.
+
+Then every number is opened up. The review shows the derivation behind each
+figure, the profile names the patterns in your play and prices them, and the
+concepts page works the same mathematics on its own with live engine calls.
 
 A separate module solves small games to Nash equilibrium with **Discounted CFR**
 and checks itself against known answers: Kuhn poker's analytic game value of
@@ -58,7 +68,7 @@ for bit.
 | `/table` | The 2-6 seat No-Limit table |
 | `/review` | Hand review, timeline, ranges, EV table, the full derivation |
 | `/replay/:seed` | Replay any hand from its deal seed, with counterfactuals |
-| `/profile` | Your archive and playing-style statistics |
+| `/profile` | Your archive, playing-style read, named leaks and estimate calibration |
 | `/learn` | The probability concepts, worked with live engine calls |
 
 ## The probability concepts on display
@@ -75,6 +85,7 @@ for bit.
 | **Expected value & fold equity** | `EV(bet s) = P(fold)·Pot + (1−P(fold))·[E_continue·(Pot+2s) − s]` (`src/poker/ev.ts`) |
 | **α and MDF** | `α = s/(P+s)`, `MDF = 1−α`, derived and pinned against published values (`src/poker/ev.ts`) |
 | **Game theory** | Discounted CFR and exact best-response exploitability (`src/poker/solver/`) |
+| **Calibration** | Your own estimates scored against the engine's, as a signed bias (`src/lib/calibration.ts`) |
 
 ## How the bots think
 
@@ -90,10 +101,13 @@ for bit.
    which is what keeps the sampler symmetric in seat order.
 3. **Price every action, and every size.** Checks, folds and closing calls are
    priced on the pot as it stands. Bets and raises are priced with fold equity,
-   once per rung of the sizing ladder, against the range that *continues* rather
+   once per rung of the sizing ladder, against the range that continues rather
    than the whole range. Calls that don't close the action are re-priced against
-   the pot the seats behind will build, on the same basis a raise is priced -
-   otherwise the two aren't comparable.
+   the pot the seats behind will build, on the same basis a raise is priced,
+   otherwise the two aren't comparable. Sizes above the pot are not priced at
+   all: the fold rate is extrapolated from a model built on no rung larger than
+   that, and holding it flat above the pot also freezes the calling range, which
+   would make an overbet score higher for no reason the model can defend.
 4. **argmax, then personality.** Seven archetypes, from Ultra-Tight to
    Hyper-Aggressive, bend the pure-EV answer with entry discipline, bluff
    frequency and an aggression tilt. The record shows both the EV table and what

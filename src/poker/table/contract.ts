@@ -91,8 +91,7 @@ export type BotArchetype =
   | "maniac"
   | "tag"
   | "lag"
-  | "professor"
-  | "mirror";
+  | "professor";
 
 /**
  * A bot's playing style, expressed as parameters rather than code so each seat

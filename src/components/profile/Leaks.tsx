@@ -22,12 +22,16 @@
  */
 
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import type {
   DecisionEvLoss,
   HandEvLoss,
+  LeakAggregate,
+  LeakKind,
   SessionEvLoss,
 } from "../../poker/coach/evLoss";
-import { money } from "../../lib/format";
+import type { ConceptId } from "../learn/concepts";
+import { money, pct } from "../../lib/format";
 import {
   Button,
   EmptyState,
@@ -46,6 +50,168 @@ const chips = (value: number): string => {
   const n = Math.round(Math.abs(value));
   return n === 0 ? "$0" : `−${money(n)}`;
 };
+
+// ---------------------------------------------------------------------------
+// Naming the pattern, and pointing at the maths that explains it
+// ---------------------------------------------------------------------------
+
+/**
+ * What each leak kind is called, and which concept teaches the number behind it.
+ *
+ * The mapping lives here rather than on `LeakKind` because `poker/coach` is
+ * engine code and has no business knowing that a page called `/learn` exists.
+ * The engine names the error; this file decides what to say about it and where
+ * to send someone who wants the derivation.
+ *
+ * `why` is one sentence and states the rule that was broken, not the chips it
+ * cost. The cost is already in the row.
+ */
+const LEAK_COPY: Record<
+  LeakKind,
+  { label: string; concept: ConceptId; why: string }
+> = {
+  "results-oriented": {
+    label: "Right decision, wrong result",
+    concept: "monte-carlo",
+    why: "The line you took was the best one available and the cards beat it anyway. This is variance, not a leak.",
+  },
+  "multiway-as-heads-up": {
+    label: "Playing multiway like heads-up",
+    concept: "multiway",
+    why: "You were ahead of every opponent one-on-one and behind the field, which is the way multiway differs from heads-up.",
+  },
+  "fold-to-cbet": {
+    label: "Overfolding to continuation bets",
+    concept: "ev",
+    why: "Folding a hand with more equity than the price required, against the flop bet the preflop raiser was always going to make.",
+  },
+  "fold-above-price": {
+    label: "Folding a hand the price was laying",
+    concept: "ev",
+    why: "Your equity was above the share the pot odds asked for, so calling was profitable and folding gave that up.",
+  },
+  "call-below-price": {
+    label: "Calling without the equity",
+    concept: "ev",
+    why: "Your equity was below the share the pot odds required, so the call could not break even.",
+  },
+  "missed-value": {
+    label: "Passing up value",
+    concept: "ev",
+    why: "Checking or calling where betting priced better, once the folds a bet buys are counted alongside the times it is called.",
+  },
+};
+
+/**
+ * A named pattern, with its frequency, its cost, and a way to go and read it up.
+ *
+ * Ranked by total model EV lost rather than by the worst single hand: one
+ * catastrophe and a habit repeated forty times are different problems, and only
+ * the second one is fixable by understanding something. `rate` is over the
+ * decisions that actually offered the error, so folding well ninety times does
+ * not dilute it away.
+ *
+ * `results-oriented` is deliberately not in this list. It is the one bucket that
+ * is not a mistake, so ranking it beside the leaks would file playing correctly
+ * as something to fix.
+ */
+export function LeakPatterns({ session }: { session: SessionEvLoss }) {
+  const patterns = useMemo(
+    () =>
+      session.leaks
+        .filter(
+          (l): l is LeakAggregate & { kind: LeakKind } =>
+            l.kind !== null && l.kind !== "results-oriented" && l.count > 0
+        )
+        .sort((a, b) => a.totalModelEvLoss - b.totalModelEvLoss),
+    [session]
+  );
+  const variance = session.leaks.find((l) => l.kind === "results-oriented");
+
+  if (patterns.length === 0 && !variance?.count) {
+    return (
+      <EmptyState title="No pattern yet">
+        A leak needs a handful of examples before it is a habit rather than a
+        hand. Keep playing.
+      </EmptyState>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {patterns.map((leak) => {
+        const copy = LEAK_COPY[leak.kind];
+        return (
+          <div
+            key={leak.kind}
+            data-testid={`leak-pattern-${leak.kind}`}
+            className={`border p-3.5 ${RADIUS.surface}`}
+            style={{ borderColor: "rgba(244,237,228,0.12)" }}
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <p className="font-display text-sm text-ivory">{copy.label}</p>
+              <p className="font-mono text-xs" style={{ color: MODEL_COLOR }}>
+                {chips(leak.totalModelEvLoss)}
+              </p>
+            </div>
+            <p className="mt-1 text-[0.72rem] leading-relaxed text-ivory/55">
+              {copy.why}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-mono text-[0.66rem] text-ivory/45">
+                {leak.count} of {leak.opportunities} spots ({pct(leak.rate, 0)}),
+                {" "}
+                {chips(leak.meanModelEvLoss)} each
+              </span>
+              {/*
+               * The door between a priced mistake and the maths that explains
+               * it. Without this the profile and the concepts page are two
+               * separate buildings, and a player who has just been shown what a
+               * leak cost has nowhere to go to find out why it is one.
+               */}
+              <Link
+                to={`/learn?c=${copy.concept}`}
+                className="font-mono text-[0.66rem] text-gold-soft underline decoration-gold/30 underline-offset-2 transition-colors hover:text-gold"
+              >
+                Read the maths
+              </Link>
+            </div>
+          </div>
+        );
+      })}
+
+      {variance && variance.count > 0 && (
+        <div
+          data-testid="leak-pattern-variance"
+          className={`border p-3.5 ${RADIUS.surface}`}
+          style={{
+            borderColor: "rgba(127,159,184,0.3)",
+            background: "rgba(127,159,184,0.06)",
+          }}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="font-display text-sm text-ivory">
+              {LEAK_COPY["results-oriented"].label}
+            </p>
+            <Tag tone="neutral">Not a leak</Tag>
+          </div>
+          <p className="mt-1 text-[0.72rem] leading-relaxed text-ivory/55">
+            {LEAK_COPY["results-oriented"].why} It happened{" "}
+            {variance.count === 1 ? "once" : `${variance.count} times`}, and cost{" "}
+            {chips(variance.totalHindsightEvLoss)} in chips you were never going
+            to keep.
+          </p>
+          <Link
+            to={`/learn?c=${LEAK_COPY["results-oriented"].concept}`}
+            className="mt-2 inline-block font-mono text-[0.66rem] text-gold-soft underline decoration-gold/30 underline-offset-2 transition-colors hover:text-gold"
+          >
+            Read the maths
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Totals

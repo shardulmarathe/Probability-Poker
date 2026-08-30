@@ -49,6 +49,7 @@ import {
   LeakByStreet,
   LeakByStreetSummary,
   LeakList,
+  LeakPatterns,
   LeakTotals,
   LossCurve,
   LossCurveSummary,
@@ -370,6 +371,27 @@ export default function Profile() {
              * them and play the hand again differently", which described the
              * button labelled "Play it again" sitting in every row below it.
              */}
+            {/*
+             * Patterns first, individual hands second, and the order is the
+             * point. A ranked list of hands answers "what did that cost", which
+             * is a fact about one hand and not something a player can act on. A
+             * named pattern with its frequency answers "what do I keep doing",
+             * which is, and it carries a link to the concept that derives the
+             * number it broke.
+             */}
+            <Group
+              title="What you keep doing"
+              lede="Named patterns, ranked by what the habit costs rather than by the worst single hand."
+            >
+              {session ? (
+                <LeakPatterns session={session} />
+              ) : (
+                <p className="py-6 text-sm text-ivory/50">
+                  {pricing ? "Pricing..." : "Nothing priced yet."}
+                </p>
+              )}
+            </Group>
+
             <Group
               title="Your biggest leaks"
               lede={`Ranked by the model's EV, over ${session?.decisionCount ?? 0} priced decision${

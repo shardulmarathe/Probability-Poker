@@ -113,6 +113,24 @@ export function actionEv(
 // rather than a property of this code, so if the two disagree, this code is
 // wrong. Everything else here is a behavioural claim; this one is arithmetic.
 
+/**
+ * The break-even bluffing frequency, `alpha = s / (Pot + s)`.
+ *
+ * The closed form of the ALPHA note above, so the derivation and the function
+ * that evaluates it live in one file. Engine code prices against this rather
+ * than re-deriving the ratio: `coach/evLoss.ts` needs it to say whether a fold
+ * was above the price it was being offered, and the concepts page needs the
+ * same number to print the published table.
+ */
+export function alphaOf(pot: number, size: number): number {
+  return pot + size > 0 ? size / (pot + size) : 0;
+}
+
+/** Minimum defence frequency, `1 - alpha = Pot / (Pot + s)`. Same note. */
+export function mdfOf(pot: number, size: number): number {
+  return pot + size > 0 ? pot / (pot + size) : 0;
+}
+
 /** One opponent's model at a single bet size. */
 export interface FoldingOpponent {
   /**

@@ -16,6 +16,7 @@
  */
 
 import { decodeCard } from "../../poker/core/card";
+import { alphaOf, mdfOf } from "../../poker/ev";
 import { makeRng } from "../../poker/core/rng";
 import { runFullKnowledgeMonteCarlo } from "../../poker/monteCarlo";
 import {
@@ -77,21 +78,13 @@ import { appliedLikelihood } from "../report/derive";
  */
 export const QUOTED_FRACTIONS: readonly number[] = [0.5, 0.75, 1, 2];
 
-/**
- * The break-even bluffing frequency, `alpha = s / (P + s)`.
- *
- * Straight out of `poker/ev.ts`'s ALPHA note: with no equity at all the fold
- * branch of `EV(bet s) = P(fold)·Pot + (1 − P(fold))·[E·(Pot + 2s) − s]`
- * collapses to `P(fold)·Pot − (1 − P(fold))·s`, which is zero exactly here.
+/*
+ * The break-even bluffing frequency and its complement come from `poker/ev.ts`,
+ * beside the ALPHA note that derives them. Re-exported rather than reimplemented
+ * so the figure this page prints and the figure the coach prices a fold against
+ * cannot drift apart.
  */
-export function alphaOf(pot: number, size: number): number {
-  return pot + size > 0 ? size / (pot + size) : 0;
-}
-
-/** Minimum defence frequency, `1 − alpha = P / (P + s)`. Same note. */
-export function mdfOf(pot: number, size: number): number {
-  return pot + size > 0 ? pot / (pot + size) : 0;
-}
+export { alphaOf, mdfOf };
 
 export interface PriceRung {
   /** Bet size as a fraction of the pot. */

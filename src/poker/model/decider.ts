@@ -742,11 +742,45 @@ export function priceSizes(
     seed: hashSeed(seed, 0xe9a4e),
   });
 
-  const candidates = sizedCandidates(base, sizings);
+  /*
+   * Sizes above `MAX_TILT_FRACTION` are not offered as a choice.
+   *
+   * Above the cap `foldAtSize` holds the fold rate flat, which is the honest
+   * reading of a model built from no rung larger than the pot. But the same
+   * clamp freezes the range that continues, and a frozen continuing range is
+   * what makes an overbet look free: with `P(fold)` and `E_continue` both
+   * constant in the size, the EV of a bet reduces to
+   *
+   *     P(fold) · Pot + (1 - P(fold)) · [E_continue · (Pot + 2s) - s]
+   *
+   * whose derivative in `s` is `(1 - P(fold)) · (2 · E_continue - 1)`. That is
+   * positive for any holding that beats the hands still there, so the largest
+   * legal size wins the argmax by an arbitrary margin, and a 100bb shove prices
+   * as better than a pot-sized bet purely because nothing in the model pushes
+   * back. What should push back is the calling range tightening as the price
+   * worsens, and that is exactly what the clamp removes.
+   *
+   * So the cap is applied to the candidate set rather than only inside
+   * `foldAtSize`: every rung at or below the pot is priced and compared, and
+   * the overbets are dropped. When nothing is at or below the pot (a short
+   * stack whose minimum raise is already an overbet) the smallest candidate is
+   * kept, so raising stays available and it is the least extrapolated size on
+   * offer rather than the most.
+   */
+  const allCandidates = sizedCandidates(base, sizings);
+  const fractionOf = (action: TableAction) =>
+    potAfterCall > 0 ? Math.max(0, action.cost - toCall) / potAfterCall : 0;
+  const withinCap = allCandidates.filter(
+    (a) => fractionOf(a) <= MAX_TILT_FRACTION
+  );
+  const candidates =
+    withinCap.length > 0
+      ? withinCap
+      : allCandidates.slice().sort((a, b) => a.cost - b.cost).slice(0, 1);
+
   const byLabel: Record<string, FoldEquityBreakdown> = {};
   for (const action of candidates) {
-    const extra = Math.max(0, action.cost - toCall);
-    const fraction = potAfterCall > 0 ? extra / potAfterCall : 0;
+    const fraction = fractionOf(action);
     // What each opponent must add to continue. A seat that already matched the
     // current bet owes only the raise increment, but one that has not owes the
     // whole way up to the hero's new level, charging everyone `extra` would

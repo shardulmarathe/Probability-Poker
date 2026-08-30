@@ -1113,12 +1113,29 @@ describe("pricing sizes", () => {
     expect(decisionSims("flop", opponents.length)).toBe(5000);
     expect(decision.equity.simulations).toBe(5000);
 
-    // One continuing-range run per rung, each on the fold-equity budget: the
-    // ladder's five sizes plus the all-in `sizedCandidates` always appends.
+    // One continuing-range run per rung, each on the fold-equity budget. The
+    // ladder offers five sizes and `sizedCandidates` appends the all-in, but
+    // `priceSizes` prices only the rungs at or below `MAX_TILT_FRACTION`: above
+    // the pot both the fold rate and the range that continues are held flat, so
+    // a larger bet would price higher for no reason the model can defend. At
+    // 100bb into a $60 flop pot the all-in is far above the pot, so five of the
+    // six candidates are priced.
     expect(FOLD_EQUITY_SIMS).toBe(800);
+    expect(MAX_TILT_FRACTION).toBe(1);
+    const labels = Object.keys(decision.foldEquity ?? {});
     const rungs = Object.values(decision.foldEquity ?? {});
     expect(sizingLadder(table, seat, table.config).length).toBe(5);
-    expect(rungs.length).toBe(6);
+    expect(rungs.length).toBe(5);
+    // The dropped candidate is the all-in specifically, and because an unpriced
+    // size is not a candidate either, it cannot win the argmax. That is the
+    // property this assertion is really protecting: with the fold rate and the
+    // continuing range both flat above the pot, an all-in priced on this model
+    // beats every smaller size for any holding ahead of the callers, so the
+    // bots would shove 100bb into a $60 pot and Drill would coach it.
+    expect(labels.some((l) => /All-in/.test(l))).toBe(false);
+    expect(Object.keys(decision.evByAction).some((l) => /All-in/.test(l))).toBe(
+      false
+    );
     for (const rung of rungs) expect(rung.simulations).toBe(800);
 
     // Plus the equity-vs-range run each priced decision pays for once, on the
@@ -1126,7 +1143,7 @@ describe("pricing sizes", () => {
     // finite one is only reachable through the run.
     expect(decision.equityVsRange).toBeGreaterThan(0);
     const sims = decision.equity.simulations + FOLD_EQUITY_SIMS * (rungs.length + 1);
-    expect(sims).toBe(10_600);
+    expect(sims).toBe(9_800);
 
     // Wall clock is logged above and only loosely bounded. A tight bound on it
     // measures how busy the machine is rather than what the decision costs:

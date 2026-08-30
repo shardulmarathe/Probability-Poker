@@ -24,6 +24,7 @@ import {
   saveArchive,
   type ProfileArchive,
 } from "./store";
+import { clearCalibration } from "../../lib/calibration";
 
 /**
  * This session's finished hands.
@@ -146,8 +147,18 @@ export function useProfileArchive(): ProfileView {
     [table.seats, seatCount, heroSeat]
   );
 
+  /*
+   * Clearing the archive clears the calibration record with it.
+   *
+   * They are two localStorage keys but one promise: the line beside this
+   * button says nothing leaves the device, and a reader who erases what the
+   * device holds means all of it. Leaving `pp.calibration.v1` behind would keep
+   * telling them they run six points optimistic on the strength of estimates
+   * made against hands that no longer exist.
+   */
   const reset = useCallback(() => {
     clearArchive();
+    clearCalibration();
     setVersion((v) => v + 1);
   }, []);
 

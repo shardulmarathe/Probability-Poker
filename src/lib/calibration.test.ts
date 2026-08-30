@@ -176,10 +176,10 @@ describe("normalizeCalibration", () => {
   it("defaults a missing timestamp rather than dropping the entry", () => {
     const summary = normalizeCalibration({
       version: CALIBRATION_VERSION,
-      byKind: { chips: { count: 1, meanSignedError: 5, meanAbsError: 5 } },
+      byKind: { equity: { count: 1, meanSignedError: 0.05, meanAbsError: 0.05 } },
       updatedAt: "yesterday",
     });
-    expect(summary.byKind.chips?.updatedAt).toBe(0);
+    expect(summary.byKind.equity?.updatedAt).toBe(0);
     expect(summary.updatedAt).toBe(0);
   });
 });
@@ -259,10 +259,13 @@ describe("recordGuess", () => {
   it("keeps the quantities apart", () => {
     recordGuess("equity", 0.5, 0.6);
     recordGuess("required-equity", 0.5, 0.333);
-    recordGuess("chips", 120, 100);
     const summary = loadCalibration();
     expect(summary.byKind.equity?.count).toBe(1);
-    expect(summary.byKind.chips?.meanSignedError).toBeCloseTo(20, 10);
+    expect(summary.byKind.equity?.meanSignedError).toBeCloseTo(-0.1, 10);
+    expect(summary.byKind["required-equity"]?.meanSignedError).toBeCloseTo(
+      0.167,
+      3
+    );
     expect(calibrationFor("required-equity", summary)?.count).toBe(1);
     expect(calibrationFor("required-equity")?.count).toBe(1);
   });
@@ -283,13 +286,13 @@ describe("recordGuess", () => {
   it("stays small on disk however long the reader keeps guessing", () => {
     for (let i = 0; i < 500; i++) {
       recordGuess("equity", (i % 100) / 100, 0.5);
-      recordGuess("chips", i, 100);
+      recordGuess("required-equity", (i % 100) / 100, 0.5);
     }
     const summary = loadCalibration();
     expect(summary.byKind.equity?.count).toBe(MAX_SAMPLES);
-    expect(summary.byKind.chips?.count).toBe(MAX_SAMPLES);
-    // Three numbers and a timestamp per quantity, and there are three
-    // quantities: a stored row that grows with use is the bug this asserts on.
+    expect(summary.byKind["required-equity"]?.count).toBe(MAX_SAMPLES);
+    // Three numbers and a timestamp per quantity, over two quantities: a stored
+    // row that grows with use is the bug this asserts on.
     expect(store[KEY].length).toBeLessThan(500);
   });
 
@@ -308,10 +311,17 @@ describe("calibrationFor", () => {
   it("reads from a summary handed in, without touching storage", () => {
     const summary: CalibrationSummary = {
       version: CALIBRATION_VERSION,
-      byKind: { chips: { count: 4, meanSignedError: -3, meanAbsError: 9, updatedAt: 1 } },
+      byKind: {
+        "required-equity": {
+          count: 4,
+          meanSignedError: -3,
+          meanAbsError: 9,
+          updatedAt: 1,
+        },
+      },
       updatedAt: 1,
     };
-    expect(calibrationFor("chips", summary)?.meanAbsError).toBe(9);
+    expect(calibrationFor("required-equity", summary)?.meanAbsError).toBe(9);
     expect(calibrationFor("equity", summary)).toBeNull();
   });
 });

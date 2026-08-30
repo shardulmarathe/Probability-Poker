@@ -64,7 +64,6 @@ export interface GuessRevealProps {
   /** Where the control starts. Deliberately not near the answer. */
   initial: number;
   /** A slider for a quantity with a natural range, a field for an amount. */
-  input?: "slider" | "number";
   /** The calibration bucket this estimate belongs to. */
   kind: CalibrationKind;
   /**
@@ -73,7 +72,6 @@ export interface GuessRevealProps {
    */
   interval?: { lo: number; hi: number };
   /** Names the interval in the reveal line. */
-  intervalLabel?: string;
   /**
    * Re-arms the question when the quantity underneath changes.
    *
@@ -97,10 +95,8 @@ export function GuessReveal({
   max,
   step,
   initial,
-  input = "slider",
   kind,
   interval,
-  intervalLabel = "95% interval",
   resetKey = "",
   testId,
   children,
@@ -167,8 +163,7 @@ export function GuessReveal({
             </span>
           </div>
 
-          {input === "slider" ? (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
               <span aria-hidden className="shrink-0 font-mono text-[0.6rem] text-ivory/35">
                 {format(min)}
               </span>
@@ -188,22 +183,7 @@ export function GuessReveal({
               <span aria-hidden className="shrink-0 font-mono text-[0.6rem] text-ivory/35">
                 {format(max)}
               </span>
-            </div>
-          ) : (
-            <input
-              id={`${uid}-guess`}
-              type="number"
-              inputMode="decimal"
-              className={`w-full border px-2.5 py-1.5 font-mono text-sm text-ivory ${RADIUS.control}`}
-              style={{ borderColor: LINE.quiet, background: SURFACE.tray }}
-              min={min}
-              max={max}
-              step={step}
-              value={draft}
-              onChange={(e) => setDraft(Number(e.target.value))}
-              data-testid={testId ? `${testId}-input` : undefined}
-            />
-          )}
+          </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <Button
@@ -249,7 +229,7 @@ export function GuessReveal({
           </p>
           {interval && (
             <p className="mt-1 font-mono text-[0.66rem] leading-relaxed text-ivory/45">
-              {intervalLabel} {format(interval.lo)} - {format(interval.hi)}, your
+              95% interval {format(interval.lo)} - {format(interval.hi)}, your
               estimate falls {inside ? "inside" : "outside"} it.
             </p>
           )}

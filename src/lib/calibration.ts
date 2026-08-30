@@ -42,11 +42,11 @@ export const CALIBRATION_VERSION = 1;
  *
  * A closed set, because it is what makes a stored row checkable: an unknown key
  * is dropped rather than accumulated, so a typo in a call site cannot quietly
- * open a fourth bucket that no surface ever reads. The three are one per unit
- * the reader is asked to produce, a probability, a break-even price, and an
- * amount of chips, which is also the three formats `GuessReveal` takes.
+ * open a third bucket that no surface ever reads. One kind per unit the reader
+ * is asked to produce: a probability, and a break-even price. A kind is added
+ * when something gates a guess of that quantity, not in anticipation of one.
  */
-export const CALIBRATION_KINDS = ["equity", "required-equity", "chips"] as const;
+export const CALIBRATION_KINDS = ["equity", "required-equity"] as const;
 
 export type CalibrationKind = (typeof CALIBRATION_KINDS)[number];
 
@@ -62,8 +62,8 @@ export type CalibrationKind = (typeof CALIBRATION_KINDS)[number];
 export const MAX_SAMPLES = 50;
 
 /**
- * Ceiling on a stored error. Nothing legitimate approaches it, the largest unit
- * here is chips and the sliders are bounded, so a value past it means the row
+ * Ceiling on a stored error. Nothing legitimate approaches it: both kinds are
+ * probabilities and the sliders are bounded, so a value past it means the row
  * was edited. Such a bucket is dropped and the others survive.
  */
 const MAX_ERROR = 1e6;

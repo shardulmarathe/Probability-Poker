@@ -1,8 +1,5 @@
 import type { BeliefDistribution, PlayerActionType } from "../types";
 
-export const SMALL_BLIND = 5;
-export const BIG_BLIND = 10;
-
 /*
  * The fixed-limit bet ladder, the raise cap, the fixed starting bankroll and
  * the three sim budgets that used to live here went with the heads-up engine.

@@ -28,7 +28,6 @@
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { FeltBackground } from "../ui";
-import { AccountMenu } from "./AccountMenu";
 
 /**
  * The id a route portals its own header controls into.
@@ -178,7 +177,6 @@ export default function AppShell() {
             className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex"
           />
 
-          <AccountMenu className="shrink-0" />
         </div>
       </header>
 

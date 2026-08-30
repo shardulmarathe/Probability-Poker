@@ -2,8 +2,7 @@ name: CI
 
 # Typecheck and the full test suite on every push and pull request. The engine
 # is pure client-side TypeScript with seeded dealing, so the suite is
-# deterministic and needs no services. The api/ suite skips its database-backed
-# cases automatically when DATABASE_URL is unset, which is the case here.
+# deterministic and needs no services.
 
 on:
   push:
@@ -31,5 +30,3 @@ jobs:
         run: npm run typecheck
       - name: Unit + engine tests
         run: npm test
-      - name: API tests
-        run: npm run test:api

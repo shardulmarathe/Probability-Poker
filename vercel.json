@@ -9,6 +9,6 @@
     { "src": "^/$", "dest": "/index.html" },
     { "src": "^/(?:table|profile|learn)/?$", "dest": "/index.html" },
     { "src": "^/(?:review|replay)(?:/[^/]+)?/?$", "dest": "/index.html" },
-    { "src": "^/(?!api/).*$", "status": 404, "dest": "/index.html" }
+    { "src": "^/.*$", "status": 404, "dest": "/index.html" }
   ]
 }

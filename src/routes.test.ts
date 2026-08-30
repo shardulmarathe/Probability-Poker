@@ -61,12 +61,15 @@ describe("vercel.json covers the router", () => {
     }
   });
 
-  it("never swallows an API path", () => {
-    // The functions must reach the filesystem handler, not the SPA shell -
-    // otherwise every endpoint returns HTML and the client sees a parse error
-    // instead of a 401.
+  it("404s an API path now that there are no functions", () => {
+    // The app is client-only: there is no `api/` directory and no serverless
+    // function to reach, so an /api path is as unknown as any other. This is
+    // asserted rather than assumed because the catch-all used to carry a
+    // `(?!api/)` lookahead, and a stale copy of it would quietly route these
+    // to the filesystem handler and serve a 404 from Vercel instead of the
+    // SPA's own.
     for (const url of ["/api/stats/me", "/api/hand/record", "/api/leaderboard"]) {
-      expect(match(url), `${url} was captured by an SPA rule`).toBeUndefined();
+      expect(match(url)?.status, `${url} should 404`).toBe(404);
     }
   });
 });

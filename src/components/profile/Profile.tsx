@@ -48,7 +48,6 @@ import { useNavigate } from "react-router-dom";
 import { MIN_CLASSIFY_HANDS, classifyStats } from "../../poker/coach/archetype";
 import { analyzeHands, type SessionEvLoss } from "../../poker/coach/evLoss";
 import { computeStats } from "../../poker/coach/stats";
-import { storageNotice, useSync } from "../account";
 import { PageBody, PageHeader } from "../shell";
 import {
   Button,
@@ -91,10 +90,6 @@ const EV_WINDOW = 120;
 
 export default function Profile() {
   const navigate = useNavigate();
-  // Where the hands actually are. The line under the archive used to be a
-  // fixed promise ("Nothing leaves the device") that a single sync would have
-  // made false; `storageNotice` returns the sentence that is true right now.
-  const sync = useSync();
   const {
     hands,
     seat,
@@ -412,8 +407,17 @@ export default function Profile() {
         {/* -------------------------- Archive -------------------------- */}
         {!empty && (
           <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-ivory/10 pt-5">
+            {/*
+             * A promise, and now an unconditional one. This line was briefly
+             * computed from a sync state, because an account could copy hands
+             * off the device and a fixed sentence would have been a lie printed
+             * directly above the button that uploaded them. There is no account
+             * and no endpoint any more, so the original wording is exactly true
+             * again: the archive is localStorage and nothing reads it but this
+             * browser.
+             */}
             <p className="text-[0.72rem] text-ivory/40" data-testid="storage-notice">
-              {storageNotice(sync)}
+              Stored locally in this browser. Nothing leaves the device.
             </p>
             <Button
               size="sm"

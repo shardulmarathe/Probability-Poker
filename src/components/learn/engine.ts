@@ -52,7 +52,6 @@ import type {
   ActionRecord,
   TableHandReport,
 } from "../../poker/table/contract";
-import { positionOf } from "../../poker/table/position";
 import {
   HandCategory,
   HAND_CATEGORY_NAMES,
@@ -662,11 +661,6 @@ export function solveReviewRiver(
   };
 }
 
-/** Position of a seat, for callers that have a report rather than a table. */
-export function seatPosition(report: TableHandReport, seat: number) {
-  return positionOf(seat, report.button, report.seatCount);
-}
-
 // ---------------------------------------------------------------------------
 // Notation, for the concepts page's worked examples
 // ---------------------------------------------------------------------------
@@ -873,8 +867,3 @@ export function solveDemo(
   };
 }
 
-/** Keep only the `keep` heaviest combos of a range, the concepts page's solve
- *  is subject to the same budget the review's is, for the same reason. */
-export function trimRange(range: Range, keep: number): Range {
-  return pruneRange(range, keep, []).range;
-}

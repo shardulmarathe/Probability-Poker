@@ -1100,6 +1100,3 @@ export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
   };
 }
 
-/** Default-budget deciders, for callers with nothing to configure. */
-export const decideTableAction: SyncBotDecider = tableDecider();
-export const decideTableActionAsync: BotDecider = asyncTableDecider();

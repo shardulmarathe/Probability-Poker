@@ -25,8 +25,6 @@ export const MD_CARD_BOX =
   "h-[clamp(4.5rem,15vw,6rem)] w-[clamp(3.25rem,10.8vw,4.25rem)]";
 export const LG_CARD_BOX =
   "h-[clamp(5rem,17vw,7rem)] w-[clamp(3.5rem,12.2vw,5rem)]";
-export const XL_CARD_BOX =
-  "h-[clamp(4.15rem,18vw,9rem)] w-[clamp(3rem,14vw,6.5rem)]";
 
 interface PlayingCardProps {
   card?: Card;

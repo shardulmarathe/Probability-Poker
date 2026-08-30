@@ -29,9 +29,10 @@ The full derivation of the mathematics lives in
 - **Vite** (dev server + build)
 - **Tailwind CSS v4**
 - **Recharts** (charts)
-- **Neon** (Postgres) behind serverless functions in `api/`, for accounts and
-  saved hands. The engine itself is pure client-side TypeScript with no network
-  call on the decision path.
+
+No backend, no accounts, no database. The whole product is client-side
+TypeScript: the engine never makes a network call, and your archive and the
+model the bots build of you live in `localStorage` and stay in your browser.
 
 ## Getting started
 
@@ -110,7 +111,7 @@ for bit.
 src/
   components/   table, hand review, profile, learn pages
   data/         tunable constants (priors, likelihoods, smoothing)
-  lib/          table options, opponent memory, API client
+  lib/          table options, opponent memory, formatting
   pages/        Home
   poker/
     core/         card codes, seeded RNG (xoshiro128**), Wilson intervals
@@ -124,7 +125,6 @@ src/
     ev.ts              expected value, fold equity, call pricing
   store/        React context wiring the engine to the UI
   workers/      equity shard worker
-api/            serverless functions (accounts, saved hands)
 ```
 
 ## Rules & betting

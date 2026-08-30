@@ -97,7 +97,7 @@ export function isWorkerReady(msg: WorkerMessage): msg is WorkerReady {
   return (msg as WorkerReady).ready === true;
 }
 
-export function isMultiwayJob(job: AnyShardJob): job is MultiwayShardJob {
+function isMultiwayJob(job: AnyShardJob): job is MultiwayShardJob {
   return (job as MultiwayShardJob).kind === "multiway";
 }
 

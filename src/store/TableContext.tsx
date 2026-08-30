@@ -264,7 +264,7 @@ function seatNames(profiles: string[]): string[] {
   });
 }
 
-export function buildTable(options: TableOptions, seed?: number): Table {
+function buildTable(options: TableOptions, seed?: number): Table {
   const lineup = [...options.lineup];
   // A lineup shorter than the table (corrupt storage, an older saved setup)
   // still has to seat everyone; the pure-EV baseline is the honest filler.

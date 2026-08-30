@@ -41,7 +41,7 @@ function chooseAction(legal: TableAction[], rng: Rng): TableAction {
 }
 
 /** Play one hand with the random picker and return its report. */
-export function playRandomHand(table: Table, rng: Rng): TableHandReport {
+function playRandomHand(table: Table, rng: Rng): TableHandReport {
   startHand(table);
   let steps = 0;
   while (table.status === "playing") {

@@ -203,7 +203,7 @@ export function emptyCounters(): StatCounters {
   };
 }
 
-export function emptyStats(seat: number): PlayerStats {
+function emptyStats(seat: number): PlayerStats {
   const byPosition = {} as Record<PositionName, StatCounters>;
   for (const p of POSITIONS) byPosition[p] = emptyCounters();
   return { seat, total: emptyCounters(), byPosition };
@@ -225,7 +225,7 @@ const COUNTER_KEYS = [
 
 type CounterKey = (typeof COUNTER_KEYS)[number];
 
-export function addCounter(into: Counter, from: Counter): void {
+function addCounter(into: Counter, from: Counter): void {
   into.n += from.n;
   into.d += from.d;
 }

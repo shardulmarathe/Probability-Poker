@@ -569,7 +569,7 @@ export type LevelName = (typeof LEVEL_NAMES)[number];
 export const BUCKET_FREE_LEVELS = 2;
 
 /** Prior strength used at each level; the pooled ones are trusted more slowly. */
-export function levelStrength(level: number): number {
+function levelStrength(level: number): number {
   return level < BUCKET_FREE_LEVELS ? POOLED_STRENGTH : PRIOR_STRENGTH;
 }
 

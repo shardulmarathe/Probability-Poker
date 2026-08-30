@@ -76,7 +76,7 @@ import { appliedLikelihood } from "../report/derive";
  * implementation in `poker/ev.ts`. Nothing in this module stores a break-even
  * frequency.
  */
-export const QUOTED_FRACTIONS: readonly number[] = [0.5, 0.75, 1, 2];
+const QUOTED_FRACTIONS: readonly number[] = [0.5, 0.75, 1, 2];
 
 /*
  * The break-even bluffing frequency and its complement come from `poker/ev.ts`,
@@ -108,7 +108,7 @@ export function priceLadder(pot: number): PriceRung[] {
 // ---------------------------------------------------------------------------
 
 /** Categories in ladder order, weakest first, the axis of the shape chart. */
-export const CATEGORY_ORDER: readonly HandCategory[] = [
+const CATEGORY_ORDER: readonly HandCategory[] = [
   HandCategory.HighCard,
   HandCategory.Pair,
   HandCategory.TwoPair,
@@ -669,7 +669,7 @@ const SUIT_TEXT = "shdc";
  * this returns. Throws on nonsense so a typo in an example is a crash in
  * development rather than a silently different hand in production.
  */
-export function cardCode(text: string): number {
+function cardCode(text: string): number {
   const rank = RANK_TEXT.indexOf(text[0]?.toUpperCase() ?? "");
   const suit = SUIT_TEXT.indexOf(text[1]?.toLowerCase() ?? "");
   if (rank < 0 || suit < 0) throw new Error(`cardCode: not a card: ${text}`);

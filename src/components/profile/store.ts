@@ -74,7 +74,7 @@ export interface ProfileArchive {
   updatedAt: number;
 }
 
-export const EMPTY_ARCHIVE: ProfileArchive = {
+const EMPTY_ARCHIVE: ProfileArchive = {
   hands: [],
   smallBlind: 5,
   bigBlind: 10,

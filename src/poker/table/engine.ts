@@ -349,7 +349,7 @@ function describe(seat: TableSeat, action: TableAction): string {
 // ---------------------------------------------------------------------------
 
 /** Close the current betting round and open the next street. */
-export function advanceStreet(table: Table): void {
+function advanceStreet(table: Table): void {
   if (table.street === "river" || table.street === "showdown") {
     showdown(table);
     return;

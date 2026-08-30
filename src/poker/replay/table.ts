@@ -28,7 +28,7 @@ import type { TableConfig } from "../table/rules";
 import { sessionSeedForHand } from "./seed";
 
 /** Blinds used when a report is too degenerate to imply its own. */
-export const FALLBACK_BLINDS: TableConfig = { smallBlind: 5, bigBlind: 10 };
+const FALLBACK_BLINDS: TableConfig = { smallBlind: 5, bigBlind: 10 };
 
 /** Stack depth, in big blinds, given to seats whose entry stack is unknown. */
 export const ASSUMED_DEPTH_BB = 100;
@@ -132,7 +132,7 @@ export function inferBlinds(report: TableHandReport): TableConfig {
 }
 
 /** A supplied config, or the inferred one when it is unusable. */
-export function resolveConfig(
+function resolveConfig(
   report: TableHandReport,
   config?: TableConfig
 ): TableConfig {

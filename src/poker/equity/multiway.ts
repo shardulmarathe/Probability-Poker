@@ -466,7 +466,7 @@ export function runMultiwayCountsFromCodes(
 }
 
 /** One unsharded stream over a whole `EquityRequest`. */
-export function runMultiwayCounts(
+function runMultiwayCounts(
   req: EquityRequest,
   rng: Rng = makeRng(req.seed)
 ): MultiwayCounts {

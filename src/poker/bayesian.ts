@@ -79,7 +79,7 @@ export function learnedLikelihood(
 }
 
 /** P(action | tier) across all three tiers for a single action. */
-export function actionLikelihoodAcrossTiers(
+function actionLikelihoodAcrossTiers(
   model: OpponentModel,
   action: PlayerActionType
 ): BeliefDistribution {

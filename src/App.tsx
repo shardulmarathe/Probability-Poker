@@ -1,9 +1,8 @@
-import { lazy, Profiler, Suspense, type ProfilerOnRenderCallback } from "react";
+import { lazy, Suspense } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Outlet, Route, Routes } from "react-router-dom";
 import { TableProvider } from "./store/TableContext";
-import { commitAction } from "./lib/latency";
 import Home from "./pages/Home";
 import ProfileRecorder from "./components/profile/ProfileRecorder";
 import { AppShell, NotFound } from "./components/shell";
@@ -25,14 +24,9 @@ const HandReview = lazy(() => import("./components/report/HandReview"));
 const Profile = lazy(() => import("./components/profile/Profile"));
 const ReplayPage = lazy(() => import("./components/profile/ReplayPage"));
 
-const onRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
-  // Attribute this commit's render cost to a pending bot decision (if any).
-  commitAction(actualDuration);
-};
-
 export default function App() {
   return (
-    <Profiler id="app" onRender={onRender}>
+    <>
       <Routes>
         {/*
          * Every route sits inside the shell, so the felt is painted once and
@@ -107,6 +101,6 @@ export default function App() {
       </Routes>
       <Analytics />
       <SpeedInsights />
-    </Profiler>
+    </>
   );
 }

@@ -93,7 +93,7 @@ function discount(t: number, exponent: number): number {
 // ---------------------------------------------------------------------------
 
 export const TERMINAL_DECISION = -1;
-export const TERMINAL_FOLD = 0;
+const TERMINAL_FOLD = 0;
 export const TERMINAL_SHOWDOWN = 1;
 
 export interface PublicTree {

@@ -42,7 +42,7 @@ import {
 import { bluffer, tableWithBluffer } from "./bluffer";
 
 /** The seat the scripted bluffer occupies, matching `tableWithBluffer`. */
-export const DEMO_HERO_SEAT = 0;
+const DEMO_HERO_SEAT = 0;
 
 /** Hands played. Sixty is where the measured experiment lands its effect. */
 export const DEMO_HANDS = 60;

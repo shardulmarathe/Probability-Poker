@@ -42,7 +42,7 @@ const SIM_BORDER = "rgba(176,127,212,0.5)";
  * screenshot of a simulated result cannot be mistaken for a screenshot of a
  * hand, including by the person who took it.
  */
-export function SimulatedBanner({
+function SimulatedBanner({
   rederived,
   children,
 }: {

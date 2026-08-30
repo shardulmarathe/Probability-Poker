@@ -4,6 +4,19 @@
  * The only concept on the page that runs no simulation at all. `priceLadder` is
  * four divisions, so it is called in render rather than memoised: a `useMemo`
  * around arithmetic this cheap costs more in comparison than it saves.
+ *
+ * The required-equity block sits behind `GuessReveal` because this is the one
+ * number on the page a player has to produce at the table, in a few seconds,
+ * from a pot and a bet. Reading the division is not the skill; arriving at 33%
+ * before the answer appears is. The gate covers the display only, `need` is
+ * computed either way and the alpha ladder below stays open, so a reader who
+ * skips reads exactly what they read before.
+ *
+ * The ladder does print the same figure in its α column, since α and required
+ * equity are one identity read from two chairs, which is the section's closing
+ * point. It is left there: hiding it would break the identity the page is
+ * making, and a reader who scrolls past the gate to look the answer up has
+ * understood the identity anyway.
  */
 
 import { useState } from "react";
@@ -12,6 +25,7 @@ import {
   Calc,
   Frac,
   Group,
+  GuessReveal,
   Heading,
   LINE,
   Lead,
@@ -22,6 +36,11 @@ import { Choice } from "../controls";
 import { priceLadder } from "../engine";
 
 const POTS = [40, 100, 250];
+
+// One decimal, matching the guess grid: the slider steps in half points, so the
+// answer is printed to the same place the reader was able to express.
+const asPct = (value: number) => pct(value, 1);
+const asPoints = (magnitude: number) => `${(magnitude * 100).toFixed(1)} points`;
 
 export function EvConcept() {
   const [pot, setPot] = useState(100);
@@ -73,19 +92,35 @@ export function EvConcept() {
           }))}
         />
       </div>
-      <Calc>
-        <div className="flex flex-wrap items-center gap-1">
-          required equity =
-          <Frac n={<>cost</>} d={<>pot + cost</>} />=
-          <Frac n={<>{callSize}</>} d={<>{pot + callSize}</>} />=
-          <span className="text-gold-soft">{pct(need)}</span>
-        </div>
-        <div className="mt-2 text-ivory/60">
-          {callSize > 0
-            ? `${((pot / callSize) || 0).toFixed(1)} to 1 on the money. Set EV(call) to zero and solve: no Monte Carlo involved.`
-            : "Nothing to call, so any equity at all is profit."}
-        </div>
-      </Calc>
+      <GuessReveal
+        label={`equity needed to call $${callSize} into a $${pot} pot`}
+        actual={need}
+        format={asPct}
+        formatGap={asPoints}
+        min={0}
+        max={1}
+        step={0.005}
+        initial={0.5}
+        kind="required-equity"
+        // No interval: this one is exact arithmetic, not a sample, which is
+        // half of what the section is for.
+        resetKey={`${pot}:${callSize}`}
+        testId="ev-guess"
+      >
+        <Calc>
+          <div className="flex flex-wrap items-center gap-1">
+            required equity =
+            <Frac n={<>cost</>} d={<>pot + cost</>} />=
+            <Frac n={<>{callSize}</>} d={<>{pot + callSize}</>} />=
+            <span className="text-gold-soft">{pct(need)}</span>
+          </div>
+          <div className="mt-2 text-ivory/60">
+            {callSize > 0
+              ? `${((pot / callSize) || 0).toFixed(1)} to 1 on the money. Set EV(call) to zero and solve: no Monte Carlo involved.`
+              : "Nothing to call, so any equity at all is profit."}
+          </div>
+        </Calc>
+      </GuessReveal>
 
       <Heading>Fold equity: the other way a bet wins</Heading>
       <Lead>

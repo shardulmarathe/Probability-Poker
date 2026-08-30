@@ -50,13 +50,18 @@ import {
 import {
   asyncTableDecider,
   closesAction,
+  decisionSeed,
   equityRequest,
   evByAction,
   handActions,
+  priceCall,
+  priceSizes,
   readsFromActions,
   sizedCandidates,
   FOLD_EQUITY_SIMS,
+  type PricedSizes,
 } from "../poker/model/decider";
+import type { FoldEquityBreakdown } from "../poker/ev";
 import {
   clearMemory,
   loadMemory,
@@ -146,12 +151,30 @@ export interface TableFx {
 
 /**
  * What Coach mode puts in front of the human: the same equity the bots price
- * their own decisions from, against the seats actually still in the pot.
+ * their own decisions from, against the seats actually still in the pot, plus
+ * the same three prices they choose between.
  *
  * Computed only when the human is on the clock and only when a mode asks for
  * it. It is display state and feeds nothing the engine reads.
+ *
+ * It arrives in two parts, and the order is deliberate. `equity` is one Monte
+ * Carlo run in the worker pool and is published the moment it lands, because
+ * Coach's line is that number and nothing else. `sizes` and `call` are the
+ * fold-equity pricers, they run on the main thread, and they are folded into a
+ * second read a paint later; until then they are null and every consumer treats
+ * that as "not priced", never as "priced at nothing".
  */
 export interface HeroRead {
+  /**
+   * The decision point this read describes, `hand:actions`, the same key the
+   * effect that builds it is mounted on.
+   *
+   * Carried because the prices below are compared against a state read from
+   * `tableRef` at click time. The clearing discipline (see `act`) already means
+   * the two agree; this makes a disagreement silence instead of a confident
+   * number about the wrong spot.
+   */
+  key: string;
   equity: MultiwayEquity;
   /** Chips to call, and the pot they would be called into. */
   toCall: number;
@@ -161,6 +184,19 @@ export interface HeroRead {
   /** Pot odds expressed the way they are spoken: "3.5 to 1". */
   odds: number | null;
   opponents: number[];
+  /**
+   * The hero's own bet and raise ladder, every rung priced with its own fold
+   * equity against the range that continues against it. Null when there is no
+   * aggressive action, when there is nobody to bet at, or when the human acted
+   * before it was priced.
+   */
+  sizes: PricedSizes | null;
+  /**
+   * The call re-priced against the pot the seats behind will build. Null when
+   * the call closes the action, where `actionEv`'s number is already exact, and
+   * null when there is no call on the table.
+   */
+  call: FoldEquityBreakdown | null;
 }
 
 /**
@@ -289,6 +325,15 @@ const sleep = (ms: number) => {
     }, ms)
   );
 };
+
+/**
+ * Give the main thread back for one task, so React can paint what was just
+ * set before the caller takes the thread again.
+ *
+ * Not `sleep(0)`: that returns a starvation verdict, and a caller that only
+ * wants to let a frame out has no use for one and no business ignoring it.
+ */
+const yieldToPaint = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 // ---------------------------------------------------------------------------
 // Narrating the decision
@@ -512,72 +557,283 @@ function planStages(
 }
 
 // ---------------------------------------------------------------------------
+// Pricing the hero's own lines
+// ---------------------------------------------------------------------------
+
+const isAggressive = (action: TableAction) =>
+  action.type === "bet" || action.type === "raise";
+
+/** The decision point a read describes: this hand, this many actions in. */
+const decisionKey = (state: Table) =>
+  `${state.handNumber}:${handActions(state).length}`;
+
+/**
+ * Sims per rung when it is the human's own ladder being priced.
+ *
+ * Three times `FOLD_EQUITY_SIMS`, and the multiplier is measured rather than
+ * chosen. The bots' budget is sized for a bot: paid on every decision, under an
+ * animation, with up to five other seats to get through before the human is back
+ * on the clock. This one is paid once, for one decision, while a person reads the
+ * board, so the same argument that caps theirs is what raises this.
+ *
+ * What the extra sims buy is the threshold. Over 228 sampled aggressive spots,
+ * re-priced at fifteen times the budget to stand in for the truth: at 800 per
+ * rung the verdict fires on 5 spots the long run calls silence and the worst of
+ * those claims a 73-chip loss, i.e. `DRILL_THRESHOLD_BB` cleared by sampling
+ * error rather than by a mistake, which is the one thing this mode may not do.
+ * At 2400 it is 2 spots and 23 chips. Beyond that the curve flattens and the
+ * main thread does not: the widest preflop ladder measured is 47 ms at 2400
+ * against 19 ms at 800.
+ *
+ * Two independent draws at 800, firing only when both clear the threshold, was
+ * the cheaper candidate and it does not work: 3 false verdicts instead of 5, and
+ * three true ones lost. The near-threshold spots are the ones where the
+ * estimator is thin rather than merely unlucky, so a second thin draw agrees
+ * with the first.
+ */
+const HERO_FOLD_EQUITY_SIMS = FOLD_EQUITY_SIMS * 3;
+
+/**
+ * Price the hero's ladder and the hero's call the way the bots price their own.
+ *
+ * These are the decider's pricers, not a second set written here, and they are
+ * handed the very ranges the showdown estimate was just run against. That is
+ * the point of passing `request.ranges` and `request.seed` through: one read of
+ * the opponents per decision, priced three ways, so the gap between a bet and a
+ * call is the selection effect rather than two models disagreeing, and the rungs
+ * are compared on common random numbers rather than on their sampling noise.
+ *
+ * Synchronous, on the main thread, and that is the same place and the same
+ * budget every bot decision already pays: `decider.finish` runs both of these
+ * after it joins the worker pool. What makes it affordable here is when it runs.
+ * It is spent while the human is on the clock, i.e. while they are thinking, and
+ * thrown away the moment they act.
+ */
+function priceHeroLines(
+  state: Table,
+  seat: number,
+  request: EquityRequest
+): Pick<HeroRead, "sizes" | "call"> {
+  const actions = legalActions(state, seat, state.config);
+  const base = actions.find(isAggressive);
+  const call = actions.find((a) => a.type === "call");
+  return {
+    sizes: base
+      ? priceSizes(
+          state,
+          seat,
+          base,
+          sizingLadder(state, seat, state.config),
+          HERO_FOLD_EQUITY_SIMS,
+          request.seed,
+          request.ranges
+        )
+      : null,
+    // Null whenever the call closes the action, on `closesAction`, the same
+    // predicate `planStages` narrates the re-pricing under.
+    call: call
+      ? priceCall(
+          state,
+          seat,
+          call,
+          HERO_FOLD_EQUITY_SIMS,
+          request.seed,
+          request.ranges
+        )
+      : null,
+  };
+}
+
+/**
+ * The fold-equity price of one rung of the ladder, or null when there is no
+ * honest one to report.
+ *
+ * `pFold` at zero is the case worth naming: somebody in the field is all-in and
+ * has no decision left, so no size can win the pot uncontested and the rung is
+ * worth only what it collects at showdown. That is `actionEv`'s assumption
+ * arriving through the back door, and it is exactly the assumption a bet may not
+ * be judged under, so the size is left unpriced instead. `simulations` at zero
+ * with folds still on the table is the same failure in a smaller box: the called
+ * branch never sampled, and `foldEquityEv` falls back to minus the cost there,
+ * which is a one-directional bias against betting.
+ */
+function pricedRung(read: HeroRead, rung: TableAction): number | null {
+  const priced = read.sizes?.byLabel[rung.label];
+  if (!priced) return null;
+  if (priced.pFold <= 0) return null;
+  if (priced.simulations === 0 && priced.pFold < 1) return null;
+  return priced.ev;
+}
+
+/**
+ * What the table itself would pay for one line the hero can take, or null when
+ * it cannot say.
+ *
+ * Three pricers, and they are the three `decider.finish` chooses between on a
+ * bot's own move. That is the whole design: what Drill judges a human move
+ * against, and what Study prints, are the numbers the table judged itself by, so
+ * the mode cannot become a second and privately written valuer that disagrees
+ * with the bot sitting next to it.
+ *
+ *   - Fold, check, and a call that closes the action: `evByAction`, i.e.
+ *     `actionEv`. Exact, because no chip can enter the pot after it.
+ *   - Bets and raises: the priced ladder. `actionEv` is not merely imprecise
+ *     here, it is biased in one direction, its own header in `poker/ev.ts` says
+ *     so ("a bet wins two different ways and `actionEv` only counts one of
+ *     them"): the entire P(fold) · Pot term is missing, so a river bluff with no
+ *     showdown equity prices at minus the bet every time and checking wins by
+ *     construction. Priced that way Drill would tell a player who had just found
+ *     a correct bluff that they were wrong, in the one mode whose whole promise
+ *     is that it stays quiet unless you are. Confidently backwards coaching is
+ *     worse than none, which is why this reads `foldEquityEv` against the range
+ *     that continues instead. `coach/evLoss.ts` reaches the same conclusion from
+ *     the same fact in its own header.
+ *   - A call that does not close the action: the re-priced call. Not an extra.
+ *     Pricing a raise against the pot the field builds while pricing the call
+ *     against the pot as it stands compares a multiway pot with a heads-up one,
+ *     and the gap runs entirely in the raise's favour (see `ev.callEv`: over 220
+ *     six-handed hands it flipped the sign of the comparison in 37.5% of spots).
+ *     Adding aggression to the comparison without this would not make Drill
+ *     honest about bets, it would make it raise-happy.
+ *
+ * An aggressive action is matched to its rung by cost rather than by label,
+ * because the two are formatted by different functions: `Actions.sized` spends
+ * `money`, so it says "Bet $1,200" where `sizedCandidates` says "Bet $1200".
+ * Cost is the quantity being priced; the label is how it is spoken.
+ */
+export function heroActionEv(
+  read: HeroRead,
+  action: TableAction
+): number | null {
+  if (isAggressive(action)) {
+    const rung = read.sizes?.candidates.find((c) => c.cost === action.cost);
+    return rung ? pricedRung(read, rung) : null;
+  }
+  if (action.type === "call" && read.call) return read.call.ev;
+  return evByAction([action], read.equity, read.pot, read.toCall)[action.label];
+}
+
+/** Every line the hero could take here, priced, unpriceable ones dropped. */
+function heroLines(
+  read: HeroRead,
+  choices: TableAction[]
+): { action: TableAction; ev: number }[] {
+  const lines: { action: TableAction; ev: number }[] = [];
+  // The legal set with its aggressive entry replaced by the whole ladder, which
+  // is the same substitution `finish` makes before its own argmax: the minimum
+  // bet is one size among several and usually not the best one.
+  const candidates = choices.flatMap((a) =>
+    isAggressive(a) ? (read.sizes?.candidates ?? []) : [a]
+  );
+  for (const action of candidates) {
+    const ev = heroActionEv(read, action);
+    if (ev !== null) lines.push({ action, ev });
+  }
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
 // Drill
 // ---------------------------------------------------------------------------
 
 /**
+ * Price one size the ladder does not carry.
+ *
+ * The presets are rungs of `sizingLadder`, but the slider can stop anywhere, so
+ * the size a human actually chose often is not one of them, and calling the $37
+ * bet the $33 rung would invent the number Drill exists to check. One rung is
+ * priced here instead: an empty `sizings` makes `sizedCandidates` return this
+ * action alone, so the cost is one field run and one range run rather than a
+ * ladder: 3 ms on a river, 16 ms on the widest preflop spot measured. This is
+ * the only work in this file the human waits on, and it buys the alternative to
+ * staying silent on every size a slider can reach, which is most of them.
+ *
+ * The seed, the budget and the ranges are the ladder's, not a second set:
+ * `decisionSeed` is a pure function of this state and this seat, and
+ * `priceSizes` rebuilds the ranges from `opponentRanges`, which is a pure
+ * function of the same. So this rung lands on the ladder's common random numbers
+ * rather than beside them, which is what makes the two comparable at all.
+ */
+function priceTakenSize(
+  state: Table,
+  seat: number,
+  taken: TableAction
+): number | null {
+  const priced = priceSizes(
+    state,
+    seat,
+    taken,
+    [],
+    HERO_FOLD_EQUITY_SIMS,
+    decisionSeed(state, seat)
+  );
+  if (!priced) return null;
+  const breakdown = priced.byLabel[taken.label];
+  if (!breakdown) return null;
+  if (breakdown.pFold <= 0) return null;
+  if (breakdown.simulations === 0 && breakdown.pFold < 1) return null;
+  return breakdown.ev;
+}
+
+/**
  * Price the move the human just made against the best one available.
  *
- * `evByAction` is the same pricer Study's EV chips print from, deliberately: a
- * player who switches Drill on after a session in Study must not be told a
- * different story about the same spot by a second, privately written valuer.
+ * Every legal line is in the comparison, bets and raises included, each on the
+ * pricer that can value it, see `heroActionEv` for which and why. The ladder is
+ * priced while the human is on the clock; only a size the ladder does not carry
+ * is priced here.
  *
- * The action taken is priced alongside the legal set rather than looked up in
- * it, because a sized raise ("Raise to $150") is not one of the actions
- * `legalActions` returned, that one carries the minimum. Labels that do collide
- * carry the same cost and therefore the same EV, so the overwrite is a no-op.
+ * Null is the answer in five cases, and all five are silence rather than a
+ * guess: no read arrived before the human acted (they were faster than one Monte
+ * Carlo run), the read describes a different decision point, the move taken
+ * cannot be priced honestly, there was nothing to choose between, or the loss is
+ * inside `DRILL_THRESHOLD_BB`, which is roughly the width of the interval the
+ * equity itself was measured to. Interrupting for that would be teaching
+ * sampling error.
  *
- * Null is the answer in three cases, and all three are silence rather than a
- * guess: no estimate arrived before the human acted (they were faster than one
- * Monte Carlo run), there was nothing to choose between, or the loss is inside
- * `DRILL_THRESHOLD_BB`, which is roughly the width of the interval the equity
- * itself was measured to. Interrupting for that would be teaching sampling
- * error.
+ * The last of those is the one the wider comparison strains, and it is worth
+ * being precise about: the rungs share common random numbers with each other, so
+ * choosing between two sizes is a low-noise comparison, but a bet against a
+ * check is a fold-equity estimate at `HERO_FOLD_EQUITY_SIMS` against a showdown
+ * estimate at the per-street budget, and those two runs are independent. That is
+ * what the raised budget buys and it is the reason it is raised; the threshold
+ * itself is unchanged rather than quietly widened for aggression, because a
+ * second threshold living here would be a private constant nobody could find
+ * from the mode's own documentation. If it has to move it should move in
+ * `lib/tableOptions.ts`, where the first one is stated.
  */
 function priceDrill(
   read: HeroRead | null,
+  state: Table,
+  seat: number,
   choices: TableAction[],
   taken: TableAction,
   bigBlind: number
 ): DrillVerdict | null {
-  if (!read) return null;
-
+  if (!read || read.key !== decisionKey(state)) return null;
   /*
-   * Drill speaks only about fold, check and call, and it is silent the moment
-   * a bet or a raise is involved on either side of the comparison.
-   *
-   * `evByAction` prices through `actionEv`, and `actionEv` has no fold equity,
-   * its own header in `poker/ev.ts` says so: "a bet wins two different ways and
-   * `actionEv` only counts one of them". For a call that closes the action that
-   * is exact, the pot is the pot and nobody is folding to it. For a bet it is
-   * not merely imprecise, it is biased in one direction, because the entire
-   * P(fold) · Pot term is missing. A river bluff with no showdown equity prices
-   * at minus the bet every time, so Drill would have announced "checking was
-   * better" to a player who had just found a correct bluff, and it would have
-   * done it in the one mode whose whole promise is that it stays quiet unless
-   * you are wrong. Coaching that is confidently backwards is worse than no
-   * coaching, and the bots do not price this way either: they use
-   * `evWithFoldEquity` against the range that continues.
-   *
-   * `coach/evLoss.ts` reaches the same conclusion from the same fact and calls
-   * it out in its own header. The honest scope is the passive decisions, which
-   * is also where the leaks this mode exists to catch actually live: calling
-   * too wide, and folding out of a pot that was laying the price.
+   * An aggressive move is judged only against a priced ladder. Pricing the size
+   * taken while the sizes it should be compared against are missing would draw
+   * the "better" line from the passive half of the set alone, and announce a
+   * check over a bet on the strength of the bets it failed to look at.
    */
-  const passive = (action: TableAction) =>
-    action.type !== "bet" && action.type !== "raise";
-  if (!passive(taken)) return null;
-  const judged = choices.filter(passive);
-  if (judged.length === 0) return null;
+  if (isAggressive(taken) && !read.sizes) return null;
 
-  const evs = evByAction([...judged, taken], read.equity, read.pot, read.toCall);
-  let better = judged[0];
-  for (const option of judged) {
-    if (evs[option.label] > evs[better.label]) better = option;
-  }
-  const loss = evs[better.label] - evs[taken.label];
+  const takenEv = isAggressive(taken)
+    ? // A rung of the priced ladder if the human landed on one, which the preset
+      // buttons and the default sizing do; otherwise its own single rung.
+      (heroActionEv(read, taken) ?? priceTakenSize(state, seat, taken))
+    : heroActionEv(read, taken);
+  if (takenEv === null) return null;
+
+  const lines = heroLines(read, choices);
+  if (lines.length === 0) return null;
+  let better = lines[0];
+  for (const line of lines) if (line.ev > better.ev) better = line;
+
+  const loss = better.ev - takenEv;
   if (loss <= DRILL_THRESHOLD_BB * bigBlind) return null;
-  return { better, loss };
+  return { better: better.action, loss };
 }
 
 // ---------------------------------------------------------------------------
@@ -983,10 +1239,14 @@ export function TableProvider({ children }: { children: ReactNode }) {
        * describe the decision that was actually faced.
        *
        * Written unconditionally, and that is the design: no mode is consulted,
-       * every mode pays the same handful of multiplications, and `CoachPanel`
-       * alone decides whether the result is printed. Gating it on `mode` here
-       * would put a rendering choice on the path an action takes into the
-       * engine, which is the one thing this file may not do.
+       * every mode pays the same price for it, and `CoachPanel` alone decides
+       * whether the result is printed. Gating it on `mode` here would put a
+       * rendering choice on the path an action takes into the engine, which is
+       * the one thing this file may not do.
+       *
+       * That price is a handful of multiplications off the read that is already
+       * in hand, with one exception: a bet or raise at a size the ladder does
+       * not carry costs one more field simulation, see `priceTakenSize`.
        *
        * Set on every hero action, so it also clears itself, a verdict from the
        * previous decision can never sit underneath the current one.
@@ -994,6 +1254,8 @@ export function TableProvider({ children }: { children: ReactNode }) {
       setDrillVerdict(
         priceDrill(
           heroReadRef.current,
+          t,
+          seat,
           legalActions(t, seat, t.config),
           action,
           t.config.bigBlind
@@ -1150,11 +1412,16 @@ export function TableProvider({ children }: { children: ReactNode }) {
   // though it prints nothing while you decide, it is what the verdict is priced
   // from once you have acted, and there is no second chance to measure a
   // decision after the cards have moved on.
+  //
+  // Two runs, published one after the other. The showdown estimate goes to the
+  // worker pool and is set the moment it lands, because Coach's whole line is
+  // that number. The fold-equity ladder is main-thread work and is folded into a
+  // second read a paint later, which is why it is priced here and not on the
+  // click: it is spent on the human's clock, where nothing is waiting on it, and
+  // discarded unspent whenever they act first.
   const heroTurn =
     heroSeat !== null && table.status === "playing" && table.toAct === heroSeat;
-  const heroKey = heroTurn
-    ? `${table.handNumber}:${handActions(table).length}`
-    : "";
+  const heroKey = heroTurn ? decisionKey(table) : "";
 
   useEffect(() => {
     // Paused counts as "not on the clock": a Monte Carlo run for a decision
@@ -1168,22 +1435,56 @@ export function TableProvider({ children }: { children: ReactNode }) {
     const request = equityRequest(t, heroSeat);
     const pot = t.pot;
     const call = toCallOf(t, heroSeat);
-    void runMultiwayEquity(request)
-      .then((equity) => {
+    void (async () => {
+      let showdown: HeroRead;
+      try {
+        const equity = await runMultiwayEquity(request);
         if (cancelled) return;
-        setHeroRead({
+        showdown = {
+          key: heroKey,
           equity,
           toCall: call,
           pot,
           required: call > 0 ? call / (pot + call) : 0,
           odds: call > 0 ? pot / call : null,
           opponents: request.opponents,
-        });
-      })
-      .catch(() => {
+          sizes: null,
+          call: null,
+        };
+      } catch {
         // A failed estimate must never block the hand; the panel just says so.
         if (!cancelled) setHeroRead(null);
-      });
+        return;
+      }
+      setHeroRead(showdown);
+      /*
+       * Hand the frame back before taking the thread for the ladder. Without
+       * this the `setHeroRead` above and the pricing below are one task and the
+       * paint waits for the pricing anyway, which is the latency this ordering
+       * exists to avoid.
+       *
+       * A click can land inside the yield, and `cancelled` does not catch it:
+       * `act` clears the read at once but the move does not reach the engine
+       * until the chip has flown, so this effect is not torn down for another
+       * 400ms. The result is one wasted pricing pass and a read that reappears
+       * after `act` cleared it, which `read.key` then refuses to price against
+       * the state that has moved on. Both are harmless, and a second flag to
+       * close a window one millisecond wide would cost more than it saves.
+       */
+      await yieldToPaint();
+      if (cancelled) return;
+      try {
+        setHeroRead({ ...showdown, ...priceHeroLines(t, heroSeat, request) });
+      } catch (err) {
+        /*
+         * The showdown read stands. Every consumer already treats a null ladder
+         * as "not priced", so a failure here costs Drill its verdict on bets and
+         * costs nothing else: it must not take Coach's equity line down with it.
+         */
+        // eslint-disable-next-line no-console
+        console.error("table: pricing the hero's sizes failed", err);
+      }
+    })();
     return () => {
       cancelled = true;
     };

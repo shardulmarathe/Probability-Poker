@@ -21,9 +21,13 @@
 
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { money, pct } from "../../lib/format";
-import { evByAction } from "../../poker/model/decider";
 import type { TableAction } from "../../poker/table/rules";
-import { useTable, type DrillVerdict, type HeroRead } from "../../store/TableContext";
+import {
+  heroActionEv,
+  useTable,
+  type DrillVerdict,
+  type HeroRead,
+} from "../../store/TableContext";
 import type { TableMode } from "../../lib/tableOptions";
 import type { TableSeat } from "../../poker/table/state";
 import { LINE, RADIUS, SURFACE, Stat, TONE } from "../ui";
@@ -387,7 +391,21 @@ function StudyDetail({
   actions: TableAction[];
   seats: TableSeat[];
 }) {
-  const evs = evByAction(actions, read.equity, read.pot, read.toCall);
+  /*
+   * The table's own price for each line, `heroActionEv`, not a second valuation
+   * assembled here. A bet's price carries its fold equity, so Study's chip and
+   * Drill's verdict are the same number about the same spot: a player who works
+   * in Study and then switches Drill on must not be told a different story by a
+   * second, privately written valuer.
+   *
+   * Null where there is no honest price, an unpriced ladder or a field with
+   * nobody left to fold, and a dash is the right thing to print for it. A chip
+   * reading "+0.0" would be a claim.
+   */
+  const evs = actions.map((action) => ({
+    action,
+    ev: heroActionEv(read, action),
+  }));
   // One wrapping row rather than two labelled ones: the felt needs the height
   // more than these need their own lines, and the chips are self-labelling.
   return (
@@ -404,12 +422,12 @@ function StudyDetail({
         />
       ))}
       <Label>EV</Label>
-      {actions.map((a) => (
+      {evs.map(({ action, ev }) => (
         <Chip
-          key={a.label}
-          label={a.label}
-          value={`${evs[a.label] >= 0 ? "+" : ""}${evs[a.label].toFixed(1)}`}
-          tone={evs[a.label] >= 0 ? "good" : "bad"}
+          key={action.label}
+          label={action.label}
+          value={ev === null ? "-" : `${ev >= 0 ? "+" : ""}${ev.toFixed(1)}`}
+          tone={ev === null ? undefined : ev >= 0 ? "good" : "bad"}
         />
       ))}
     </div>

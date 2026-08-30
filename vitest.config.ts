@@ -7,10 +7,11 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     // The slow tests are the engine self-play runs: they play real hands with
-    // the bot deciding at production sim counts, so the heaviest one takes a
-    // few seconds (the evaluator property test, despite brute-forcing 100k+
-    // deals, runs in ~1s). 30s leaves roughly 10x headroom over the current
-    // worst case on slower CI hardware while still failing fast on a hang.
+    // the bot deciding at production sim counts. 30s fails fast on a hang and
+    // covers everything except the equity-ladder audit in
+    // `poker/model/buckets.test.ts`, which measures 14 million rollouts and
+    // passes its own longer timeout at the call site rather than raising this
+    // ceiling for every test that should never approach it.
     testTimeout: 30_000,
   },
 });

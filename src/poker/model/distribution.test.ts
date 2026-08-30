@@ -376,6 +376,95 @@ function centroids(len: number, n: number, seed: number) {
   return { dist, present, count };
 }
 
+/**
+ * Robinson violations in one ordering of the buckets: triples of positions
+ * a < b < c whose outer pair (a, c) sits closer than a pair nested inside it.
+ * Zero means the centroid matrix grows monotonically away from the diagonal,
+ * which is what a ladder claiming its index is strength ordered has to look
+ * like.
+ */
+function robinsonViolations(dist: Float64Array, order: readonly number[]): number {
+  let v = 0;
+  for (let a = 0; a < order.length; a++) {
+    for (let b = a + 1; b < order.length; b++) {
+      for (let c = b + 1; c < order.length; c++) {
+        const far = dist[order[a] * BUCKET_COUNT + order[c]];
+        if (far < dist[order[a] * BUCKET_COUNT + order[b]]) v++;
+        if (far < dist[order[b] * BUCKET_COUNT + order[c]]) v++;
+      }
+    }
+  }
+  return v;
+}
+
+/**
+ * The fewest Robinson violations any ordering of `present` reaches, and every
+ * ordering that reaches it.
+ *
+ * The answer is over all n! orderings, but the walk is depth first over
+ * positions with a bound rather than a pass over the n! themselves. A triple
+ * (a, b, c) is settled the moment position c is filled, and extending a prefix
+ * only ever closes further triples, so the count over a prefix is a lower bound
+ * on every ordering beginning with it. A prefix already past the incumbent
+ * therefore cannot be completed into a win or even a tie, and its whole subtree
+ * is dropped. What comes back is exactly the (best, optima) pair full
+ * enumeration returns; `prefixes` reports how much of the tree that took.
+ */
+function robinsonOptima(
+  dist: Float64Array,
+  present: readonly number[]
+): { best: number; optima: number[][]; prefixes: number } {
+  const n = present.length;
+  // The present buckets' distances alone, in present-index space, so the inner
+  // loop reads a dense n x n block instead of striding BUCKET_COUNT.
+  const d = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      d[i * n + j] = dist[present[i] * BUCKET_COUNT + present[j]];
+    }
+  }
+
+  const order = new Int32Array(n);
+  const used = new Uint8Array(n);
+  let best = Infinity;
+  let optima: number[][] = [];
+  let prefixes = 0;
+
+  const extend = (p: number, v: number): void => {
+    prefixes++;
+    if (p === n) {
+      if (v < best) {
+        best = v;
+        optima = [];
+      }
+      if (v === best) optima.push(Array.from(order, (i) => present[i]));
+      return;
+    }
+    for (let x = 0; x < n; x++) {
+      if (used[x] === 1) continue;
+      // Triples closed by putting x at position p: every (a, b, p) with a < b < p.
+      let added = 0;
+      for (let a = 0; a < p; a++) {
+        const far = d[order[a] * n + x];
+        for (let b = a + 1; b < p; b++) {
+          if (far < d[order[a] * n + order[b]]) added++;
+          if (far < d[order[b] * n + x]) added++;
+        }
+      }
+      // > rather than >=: an ordering that merely ties the incumbent is one of
+      // the answers this test is asking about, so ties are not pruned.
+      if (v + added > best) continue;
+      order[p] = x;
+      used[x] = 1;
+      extend(p + 1, v + added);
+      used[x] = 0;
+    }
+  };
+
+  extend(0, 0);
+  return { best, optima, prefixes };
+}
+
 describe("is the 9-class taxonomy defensible under a distribution metric", () => {
   it("groups hands whose distributions are far closer than chance", () => {
     // The clustering question, asked directly: are two hands sharing a bucket
@@ -445,8 +534,10 @@ describe("is the 9-class taxonomy defensible under a distribution metric", () =>
     // A ladder whose index is claimed to be monotone in strength should have a
     // Robinson centroid matrix: distances grow as you move away from the
     // diagonal. That is testable against every alternative ordering, so this
-    // does not merely check the current order, it searches all 9! = 362,880 of
-    // them and asks whether any is better.
+    // does not merely check the current order, it asks whether any of the
+    // 9! = 362,880 orderings is better. The answer is over all of them and the
+    // walk is not: `robinsonOptima` bounds the search, which settles those
+    // 362,880 in roughly a thousand prefixes.
     //
     // Verified over six independent board samples (flop/turn/river x two
     // seeds): the answer is that the enum order is optimal or tied-optimal
@@ -463,51 +554,19 @@ describe("is the 9-class taxonomy defensible under a distribution metric", () =>
     ] as const) {
       const { dist, present } = centroids(len, boards, seed);
       const identity = present.slice();
-
-      const violations = (order: number[]): number => {
-        let v = 0;
-        for (let a = 0; a < order.length; a++) {
-          for (let b = a + 1; b < order.length; b++) {
-            for (let c = b + 1; c < order.length; c++) {
-              const far = dist[order[a] * BUCKET_COUNT + order[c]];
-              if (far < dist[order[a] * BUCKET_COUNT + order[b]]) v++;
-              if (far < dist[order[b] * BUCKET_COUNT + order[c]]) v++;
-            }
-          }
-        }
-        return v;
-      };
-
-      const permute = (items: number[]): number[][] => {
-        if (items.length <= 1) return [items];
-        const out: number[][] = [];
-        for (let i = 0; i < items.length; i++) {
-          const rest = items.slice(0, i).concat(items.slice(i + 1));
-          for (const p of permute(rest)) out.push([items[i], ...p]);
-        }
-        return out;
-      };
-
-      const all = permute(identity);
-      let best = Infinity;
-      const optimal: number[][] = [];
-      for (const order of all) {
-        const v = violations(order);
-        if (v < best) {
-          best = v;
-          optimal.length = 0;
-        }
-        if (v === best) optimal.push(order);
-      }
+      const { best, optima, prefixes } = robinsonOptima(dist, identity);
+      const enumViolations = robinsonViolations(dist, identity);
+      let total = 1;
+      for (let k = 2; k <= identity.length; k++) total *= k;
 
       console.log(
-        `${street}: enum order has ${violations(identity)} Robinson violations, ` +
-          `best of ${all.length} orderings is ${best}`
+        `${street}: enum order has ${enumViolations} Robinson violations, ` +
+          `best of ${total} orderings is ${best} (${prefixes} prefixes searched)`
       );
 
       // Reversal is always as good as the original, so the optimum comes in
       // pairs; strip the descending half before looking at what is left.
-      const ascending = optimal.filter((o) => o[0] === identity[0]);
+      const ascending = optima.filter((o) => o[0] === identity[0]);
       for (const order of ascending) {
         const moved = order
           .map((b, k) => (b === identity[k] ? null : BUCKET_NAMES[b as HandBucket]))
@@ -523,7 +582,7 @@ describe("is the 9-class taxonomy defensible under a distribution metric", () =>
       // ...and the enum order is one of the optimal ones, or within a hair of
       // it. The gap is bounded rather than asserted to zero: which of TopPair
       // and Overpair leads is a property of the boards drawn, not of the code.
-      expect(violations(identity) - best).toBeLessThanOrEqual(4);
+      expect(enumViolations - best).toBeLessThanOrEqual(4);
     }
   });
 

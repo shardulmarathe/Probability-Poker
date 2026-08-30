@@ -6,6 +6,12 @@
  * `LearnPage` mounts one concept at a time: four convergence runs, a 540-cell
  * likelihood prior, a six-thousand-trial multiway sample and a river solve would
  * otherwise all be triggered by a single navigation.
+ *
+ * The convergence table sits behind `GuessReveal`, which is the one thing on
+ * this page that asks the reader to produce a number instead of reading one.
+ * It gates the display and nothing else: the four runs happen on mount either
+ * way, so the figure the gate opens on is the figure that was already computed,
+ * and pressing skip costs the reader nothing but the exercise.
  */
 
 import { useMemo, useState } from "react";
@@ -15,6 +21,7 @@ import {
   CardRow,
   Frac,
   Group,
+  GuessReveal,
   Heading,
   HowCalculated,
   LINE,
@@ -33,6 +40,11 @@ const MATCHUPS = [
 ] as const;
 
 const SAMPLE_SIZES = [500, 2000, 8000, 32000];
+
+// One decimal, matching the guess grid: a slider stepping in half points can
+// express 62.5%, so printing the answer to one place compares like with like.
+const asPct = (value: number) => pct(value, 1);
+const asPoints = (magnitude: number) => `${(magnitude * 100).toFixed(1)} points`;
 
 export function MonteCarloConcept() {
   const [pick, setPick] = useState<string>(MATCHUPS[0].id);
@@ -91,48 +103,71 @@ export function MonteCarloConcept() {
         {matchup.board && <CardRow label="Board" cards={cardCodes(matchup.board)} />}
       </div>
 
-      <Scroller>
-        <table className="w-full text-sm" data-testid="convergence-table">
-          <thead>
-            <tr className="text-left text-[0.6rem] uppercase tracking-wider text-ivory/45">
-              <th className="py-2 pr-3">Trials</th>
-              <th className="py-2 pr-3 text-right">P̂(win)</th>
-              <th className="py-2 pr-3 text-right">± SE</th>
-              <th className="py-2 pr-3 text-right">95% interval</th>
-              <th className="py-2 pr-3 text-right">Width</th>
-              <th className="py-2 pr-3 text-right">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((r) => (
-              <tr
-                key={r.simulations}
-                className="border-t"
-                style={{ borderColor: LINE.quietFaint }}
-              >
-                <td className="py-2 pr-3 font-mono text-xs text-ivory/80">
-                  {r.simulations.toLocaleString()}
-                </td>
-                <td className="py-2 pr-3 text-right font-mono text-xs text-gold-soft">
-                  {pct(r.pWin, 2)}
-                </td>
-                <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                  {(r.se * 100).toFixed(2)}
-                </td>
-                <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                  {pct(r.ci.lo, 1)} - {pct(r.ci.hi, 1)}
-                </td>
-                <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/50">
-                  {((r.ci.hi - r.ci.lo) * 100).toFixed(2)}
-                </td>
-                <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">
-                  {r.ms.toFixed(1)} ms
-                </td>
+      <GuessReveal
+        label={`hero's P(win) at ${last.simulations.toLocaleString()} trials`}
+        actual={last.pWin}
+        format={asPct}
+        formatGap={asPoints}
+        direction={["optimistic", "pessimistic"]}
+        min={0}
+        max={1}
+        step={0.005}
+        initial={0.5}
+        kind="equity"
+        interval={last.ci}
+        /*
+         * The matchup re-arms the question, a fresh sample deliberately does
+         * not. Resampling is the exercise the note below sets, "press it a few
+         * times and watch the estimate move", and that only works if the table
+         * is already open: re-asking on every draw would turn the one control
+         * that demonstrates sampling error into four presses per observation.
+         */
+        resetKey={matchup.id}
+        testId="mc-guess"
+      >
+        <Scroller>
+          <table className="w-full text-sm" data-testid="convergence-table">
+            <thead>
+              <tr className="text-left text-[0.6rem] uppercase tracking-wider text-ivory/45">
+                <th className="py-2 pr-3">Trials</th>
+                <th className="py-2 pr-3 text-right">P̂(win)</th>
+                <th className="py-2 pr-3 text-right">± SE</th>
+                <th className="py-2 pr-3 text-right">95% interval</th>
+                <th className="py-2 pr-3 text-right">Width</th>
+                <th className="py-2 pr-3 text-right">Time</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Scroller>
+            </thead>
+            <tbody>
+              {runs.map((r) => (
+                <tr
+                  key={r.simulations}
+                  className="border-t"
+                  style={{ borderColor: LINE.quietFaint }}
+                >
+                  <td className="py-2 pr-3 font-mono text-xs text-ivory/80">
+                    {r.simulations.toLocaleString()}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-gold-soft">
+                    {pct(r.pWin, 2)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
+                    {(r.se * 100).toFixed(2)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
+                    {pct(r.ci.lo, 1)} - {pct(r.ci.hi, 1)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/50">
+                    {((r.ci.hi - r.ci.lo) * 100).toFixed(2)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">
+                    {r.ms.toFixed(1)} ms
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Scroller>
+      </GuessReveal>
 
       <Calc>
         SE = √( p̂(1 − p̂) / n )

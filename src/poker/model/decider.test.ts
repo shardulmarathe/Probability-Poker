@@ -1087,14 +1087,55 @@ describe("pricing sizes", () => {
       pot: 60,
       seed: 31337,
     });
-    decide(table, seat, table.config); // warm the JIT and the bucket tables
+    let decision = decide(table, seat, table.config); // warm the JIT and the bucket tables
     const started = performance.now();
     const runs = 5;
-    for (let i = 0; i < runs; i++) decide(table, seat, table.config);
+    for (let i = 0; i < runs; i++) decision = decide(table, seat, table.config);
     const each = (performance.now() - started) / runs;
     // eslint-disable-next-line no-console
     console.log(`six-handed flop decision: ${each.toFixed(1)}ms`);
-    expect(each).toBeLessThan(250);
+
+    // What the budget actually is, counted in the only unit a decision's cost
+    // scales with. Sims are exact: the count is a pure function of street and
+    // field size, and every run reports how many it scored, so the numbers
+    // below are the arithmetic of `decisionSims` and `FOLD_EQUITY_SIMS` read
+    // back off a real decision rather than off the constants that set them.
+    // Both sides are spelled out as literals on purpose. Comparing a decision
+    // against `decisionSims(...)` would agree with itself no matter what the
+    // per-street budget were changed to.
+    const opponents = opponentsOf(table, seat);
+    expect(opponents.length).toBe(5);
+
+    // One multiway run. 20000 flop sims over a field of five is 4000, which is
+    // under the floor, so the floor is what the six-handed budget really is.
+    expect(TABLE_DECISION_SIMS.flop).toBe(20000);
+    expect(MIN_DECISION_SIMS).toBe(5000);
+    expect(decisionSims("flop", opponents.length)).toBe(5000);
+    expect(decision.equity.simulations).toBe(5000);
+
+    // One continuing-range run per rung, each on the fold-equity budget: the
+    // ladder's five sizes plus the all-in `sizedCandidates` always appends.
+    expect(FOLD_EQUITY_SIMS).toBe(800);
+    const rungs = Object.values(decision.foldEquity ?? {});
+    expect(sizingLadder(table, seat, table.config).length).toBe(5);
+    expect(rungs.length).toBe(6);
+    for (const rung of rungs) expect(rung.simulations).toBe(800);
+
+    // Plus the equity-vs-range run each priced decision pays for once, on the
+    // same budget. Its sim count is not in the breakdown; its answer is, and a
+    // finite one is only reachable through the run.
+    expect(decision.equityVsRange).toBeGreaterThan(0);
+    const sims = decision.equity.simulations + FOLD_EQUITY_SIMS * (rungs.length + 1);
+    expect(sims).toBe(10_600);
+
+    // Wall clock is logged above and only loosely bounded. A tight bound on it
+    // measures how busy the machine is rather than what the decision costs:
+    // this exact decision has been timed at 28ms and at over 300ms on the same
+    // machine depending on what else was running on it, a 10x spread over
+    // identical work. Any bound that survives that is far too loose to catch a
+    // 2x regression, and the sim counts above catch one exactly. What is left
+    // here is a catastrophe guard: a decision that has stopped terminating.
+    expect(each).toBeLessThan(10_000);
   });
 });
 

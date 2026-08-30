@@ -45,6 +45,77 @@
  *    exactly what was considered, so a counterfactual is visible rather than
  *    hidden.
  *
+ * CLASSIFICATION.
+ *
+ * A price is not a lesson. "That call cost 180" is a fact about one hand; "you
+ * call below the price the pot is laying you" is a fact about a game, and only
+ * the second one transfers. Every decision therefore also carries a `kind`, a
+ * name for WHAT went wrong, read off the model lens. Hindsight names exactly one
+ * kind and it is the one that is not a leak, see RESULTS-ORIENTED below.
+ *
+ * Two rules keep the vocabulary honest.
+ *
+ * The first is that `kind` is `null` whenever the recorded data cannot support a
+ * name. A wrong leak name is worse than no leak name: the player drills the
+ * wrong thing, and the analysis spent its credibility to send them there. The
+ * `null` bucket is aggregated and ranked like any other, so an unclassifiable
+ * majority is visible rather than quietly absorbed into the nearest label.
+ *
+ * The second is that the pricing model's blind spot decides which kinds may
+ * exist at all. `priceAction` carries no fold-equity term, so it prices every
+ * bet as though it were called. That error has a direction: it UNDERSTATES
+ * betting. So
+ *
+ *   - "the model wanted the aggressive line and you took the passive one" is
+ *     safe. Fold equity could only have widened that gap, so the complaint
+ *     survives adding the term the model lacks. That kind is `missed-value`.
+ *   - "you bet without value" is not safe, and is REJECTED for that reason. It
+ *     is what this model says about every bluff ever made, and a taxonomy that
+ *     files bluffing under leaks teaches a falsehood with the authority of a
+ *     number. Such a decision is left unclassified instead.
+ *
+ * PRICE, not MDF. Owing `toCall` into `potBefore`, a call breaks even at
+ * `toCall / (potBefore + toCall)` of the pot. That is exact from the record and
+ * assumes nothing about who put which chips in, and it is the threshold the call
+ * and fold kinds test against. Alpha and MDF are deliberately NOT used per
+ * decision. MDF is a frequency over a range, one fold has no frequency, and
+ * "folded above MDF" is therefore a category error wearing a diagnosis. The
+ * frequency claim belongs to the aggregate, where `LeakAggregate.rate` divides a
+ * count by the number of spots that actually offered the error, and that is a
+ * number MDF can be set against.
+ *
+ * MULTIWAY. `perOpponent` (`equity/multiway.ts`, where it falls out of the same
+ * scoring pass and costs nothing) is the hero's equity against each seat taken
+ * alone. When the hero had the price against every opponent individually and did
+ * not have it against the field, the mistake is not the call, it is the
+ * arithmetic: equity does not survive being multiplied by a field. That is
+ * `multiway-as-heads-up`, and it is tested before `call-below-price` because it
+ * is a strict refinement of it and names the mechanism instead of the symptom.
+ *
+ * RESULTS-ORIENTED is the one kind that is not a leak. It fires when
+ * `modelEvLoss` is within noise of zero, hindsight's best line was to fold, and
+ * the gap between the lenses is a real fraction of the pot: the read said be in
+ * this hand, the cards said be out of it, and the player was right. It is a kind
+ * rather than an absence of one because the alternative is silence, and silence
+ * in that exact spot is what teaches the lesson this module exists to prevent.
+ * Its `modelEvLoss` is bounded by the mistake threshold, so it cannot outrank a
+ * real leak; its `totalHindsightEvLoss` is the number worth showing.
+ *
+ * RANKING. Kinds are ranked by total model EV lost, which is count times mean
+ * per occurrence, so the order is frequency x cost by construction. Ranking by
+ * the single worst decision instead puts one disastrous hand above a habit the
+ * player has forty times, and the habit is what is actually costing them. The
+ * mean is reported next to the total rather than instead of it, because a rare
+ * expensive kind and a frequent cheap one need different advice.
+ *
+ * NOISE. `modelEquity` is a Monte Carlo estimate, so every comparison above
+ * carries a margin: `MISTAKE_POT_FRACTION` of the pot before a loss counts as a
+ * mistake at all, and `PRICE_MARGIN` of equity before a holding counts as being
+ * on the wrong side of a price. Both sit at roughly two to three standard errors
+ * at `DEFAULT_MODEL_SIMS`. Without them the classifier would put names to the
+ * sampler's own noise, and it would do it most often in the marginal spots where
+ * a name matters most.
+ *
  * Everything here reads only the long-standing fields of `TableHandReport`
  * (`seats`, `board`, `actions`, `button`, `seatCount`, `seed`) and rebuilds the
  * opponent read itself, so it works identically for a human seat, which has no
@@ -131,6 +202,73 @@ export interface AlternativeEv {
   chosen: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Error taxonomy
+// ---------------------------------------------------------------------------
+
+/**
+ * What kind of mistake a decision was, as opposed to what it cost.
+ *
+ * Every member is a claim the model lens can make on its own from the recorded
+ * action, and the header's CLASSIFICATION section says why the obvious extra
+ * members ("bet without value", "folded above MDF") are absent rather than
+ * merely unimplemented.
+ */
+export type LeakKind =
+  | "results-oriented"
+  | "multiway-as-heads-up"
+  | "fold-to-cbet"
+  | "fold-above-price"
+  | "call-below-price"
+  | "missed-value";
+
+/**
+ * Every kind, in classifier precedence order: the earliest match wins, so a
+ * refinement is listed above the general case it refines.
+ */
+export const LEAK_KINDS: readonly LeakKind[] = [
+  "results-oriented",
+  "multiway-as-heads-up",
+  "fold-to-cbet",
+  "fold-above-price",
+  "call-below-price",
+  "missed-value",
+] as const;
+
+/**
+ * The one kind that is not a leak. Exported so a caller can present it
+ * separately without hardcoding the string, which is exactly the mistake that
+ * would let it be listed as something the player should fix.
+ */
+export const NOT_A_LEAK: LeakKind = "results-oriented";
+
+/** Fraction of the pot a model loss must exceed to count as a mistake. */
+export const MISTAKE_POT_FRACTION = 0.02;
+
+/** Floor on that threshold, so a blind-sized pot still needs a real loss. */
+export const MISTAKE_FLOOR_CHIPS = 1;
+
+/**
+ * Equity a holding must clear a price by before it is called wrong-side of it.
+ * About three standard errors at `DEFAULT_MODEL_SIMS`.
+ */
+export const PRICE_MARGIN = 0.03;
+
+/**
+ * Fraction of the pot the hindsight-minus-model gap must exceed before a
+ * correctly played decision is called out as punished by the cards.
+ */
+export const VARIANCE_GAP_POT_FRACTION = 0.2;
+
+/**
+ * How large a model loss has to be, in chips, before it is a mistake rather
+ * than the sampler's noise. Scaled by the pot because the noise is: the EV error
+ * from an equity error of e is on the order of e times the pot.
+ */
+export function mistakeThreshold(potBefore: number): number {
+  return Math.max(MISTAKE_FLOOR_CHIPS, MISTAKE_POT_FRACTION * potBefore);
+}
+
 export interface DecisionEvLoss {
   /** Index into `report.actions`. */
   index: number;
@@ -146,6 +284,15 @@ export interface DecisionEvLoss {
   // --- Model: the honest lens ---------------------------------------------
   /** Pot share against the inferred range, 0..1. */
   modelEquity: number;
+  /**
+   * Pot share against each live opponent taken alone, keyed by seat id, from the
+   * same run and the same inferred ranges as `modelEquity`. Empty when the seat
+   * had nobody left to beat.
+   *
+   * The gap between the smallest of these and `modelEquity` is the cost of the
+   * field, and it is the evidence behind `multiway-as-heads-up`.
+   */
+  modelEquityPerOpponent: Record<number, number>;
   modelEvChosen: number;
   modelEvBest: number;
   modelBestAction: ActionType;
@@ -164,6 +311,204 @@ export interface DecisionEvLoss {
   hindsightExact: boolean;
 
   alternatives: AlternativeEv[];
+
+  // --- Classification: the name, and the evidence behind it ----------------
+  //
+  // The three fields below `kind` are what the classifier reads and what a
+  // caller needs to state the finding as a sentence ("you needed 23% and had
+  // 18%", "you were ahead of each of the three of them and behind the field").
+  // All three are derivations of the same `TableHandReport`, so a decision can
+  // still be re-scored in isolation.
+
+  /** Seats still contesting the pot when the decision was taken, hero aside. */
+  opponentCount: number;
+  /**
+   * Pot share a call has to beat to break even, `toCall / (potBefore + toCall)`.
+   * Null when nothing was owed, a check or a bet has no price to be wrong about.
+   */
+  requiredEquity: number | null;
+  /**
+   * True when this is a flop decision facing a bet from the seat that was the
+   * last preflop aggressor, which is what a continuation bet is.
+   */
+  facingCbet: boolean;
+  /** Null when the recorded data supports no honest name. See `LeakKind`. */
+  kind: LeakKind | null;
+}
+
+/**
+ * Everything `classifyLeak` is allowed to look at, which is a whole decision
+ * minus the answer. Written as an `Omit` rather than a hand-listed subset so a
+ * new field on `DecisionEvLoss` is available to the classifier automatically and
+ * a `DecisionEvLoss` can be passed straight in.
+ */
+export type LeakEvidence = Omit<DecisionEvLoss, "kind">;
+
+/**
+ * Name the mistake, or decline to.
+ *
+ * Reads the model lens only, with the single exception of `results-oriented`,
+ * which is a statement about the gap between the lenses and cannot be made
+ * without both. Precedence follows `LEAK_KINDS`.
+ */
+export function classifyLeak(d: LeakEvidence): LeakKind | null {
+  const threshold = mistakeThreshold(d.potBefore);
+
+  // Played correctly. The only thing left to ask is whether the cards punished
+  // it anyway, and that is the one question hindsight answers by itself.
+  //
+  // The gap alone is not enough to ask it with. `hindsightEvLoss` is negative
+  // for a winner too, because with the cards face up the omniscient line is
+  // always the biggest raise, so "you were ahead and could have charged more"
+  // shares a sign with "you were behind and the cards took your chips". Only the
+  // second is variance. `hindsightBestAction === "fold"` separates them exactly:
+  // folding wins the hindsight lens only when every line that put chips in lost
+  // them, which is to say the cards said be out of this hand while the read said
+  // be in it. That is the whole of the claim, and it is why a bare gap test was
+  // rejected here.
+  if (d.modelEvLoss > -threshold) {
+    const punished = Math.max(
+      MISTAKE_FLOOR_CHIPS,
+      VARIANCE_GAP_POT_FRACTION * d.potBefore
+    );
+    return d.hindsightBestAction === "fold" &&
+      d.hindsightEvLoss - d.modelEvLoss < -punished
+      ? "results-oriented"
+      : null;
+  }
+
+  const price = d.requiredEquity;
+  if (price !== null) {
+    if (d.action === "fold" && d.modelEquity > price + PRICE_MARGIN) {
+      return d.facingCbet ? "fold-to-cbet" : "fold-above-price";
+    }
+
+    if (d.action !== "fold" && d.modelEquity + PRICE_MARGIN < price) {
+      // Ahead of each of them, behind all of them: the field is the whole of
+      // the mistake. Tested before the bare price failure it refines.
+      const heads = Object.values(d.modelEquityPerOpponent);
+      if (
+        d.opponentCount >= 2 &&
+        heads.length === d.opponentCount &&
+        Math.min(...heads) > price + PRICE_MARGIN
+      ) {
+        return "multiway-as-heads-up";
+      }
+      if (d.action === "call") return "call-below-price";
+    }
+  }
+
+  // Passive where the model wanted aggression. Safe in exactly one direction:
+  // the missing fold-equity term could only have made the aggressive line look
+  // better still. The mirror claim is rejected, see the header.
+  const wantedAggression =
+    d.modelBestAction === "bet" || d.modelBestAction === "raise";
+  const wasPassive = d.action === "check" || d.action === "call";
+  if (wantedAggression && wasPassive) return "missed-value";
+
+  return null;
+}
+
+/** One kind, counted and priced across a set of decisions. */
+export interface LeakAggregate {
+  /** Null is the unclassified bucket, reported rather than dropped. */
+  kind: LeakKind | null;
+  /** Decisions classified this way. */
+  count: number;
+  /**
+   * Decisions that OFFERED this error, whether or not they committed it: the
+   * denominator that turns a count into a frequency. Always >= `count`, because
+   * committing an error implies having been in a spot that allowed it.
+   */
+  opportunities: number;
+  /** `count / opportunities`, and 0 when no decision offered the error. */
+  rate: number;
+  /** Σ `modelEvLoss` over the bucket, <= 0. The ranking key. */
+  totalModelEvLoss: number;
+  /** Σ `hindsightEvLoss` over the bucket. What `results-oriented` is read from. */
+  totalHindsightEvLoss: number;
+  /** `totalModelEvLoss / count`. Cost of one occurrence, not of the habit. */
+  meanModelEvLoss: number;
+  /** Most negative `modelEvLoss` in the bucket; ties go to the earliest. */
+  worst: DecisionEvLoss | null;
+}
+
+/**
+ * Whether a decision was in a position to commit `kind`.
+ *
+ * The denominators are deliberately narrow. Counting every decision as an
+ * opportunity to overfold to a continuation bet would divide fourteen bad folds
+ * by four hundred decisions and report a 3.5% leak, when the honest number is
+ * fourteen out of the forty continuation bets the seat actually faced.
+ */
+function offersLeak(kind: LeakKind | null, d: DecisionEvLoss): boolean {
+  switch (kind) {
+    case "results-oriented":
+      // Only a decision played correctly can have been punished for it.
+      return d.modelEvLoss > -mistakeThreshold(d.potBefore);
+    case "multiway-as-heads-up":
+      return d.toCall > 0 && d.opponentCount >= 2;
+    case "fold-to-cbet":
+      return d.facingCbet;
+    case "fold-above-price":
+    case "call-below-price":
+      return d.toCall > 0;
+    case "missed-value":
+      // Every decision has a passive line and an aggressive one available.
+      return true;
+    case null:
+      return true;
+  }
+}
+
+/**
+ * Group decisions by kind and rank the groups by frequency x cost.
+ *
+ * The product is `totalModelEvLoss` itself, since a total is a count times a
+ * mean, so the total is the sort key and no separate score has to be invented
+ * and justified. Empty buckets are dropped: a list of kinds the player has never
+ * committed is not a finding.
+ *
+ * Takes a flat decision list rather than a `HandEvLoss`, because a frequency
+ * needs a sample and one hand is not one. `SessionEvLoss.leaks` is the intended
+ * caller for that reason.
+ */
+export function aggregateLeaks(
+  decisions: readonly DecisionEvLoss[]
+): LeakAggregate[] {
+  const out: LeakAggregate[] = [];
+  for (const kind of [...LEAK_KINDS, null] as (LeakKind | null)[]) {
+    const own = decisions.filter((d) => d.kind === kind);
+    if (own.length === 0) continue;
+
+    let totalModelEvLoss = 0;
+    let totalHindsightEvLoss = 0;
+    let worst: DecisionEvLoss | null = null;
+    for (const d of own) {
+      totalModelEvLoss += d.modelEvLoss;
+      totalHindsightEvLoss += d.hindsightEvLoss;
+      if (!worst || d.modelEvLoss < worst.modelEvLoss) worst = d;
+    }
+
+    const opportunities = decisions.filter((d) => offersLeak(kind, d)).length;
+    out.push({
+      kind,
+      count: own.length,
+      opportunities,
+      rate: opportunities > 0 ? own.length / opportunities : 0,
+      totalModelEvLoss,
+      totalHindsightEvLoss,
+      meanModelEvLoss: totalModelEvLoss / own.length,
+      worst,
+    });
+  }
+
+  // Ties to the more frequent kind: the same chips lost more often is the firmer
+  // read on a habit, and the firmer read is the one worth putting first.
+  out.sort(
+    (a, b) => a.totalModelEvLoss - b.totalModelEvLoss || b.count - a.count
+  );
+  return out;
 }
 
 export interface EvLossTotals {
@@ -191,6 +536,13 @@ export interface SessionEvLoss {
   totalHindsightEvLoss: number;
   byStreet: Record<ActingStreet, EvLossTotals>;
   worst: DecisionEvLoss | null;
+  /**
+   * Every kind the seat committed, ranked by frequency x cost. Lives on the
+   * session and not on `HandEvLoss` because a frequency needs a sample: one
+   * hand's worth of "you did this once" is the per-hand cost report again under
+   * a new name.
+   */
+  leaks: LeakAggregate[];
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +674,13 @@ function holeOf(report: TableHandReport, seat: number): number[] {
 // Equity, both lenses
 // ---------------------------------------------------------------------------
 
+/**
+ * Model equity, with the per-opponent heads-up shares alongside it.
+ *
+ * Both come out of one run: `perOpponent` is a by-product of the same scoring
+ * pass (see `equity/multiway.ts`) and costs nothing, which is what makes the
+ * multiway classification free rather than a second simulation per decision.
+ */
 function modelEquity(
   report: TableHandReport,
   hero: number,
@@ -329,13 +688,13 @@ function modelEquity(
   street: ActingStreet,
   opponents: number[],
   simulations: number
-): number {
+): { equity: number; perOpponent: Record<number, number> } {
   // Nobody to beat: the pot is already this seat's, and no sampling is honest
   // about a certainty.
-  if (opponents.length === 0) return 1;
+  if (opponents.length === 0) return { equity: 1, perOpponent: {} };
 
   const visible = Math.min(BOARD_CARDS_AT[street], report.board.length);
-  return runMultiwayEquitySync({
+  const run = runMultiwayEquitySync({
     heroHole: holeOf(report, hero),
     board: report.board.slice(0, visible),
     opponents,
@@ -344,9 +703,43 @@ function modelEquity(
     // Keyed by (hand seed, decision index, seat) so one decision can be
     // re-scored in isolation and lands on the same number every time.
     seed: hashSeed(report.seed, index, hero),
-    // The pot SHARE, not `pWin`: a chop is worth 1/k of the pot and `pWin`
-    // scores it as zero, which multiway is exactly where it starts to matter.
-  }).equity;
+  });
+  // The pot SHARE, not `pWin`: a chop is worth 1/k of the pot and `pWin`
+  // scores it as zero, which multiway is exactly where it starts to matter.
+  return { equity: run.equity, perOpponent: run.perOpponent };
+}
+
+/**
+ * Was this decision facing a continuation bet.
+ *
+ * A c-bet is the flop bet of the seat that took the last aggressive action
+ * preflop. Both halves are read straight off the action prefix, so no new input
+ * is needed and a scripted report classifies the same way a played one does.
+ * Blinds are not action records, so an unraised pot has no preflop aggressor and
+ * therefore no continuation bet, which is correct.
+ */
+function facingCbetAt(
+  report: TableHandReport,
+  hero: number,
+  index: number
+): boolean {
+  const record = report.actions[index];
+  if (record.street !== "flop" || record.toCall <= 0) return false;
+
+  let preflopAggressor: number | null = null;
+  let flopBettor: number | null = null;
+  for (let i = 0; i < index; i++) {
+    const a = report.actions[i];
+    if (a.action !== "bet" && a.action !== "raise") continue;
+    if (a.street === "preflop") preflopAggressor = a.seat;
+    else if (a.street === "flop" && flopBettor === null) flopBettor = a.seat;
+  }
+
+  return (
+    preflopAggressor !== null &&
+    preflopAggressor === flopBettor &&
+    preflopAggressor !== hero
+  );
 }
 
 /** Hero's share of the pot given every score at showdown; 1/k on a k-way chop. */
@@ -509,7 +902,7 @@ export function analyzeDecision(
   const hero = record.seat;
   const opponents = liveOpponentsAt(report, hero, index);
 
-  const equityModel = modelEquity(
+  const model = modelEquity(
     report,
     hero,
     index,
@@ -517,6 +910,7 @@ export function analyzeDecision(
     opponents,
     options.simulations ?? DEFAULT_MODEL_SIMS
   );
+  const equityModel = model.equity;
   const hindsight = hindsightEquity(
     report,
     hero,
@@ -556,7 +950,7 @@ export function analyzeDecision(
   const bestModel = best(alternatives, "modelEv");
   const bestHindsight = best(alternatives, "hindsightEv");
 
-  return {
+  const evidence: LeakEvidence = {
     index,
     handNumber: report.handNumber,
     seat: hero,
@@ -568,6 +962,7 @@ export function analyzeDecision(
     toCall: record.toCall,
 
     modelEquity: equityModel,
+    modelEquityPerOpponent: model.perOpponent,
     modelEvChosen: chosen.modelEv,
     modelEvBest: bestModel.modelEv,
     modelBestAction: bestModel.action,
@@ -581,7 +976,18 @@ export function analyzeDecision(
     hindsightExact: hindsight.exact,
 
     alternatives,
+
+    opponentCount: opponents.length,
+    // Exact from the record: nothing here assumes which seats put in the chips
+    // that make up `potBefore`, only that the hero owes `toCall` to win it.
+    requiredEquity:
+      record.toCall > 0 && record.potBefore + record.toCall > 0
+        ? record.toCall / (record.potBefore + record.toCall)
+        : null,
+    facingCbet: facingCbetAt(report, hero, index),
   };
+
+  return { ...evidence, kind: classifyLeak(evidence) };
 }
 
 /** Every decision one seat took in one hand. */
@@ -654,5 +1060,6 @@ export function analyzeHands(
     totalHindsightEvLoss,
     byStreet,
     worst,
+    leaks: aggregateLeaks(hands.flatMap((h) => h.decisions)),
   };
 }

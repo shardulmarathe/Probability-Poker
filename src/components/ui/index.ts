@@ -37,5 +37,6 @@ export {
   type ButtonVariant,
 } from "./Button";
 export { Calc, Frac, Heading, HowCalculated, Lead, Note, Reveal, Why } from "./Prose";
+export { GuessReveal, type GuessRevealProps } from "./GuessReveal";
 export { CardRow, cardText } from "./CardRow";
 export { LINE, RADIUS, SURFACE, TONE, netTone, type Tone } from "./tokens";

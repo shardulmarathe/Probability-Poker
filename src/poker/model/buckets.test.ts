@@ -668,6 +668,16 @@ describe("classification is total and consistent", () => {
 // ---------------------------------------------------------------------------
 
 describe("bucket order tracks equity", () => {
+  /*
+   * This one carries its own timeout. Three streets x 60 boards x ~1300 combos
+   * x 60 rollouts is roughly 14 million hand evaluations, and it takes about
+   * 50s, over the suite-wide 30s. The budget is not padding: the claim it makes
+   * is that adjacent rungs differ, and the narrowest real gap on the ladder is
+   * the 0.02 between Top Pair and Overpair, so the standard error on each mean
+   * has to sit well under that. Thinning the sample to fit the shared timeout
+   * would buy speed by making the one assertion that is already borderline
+   * depend on sampling noise.
+   */
   it("has rising mean equity as the bucket rises, on every street", () => {
     // Every combo on 60 random boards per street, rolled out against a random
     // opponent hand. This is the evidence for the taxonomy: if the ordering
@@ -735,7 +745,7 @@ describe("bucket order tracks equity", () => {
       const top = means[HandBucket.Monster] as number;
       expect(top - bottom).toBeGreaterThan(0.5);
     }
-  });
+  }, 120_000);
 });
 
 // ---------------------------------------------------------------------------

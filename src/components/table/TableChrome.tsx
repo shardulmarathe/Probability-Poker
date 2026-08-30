@@ -1,15 +1,13 @@
 /**
  * The table's own controls, hung in the application's header.
  *
- * These used to be a second header row of the table's own: a compact
- * `PageHeader` reading "Your table", the mode switch, an always-visible italic
- * blurb under it, and a "Change table" link. That row and its heading were
- * 114px of the ~240px that pushed Fold and Call below the fold at 1440x760, on
- * a page whose entire purpose is the moment you press one of them. The 52px app
- * bar is already paid for on every route and had a free half, so the controls
- * moved into it and the row went away.
+ * A second header row of the table's own (a compact `PageHeader`, the mode
+ * switch, a blurb and a "Change table" link) would cost 114px of the ~240px that
+ * pushes Fold and Call below the fold at 1440x760, on a page whose entire
+ * purpose is the moment one of them is pressed. The 52px app bar is already paid
+ * for on every route and has a free half, so these controls live in it.
  *
- * A portal rather than a prop, because `AppShell` sits *outside* `TableProvider`
+ * A portal rather than a prop, because `AppShell` sits outside `TableProvider`
  * (see App.tsx) and so cannot call `useTable()`. The shell owns an empty slot;
  * this is the only thing that ever fills it.
  *
@@ -53,12 +51,11 @@ export function TableChrome({
   const hint = TABLE_MODES.find((m) => m.id === hinted);
 
   /*
-   * The blurbs used to be `title=` attributes, then an always-on paragraph
-   * under the switch. The first was invisible on every touch device, the second
-   * cost a permanent line of the page's height to say something you need once.
-   * A tooltip is the honest shape for it, and `role="tooltip"` with a real
-   * `aria-describedby` is what makes it reach a screen reader, which `title=`
-   * never reliably did.
+   * A tooltip rather than either obvious alternative: a `title=` attribute is
+   * invisible on every touch device, and an always-on paragraph under the switch
+   * costs a permanent line of page height to say something needed once.
+   * `role="tooltip"` with a real `aria-describedby` is what makes it reach a
+   * screen reader, which `title=` never reliably does.
    *
    * `aria-describedby` is set on the element rather than passed as a prop
    * because `Tabs` has no way to express one yet. React does not manage this
@@ -81,7 +78,7 @@ export function TableChrome({
    *
    * Hover and focus alone are a pointer-only affordance, and this row is on
    * screen at 1024px and up, which includes every tablet in landscape. There, a
-   * tap fires `focusin` *and* commits the change in the same gesture, so the
+   * tap fires `focusin` and commits the change in the same gesture, so the
    * blurb could only ever be read after switching to the mode it describes,
    * which is the same "invisible on touch" failure that got `title=` removed
    * from this codebase in the first place. Showing the new mode's own blurb on
@@ -120,7 +117,7 @@ export function TableChrome({
           onChange={choose}
           /* First word only. Four modes share 17.5rem in a bar that also
              carries the wordmark, four nav links and the account control, and a
-             truncated "Fair Pl…" reads worse than a short label with the full
+             truncated "Fair Pl..." reads worse than a short label with the full
              name one hover away. */
           options={TABLE_MODES.map((m) => ({
             value: m.id,
@@ -175,7 +172,7 @@ export function TableChrome({
        * Moving this row into the app bar dropped `TopBar`'s "Change table"
        * link, and at 1024px and up that left no labelled route to seat count,
        * stack depth or the opponent roster at all: only the wordmark, whose
-       * accessible name is "Probability Poker — home". Rather than put the
+       * accessible name is "Probability Poker - home". Rather than put the
        * button back, which is the opposite of what this round is for, the rail
        * that already states the table becomes the link that changes it.
        */}

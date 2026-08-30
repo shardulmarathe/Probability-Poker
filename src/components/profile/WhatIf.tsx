@@ -3,7 +3,7 @@
  *
  * A counterfactual holds the cards fixed and changes one decision. A lineup
  * replay holds the cards fixed and changes the opposition. In both, everything
- * that happens after the change is the bots' answer *now*, not a record of
+ * that happens after the change is the bots' answer now, not a record of
  * anything, and in the counterfactual's case not even the opponents' real
  * strategy, since they were answering a different question at the time.
  *
@@ -64,8 +64,8 @@ export function SimulatedBanner({
           Simulated
         </span>
         <span className="font-mono text-[0.62rem] uppercase tracking-wider" style={{ color: SIM }}>
-          {/* Zero is a real and common answer — a fold that ends the hand
-              leaves nothing to re-derive — and "0 moves re-derived" reads as a
+          {/* Zero is a real and common answer - a fold that ends the hand
+              leaves nothing to re-derive - and "0 moves re-derived" reads as a
               failure rather than as that fact. */}
           {rederived === 0
             ? "nothing to re-derive"
@@ -133,7 +133,7 @@ export function CounterfactualPanel({
   if (indexes.length === 0) {
     return (
       <EmptyState title="No decisions to change">
-        {seatName(seat)} never acted in this hand — there is nothing to replace.
+        {seatName(seat)} never acted in this hand. There is nothing to replace.
       </EmptyState>
     );
   }
@@ -229,7 +229,7 @@ export function CounterfactualPanel({
                 answer, so the usual "one way it could have gone" caveat would
                 be understating it. */}
             {result.rederived === 0
-              ? "That ended the hand where it stood, so nothing after it had to come from the bots — this outcome is exact."
+              ? "That ended the hand where it stood, so nothing after it had to come from the bots. This outcome is exact."
               : `The ${result.rederived} move${result.rederived === 1 ? "" : "s"} after it came from the bots just now, not from the record. This is one way the hand could have gone, not the way it would have gone.`}
           </SimulatedBanner>
 
@@ -334,7 +334,7 @@ export function LineupPanel({
     <div data-testid="lineup">
       <p className="text-[0.8rem] leading-relaxed text-ivory/65">
         The same deal against different opponents. The seed fixes the deck, so
-        every seat is dealt exactly the cards it held — what changes is who is
+        every seat is dealt exactly the cards it held. What changes is who is
         holding them. This is how you tell a pot lost to the deck from a pot lost
         to the table.
       </p>
@@ -387,7 +387,7 @@ export function LineupPanel({
       {result && (
         <div className="mt-5 space-y-3" data-testid="lineup-result">
           <SimulatedBanner rederived={result.rederived}>
-            Not one move here was replayed — the recorded actions were answers to
+            Not one move here was replayed: the recorded actions were answers to
             a different table, so{" "}
             {result.rederived === 0
               ? "the hand ended before anyone had a decision to make"

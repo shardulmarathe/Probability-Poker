@@ -14,7 +14,7 @@
  * modelling another bot still gets the data-free prior, because nothing has been
  * observed about that bot, the observations here belong to the human.
  *
- * OFF THE DECISION PATH. A decision only ever *reads* a model, at the same
+ * OFF THE DECISION PATH. A decision only ever reads a model, at the same
  * O(levels) cost it has always paid; nothing here is called while a seat is
  * thinking. Recording happens once, when a hand is already over, and the
  * localStorage write is deferred and coalesced (`scheduleSave`) so even that
@@ -64,7 +64,7 @@ export const MEMORY_VERSION = 1;
  * The root of the backoff, pinned.
  *
  * `decider.OPPONENT_MODEL` is built on `"poker"`, and a model is only comparable
- * to, or mergeable with, one built on the same prior: the prior *is* what the
+ * to, or mergeable with, one built on the same prior: the prior is what the
  * counts are corrections to. A stored model on a different root is an estimate
  * of a different quantity, so it is discarded rather than adopted.
  */
@@ -138,7 +138,7 @@ export function memoryStats(memory: OpponentMemory): MemoryStats {
  * A flop bet has to be recorded against the flop, not against the river the hand
  * eventually ran out to. This is the same slicing `decider.streetBuckets` does
  * when it reads the model back, and it has to be, or a decision would be
- * *counted* under its river bucket and *looked up* under its flop bucket, a
+ * counted under its river bucket and looked up under its flop bucket, a
  * silent mismatch that no test of either side alone would catch. That is why
  * `BOARD_CARDS_AT` is imported rather than restated.
  *
@@ -179,7 +179,7 @@ const ACTION_SET: ReadonlySet<string> = new Set<string>(ACTIONS);
  * That is not a wasted hand. Those levels are the shrinkage target for every
  * bucket-conditioned one, so folds still move every bucket, together, which
  * compresses the likelihood ratio rather than sharpening it. Learning that a
- * player raises constantly without ever seeing what they raise *with* should
+ * player raises constantly without ever seeing what they raise with should
  * make a raise mean less, and it does.
  *
  * The condition is `final !== null`, which the engine sets exactly when the seat
@@ -291,7 +291,7 @@ export function recordReports(
  * `seat` is the human's. A null seat is observer mode, nobody at the table is
  * the person this memory is about, and every seat falls back to the prior.
  *
- * An empty memory is not merely *close* to the default, it is the default:
+ * An empty memory is not merely close to the default, it is the default:
  * `betaMean(0, 0, m)` is exactly `m`, so a model with no cells cannot move a
  * single lookup at any level of the backoff. `decider.test.ts` asserts that a
  * whole session plays out bit-identically through one.

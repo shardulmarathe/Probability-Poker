@@ -49,7 +49,7 @@ export const LINE = {
  *
  * Four, and the count is the point. These five names were already here and
  * thirty-five call sites went round them anyway, hand-writing
- * `rgba(0,0,0,0.2)`, `0.25`, `0.28`, `0.35`, `0.4`, `0.45` and `0.5` — seven
+ * `rgba(0,0,0,0.2)`, `0.25`, `0.28`, `0.35`, `0.4`, `0.45` and `0.5` - seven
  * shades of the same black for what are only ever three or four depths. Nobody
  * can name that difference when they see it, which is exactly why it reads as
  * clutter: every box looks like a slightly different kind of box, so the eye

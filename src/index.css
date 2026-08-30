@@ -404,7 +404,7 @@ body {
   --pp-felt-edge: #06140d;
 
   /* The padded rail: dark vinyl over a hardwood lip. Thick enough to read as
-     an armrest at 1280 and still visible as one at 390 — it is the edge, more
+     an armrest at 1280 and still visible as one at 390 - it is the edge, more
      than anything else, that makes a table look like a table. */
   --pp-rail-t: clamp(0.7rem, 2.1vw, 1.75rem);
 
@@ -632,7 +632,7 @@ body {
       var(--pp-chip-body) 64%
     ),
     /* Six spots, not eight. At the size a chip is actually drawn here, 12 to
-       16 pixels — eight arcs on the rim fall below a pixel each and read as
+       16 pixels - eight arcs on the rim fall below a pixel each and read as
        noise rather than as moulding. */
       repeating-conic-gradient(
         from 12deg,

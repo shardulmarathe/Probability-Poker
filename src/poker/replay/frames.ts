@@ -7,7 +7,7 @@
  * reader cares about, taken after each action, so a UI can move back and forth
  * without re-running anything.
  *
- * Frames are taken *after* `applyAction` returns rather than around it, so a
+ * Frames are taken after `applyAction` returns rather than around it, so a
  * frame includes whatever the engine did in response, the street advancing,
  * the board landing, the pot being settled. Frame 0 is the deal: hole cards
  * out, blinds posted, nobody voluntarily acted yet.

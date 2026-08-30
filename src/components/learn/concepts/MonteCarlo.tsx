@@ -1,11 +1,11 @@
 /**
  * Concept 1: Monte Carlo.
  *
- * Every number here is drawn when this module mounts, which is now the moment
- * the reader selects it rather than the moment `/learn` loads. That is the
- * whole reason the page was split: four convergence runs, a 540-cell likelihood
- * prior, a six-thousand-trial multiway sample and a river solve all used to be
- * kicked off by one navigation.
+ * Every number here is drawn when this module mounts, which is the moment the
+ * reader selects the concept rather than the moment `/learn` loads. That is why
+ * `LearnPage` mounts one concept at a time: four convergence runs, a 540-cell
+ * likelihood prior, a six-thousand-trial multiway sample and a river solve would
+ * otherwise all be triggered by a single navigation.
  */
 
 import { useMemo, useState } from "react";
@@ -66,7 +66,7 @@ export function MonteCarloConcept() {
         Two hands and five community cards leave more runouts than anyone wants
         to walk: preflop there are 1,712,304 boards. So the engine does not walk
         them. It deals the remaining cards at random, plays the hand out, records
-        who won, and repeats — and the fraction of wins converges on the
+        who won, and repeats. The fraction of wins converges on the
         probability of winning. That is the entire idea. What makes it a
         measurement rather than a guess is the second half: every estimate comes
         with an interval, and the interval shrinks in a way you can predict.
@@ -120,7 +120,7 @@ export function MonteCarloConcept() {
                   {(r.se * 100).toFixed(2)}
                 </td>
                 <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                  {pct(r.ci.lo, 1)} – {pct(r.ci.hi, 1)}
+                  {pct(r.ci.lo, 1)} - {pct(r.ci.hi, 1)}
                 </td>
                 <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/50">
                   {((r.ci.hi - r.ci.lo) * 100).toFixed(2)}
@@ -149,8 +149,8 @@ export function MonteCarloConcept() {
       </Calc>
 
       <Note label="Watch the estimate, not just the interval">
-        Press "draw a fresh sample" a few times. The estimate moves — that is
-        sampling error being sampling error — and it moves less in the bottom row
+        Press "draw a fresh sample" a few times. The estimate moves. That is
+        sampling error being sampling error, and it moves less in the bottom row
         than in the top one. It stays inside its interval about nineteen times out
         of twenty, which is what "95%" means and is the only promise a Monte Carlo
         ever makes.
@@ -164,7 +164,7 @@ export function MonteCarloConcept() {
           and a poker equity spends a lot of its life at the edges: by the river
           the hand is decided, p̂ is exactly 0 or 1, and the standard error
           collapses to zero. The Wald interval then claims perfect certainty from
-          a finite sample, and can report bounds outside 0–1 on the way there.
+          a finite sample, and can report bounds outside 0-1 on the way there.
         </Lead>
         <Heading>What Wilson does instead</Heading>
         <Calc>
@@ -180,8 +180,8 @@ export function MonteCarloConcept() {
         <Lead>
           The z²/2n pulls the centre off the observed proportion and toward a
           half, by an amount that shrinks as n grows. At zero observed wins the
-          interval still has width — it says "we saw none in n tries", not "it
-          cannot happen" — and it never leaves 0–1.
+          interval still has width. It says "we saw none in n tries", not "it
+          cannot happen", and it never leaves 0-1.
         </Lead>
         <Why>
           Sample size is not a footnote on an estimate; it is part of it. Two

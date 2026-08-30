@@ -13,14 +13,12 @@
  * loss alone; hindsight sits beside it, dimmer and dashed, labelled as the
  * results-oriented number it is.
  *
- * Half of what is in here now opens rather than shouts. The page used to print
- * two totals, a paragraph about the totals, a curve, a per-street table and ten
- * priced leaks in one column, and the leak that actually cost the most was
- * indistinguishable from the ninth one down. Three leaks are shown; everything
- * else is a `Reveal` whose closed row still carries its own number, because a
- * folded section that says nothing forces the reader to open it to find out
- * whether it was worth opening. Every one of those numbers comes off the
- * `session` the page has already computed, so nothing is priced late.
+ * Three leaks are shown and everything else sits behind a `Reveal`, so the
+ * costliest leak is not competing for attention with the ninth one down. Each
+ * closed row still carries its own number, because a folded section that says
+ * nothing forces the reader to open it to find out whether it was worth
+ * opening. Every one of those numbers comes off the `session` the page has
+ * already computed, so nothing is priced late.
  */
 
 import { useMemo } from "react";
@@ -124,7 +122,7 @@ export function LeakTotals({ session }: { session: SessionEvLoss }) {
         <p className="text-[0.8rem] leading-relaxed text-ivory/65">
           These two are different questions about the same decisions, not two
           parts of one bill. They are never added, and the leaks below are
-          ranked by the model number alone — a fold that would have won is not a
+          ranked by the model number alone: a fold that would have won is not a
           mistake.
         </p>
       </Reveal>
@@ -328,7 +326,7 @@ function LeakRow({
       <div className="mt-2.5">
         <div className="mb-1 flex items-baseline justify-between gap-2 text-[0.7rem]">
           <span className="text-ivory/60">
-            Model — best was{" "}
+            Model: best was{" "}
             <span className="font-mono text-ivory/80">{decision.modelBestAction}</span>
           </span>
           <span className="font-mono" style={{ color: MODEL_COLOR }}>
@@ -353,7 +351,7 @@ function LeakRow({
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[0.68rem]">
           <span className="text-ivory/45">
-            Hindsight — with the cards face up, {decision.hindsightBestAction} was best
+            Hindsight: with the cards face up, {decision.hindsightBestAction} was best
             {decision.hindsightExact ? "" : " (sampled runout)"}
           </span>
           <span className="font-mono" style={{ color: HINDSIGHT_COLOR }}>
@@ -399,7 +397,7 @@ export function LeakList({
     return (
       <EmptyState title="Nothing has cost you yet">
         Every decision so far came out at or above the best line the model could
-        find. Keep playing — leaks show up faster than they feel like they
+        find. Keep playing: leaks show up faster than they feel like they
         should.
       </EmptyState>
     );
@@ -456,7 +454,7 @@ export function LeakList({
         </p>
         <p className="mb-2">
           <span style={{ color: MODEL_COLOR }}>Model</span> uses the range the
-          opponents' own actions implied — public information, available while
+          opponents' own actions implied: public information, available while
           the decision was live. A negative model loss means a better line was
           visible at the time. This is the only one worth changing your play over.
         </p>

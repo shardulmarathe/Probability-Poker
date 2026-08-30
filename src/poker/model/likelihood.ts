@@ -67,7 +67,7 @@ export type LearnStreet = Exclude<Street, "showdown">;
  * This is the axis the flat table is most obviously missing. "Raise" unopened is
  * a bet; "raise" facing a bet is a raise; "raise" facing a raise is a three-bet,
  * and the three carry wildly different strength implications. Folding is only
- * even *legal* in the last two, so pooling them corrupts the fold rate as well.
+ * even legal in the last two, so pooling them corrupts the fold rate as well.
  */
 export type Facing = "unopened" | "facing-bet" | "facing-raise";
 
@@ -148,7 +148,7 @@ export interface CellCounts {
  *              it is what makes the Beta claim in TECHNICAL_WRITEUP.md §7 still
  *              literally true of this module.
  * - `legacy`, the flat 3x5 `ACTION_LIKELIHOODS` broadcast over buckets. Kept so
- *              the old model is demonstrably a *special case* of this one rather
+ *              the old model is demonstrably a special case of this one rather
  *              than something that was thrown away.
  */
 export type PriorId = "poker" | "flat" | "legacy";
@@ -203,7 +203,7 @@ export const PRIOR_STRENGTH = LEARNING_PRIOR_DENOM;
  * Prior strength for the two bucket-free levels, which pool over hand classes.
  *
  * A decision recorded without a hand class could have come from any of the
- * `BUCKET_COUNT` buckets, so as evidence about *one specific* bucket it is worth
+ * `BUCKET_COUNT` buckets, so as evidence about one specific bucket it is worth
  * roughly `1 / BUCKET_COUNT` of a decision that was attributed, the value of a
  * uniform soft assignment. Weighting it that way is the same as making its
  * prior strength `BUCKET_COUNT` times larger, which is all this constant is.
@@ -255,7 +255,7 @@ export function betaMean(
  *
  *   weight(action) = base(action, facing) * exp(role_exponent)
  *
- * where `role` is what the action *does* at that node, and the exponent scales
+ * where `role` is what the action does at that node, and the exponent scales
  * with hand strength and with how far the hand has developed.
  */
 
@@ -279,7 +279,7 @@ const ROLE: Record<PlayerActionType, "aggro" | "mid" | "give"> = {
  * rather than 0: they should be vanishingly unlikely, but a hard zero would make
  * one mislabelled observation an infinitely strong Bayes factor.
  *
- * These are the *shape* of the prior. Its fold LEVEL is set separately, one line
+ * These are the shape of the prior. Its fold LEVEL is set separately, one line
  * down, because the level is bounded by something these numbers know nothing
  * about, see `MDF_FOLD_SCALE`.
  */
@@ -308,7 +308,7 @@ const BASE_MIX: Record<Facing, ActionWeights> = {
  * correctly collected it by betting close to everything. This constant removes
  * the subsidy.
  *
- * WHAT IS ANCHORED. The bound is on the *range-weighted* fold frequency, the
+ * WHAT IS ANCHORED. The bound is on the range-weighted fold frequency, the
  * share of the hands an opponent actually holds that go in the muck, which is
  * what `foldEquityEv` integrates. Not the flat mean over the nine buckets: a
  * random range is air-heavy and air is what folds, so the range-weighted rate
@@ -373,7 +373,7 @@ const AGGRO_LIFT = 1.0;
 /** How much a strong hand suppresses checking and folding. */
 const GIVEUP_DROP = 1.0;
 /**
- * Calling is the *middle* action, not a weak one, it peaks at medium strength
+ * Calling is the middle action, not a weak one, it peaks at medium strength
  * and falls off at both ends (nothing to call with, or too good to just call).
  * A quadratic in the strength tilt is the cheapest shape with that property.
  */
@@ -485,7 +485,7 @@ export function priorRow(
   } else if (prior === "legacy") {
     // Deliberately unnormalised: the legacy table is five independent
     // per-hand Bernoullis, not a categorical, and its rows sum to ~1.75. That
-    // is harmless here because Bayes normalises over *hypotheses*, not over
+    // is harmless here because Bayes normalises over hypotheses, not over
     // actions, scaling a likelihood column leaves the posterior untouched.
     const tier = tierFromBucket(b as HandBucket);
     row = {} as ActionWeights;
@@ -537,7 +537,7 @@ function clampBucket(bucket: Bucket): Bucket {
  *
  * NO DOUBLE COUNTING. The naive version of this chain feeds the same
  * observation into all six levels, so 30 hands at one context move the estimate
- * as if there had been 180. Instead each level uses its *exclusive* evidence -
+ * as if there had been 180. Instead each level uses its exclusive evidence -
  * the observations it saw that the finer levels did not, via inclusion and
  * exclusion over the six cells (`LEVEL_COEFFS`). The coefficient columns sum to
  * (1,0,0,0,0,0), so summing the exclusive totals across levels returns exactly
@@ -704,7 +704,7 @@ export interface LikelihoodExplanation {
  *
  * This module's output is shown to the player as a claim about themselves, so
  * the claim has to be auditable: "you raise 71% of the time here" should be
- * traceable to how many of those observations were actually at *here* versus
+ * traceable to how many of those observations were actually at here versus
  * borrowed from a coarser slice.
  */
 export function explainLikelihood(

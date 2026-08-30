@@ -2,13 +2,12 @@
  * The one copy of "what table am I sitting at", shared by the hero and the
  * setup panel.
  *
- * It used to live inside `TableSetupPanel` alone, which was fine while the
- * panel owned the only button that could start a hand. It does not any more:
- * the landing page now has a single `Deal me in`, up in the hero, above the
- * summary of the table it will deal. With the state hidden inside the panel
- * that button could not read the setup, so ticking "sit out and watch" left the
- * hero cheerfully promising to deal you cards it was never going to deal. One
- * hook, two readers, no way for the label to disagree with the table.
+ * Two components start a hand: the setup panel, and the single `Deal me in` in
+ * the landing hero above the summary of the table it will deal. Keeping the
+ * state inside `TableSetupPanel` would leave the hero unable to read the setup,
+ * so ticking "sit out and watch" would produce a hero promising to deal cards it
+ * was never going to deal. One hook, two readers, no way for the label to
+ * disagree with the table.
  *
  * Every mutation persists immediately rather than on some later "save", because
  * the hero's link is a plain `<Link to="/table">`: it does not run through this

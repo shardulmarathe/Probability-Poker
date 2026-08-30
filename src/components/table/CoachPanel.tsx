@@ -11,7 +11,7 @@
  * Closed, this is one line and one verdict, because a player reads a
  * conclusion and skims a table of four. Everything the four `Stat`s ever said
  * is still here, one click away, and on a wide screen that click opens a panel
- * *over* the felt rather than under it. In-flow growth here is how Fold and
+ * over the felt rather than under it. In-flow growth here is how Fold and
  * Call ended up 240px below the fold.
  *
  * None of it reaches the engine. The equity shown here is a second, independent
@@ -114,7 +114,7 @@ export function CoachPanel({
     return (
       <Shell tight>
         <span className="font-mono text-xs text-ivory/45">
-          Estimating equity…
+          Estimating equity...
         </span>
       </Shell>
     );
@@ -273,7 +273,7 @@ function Details({
           <>
             <Stat
               label="Pot odds"
-              value={read.odds ? `${read.odds.toFixed(1)} : 1` : "—"}
+              value={read.odds ? `${read.odds.toFixed(1)} : 1` : "-"}
               tone="gold"
               note="pot : call"
             />
@@ -351,7 +351,7 @@ export function DrillLine({
         onClick={onDismiss}
         className="shrink-0 font-mono text-[0.7rem] leading-none text-ivory/40 transition-colors hover:text-ivory/75"
       >
-        ✕
+        ×
       </button>
     </div>
   );

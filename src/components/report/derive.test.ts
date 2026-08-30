@@ -4,7 +4,7 @@
  * The module has one job that can fail silently: it turns a factual record into
  * the numbers a player will read as facts. A wrong equity here does not throw,
  * does not look wrong, and is exactly as authoritative on the page as a right
- * one, so the assertions below are mostly about *identity*: that a number is
+ * one, so the assertions below are mostly about identity: that a number is
  * the quantity its label claims, and not some other number that happens to sit
  * in the same range.
  *
@@ -188,7 +188,7 @@ function tableState(spec: {
  * The reviewed case: seat 0 is a human holding 7-2 offsuit that has raised
  * twice, so seat 1's read on it is strong; seat 1 holds kings and records its
  * own equity against that read. A human records no decision of its own, so this
- * bot's entry is the *only* thing in the record naming the matchup.
+ * bot's entry is the only thing in the record naming the matchup.
  */
 function humanVsKings(heroHole: number[], botEquityVsHero: number) {
   return report({
@@ -473,7 +473,7 @@ describe("rangeView", () => {
       worst = Math.max(worst, Math.abs(view.range[c] - engine[c]));
     }
     expect(worst).toBeLessThan(1e-15);
-    // …and not vacuously: the range is a real distribution with structure in it.
+    // ...and not vacuously: the range is a real distribution with structure in it.
     expect(view.range.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 12);
     expect(Math.max(...view.range)).toBeGreaterThan(2 / view.liveCombos);
   });

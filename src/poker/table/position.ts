@@ -7,7 +7,7 @@
  * rather than stored, which keeps rotation to a single `button++`.
  *
  * Heads-up is the case that is usually gotten wrong, and it is special twice
- * over: the button posts the *small* blind (not the big), and it acts first
+ * over: the button posts the small blind (not the big), and it acts first
  * preflop but last on every later street. Three-handed and up, the blinds sit
  * immediately left of the button and the small blind leads postflop.
  */
@@ -53,7 +53,7 @@ export function positionOf(seat: number, button: number, n: number): PositionNam
 }
 
 /**
- * Who posts the blinds. Heads-up the button *is* the small blind; otherwise the
+ * Who posts the blinds. Heads-up the button is the small blind; otherwise the
  * blinds are the next two seats clockwise.
  */
 export function blindSeats(button: number, n: number): { sb: number; bb: number } {

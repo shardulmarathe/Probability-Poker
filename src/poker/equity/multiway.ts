@@ -4,7 +4,7 @@
  * The heads-up sampler in `../monteCarlo.ts` answers "do I beat him?". This one
  * answers "do I beat all of them?", and the two questions come apart fast: the
  * hero must be strictly best to win outright, so the field's chance of holding
- * *something* compounds with every extra seat. A hand that is 65% against each
+ * something compounds with every extra seat. A hand that is 65% against each
  * opponent taken alone can be a clear underdog to three of them together, which
  * is the single biggest way multiway play differs from heads-up and the reason
  * this module exists rather than a loop over pairwise calls.
@@ -23,7 +23,7 @@
  * WHAT A SEAT'S HAND IS DRAWN FROM. A `Range`, one weight for each of the 1326
  * hole-card combinations, and not the three-tier `BeliefDistribution` this
  * module sampled from originally. That version bucketed the pool with
- * `bayesian.tierOf`, a *preflop* Chen score, and drew uniformly inside the
+ * `bayesian.tierOf`, a preflop Chen score, and drew uniformly inside the
  * chosen tier. On K-7-2-9-4 that calls 7-2 weak when it is two pair, and on
  * 5-6-7-8-9 it calls aces strong when they are playing the board; every equity
  * number the bot acted on was built on that classifier. A range fixes it at the
@@ -136,7 +136,7 @@ export function remainingPool(heroHole: number[], board: number[]): Uint8Array {
 }
 
 /**
- * A three-tier belief spread over combos, by *board-relative* bucket.
+ * A three-tier belief spread over combos, by board-relative bucket.
  *
  * The adapter for callers that still speak `BeliefDistribution`. Two things
  * make it more than a type conversion:
@@ -144,7 +144,7 @@ export function remainingPool(heroHole: number[], board: number[]): Uint8Array {
  *  - `buckets` comes from `model/buckets.ts`, so "strong" means two pair on
  *    this board rather than a good preflop score. That alone is most of the
  *    defect this migration exists to remove, and it reaches every caller.
- *  - Each tier's *total* weight is set to `belief[tier]` and split evenly
+ *  - Each tier's total weight is set to `belief[tier]` and split evenly
  *    inside it, rather than writing `belief[tier]` into every combo. The weak
  *    tier holds several times the combos the strong one does, so the naive form
  *    turns a 0.40 / 0.35 / 0.25 read into an effective 0.70 / 0.24 / 0.06, an
@@ -324,7 +324,7 @@ export function runMultiwayCountsFromCodes(
 
   // Swap journal. Undoing this sim's swaps in reverse restores the identity
   // permutation in ≤ 2N+5 steps instead of rewriting all L slots, and restores
-  // it *exactly*, which the one-opponent equivalence depends on. Each seat
+  // it exactly, which the one-opponent equivalence depends on. Each seat
   // performs exactly two swaps and each board card one, so the size is tight.
   const jA = new Uint8Array(2 * N + needed);
   const jB = new Uint8Array(2 * N + needed);
@@ -427,7 +427,7 @@ export function runMultiwayCountsFromCodes(
       fixedHeroScore >= 0 ? fixedHeroScore : scoreInts(heroHand, handSize);
 
     // One pass gives both answers: the hero beats the field iff it beats the
-    // best opponent, and each comparison made along the way *is* the heads-up
+    // best opponent, and each comparison made along the way is the heads-up
     // result against that seat. This is why `perOpponent` is free.
     let bestOpp = -1;
     let tiedWithHero = 0;

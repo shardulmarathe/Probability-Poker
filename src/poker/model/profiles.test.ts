@@ -132,13 +132,19 @@ describe("roster", () => {
       const p = BOT_PROFILES[id];
       expect(p.id).toBe(id);
       expect(p.name.length).toBeGreaterThan(0);
-      expect(p.avatar.length).toBeGreaterThan(0);
+      expect(p.short.length).toBeGreaterThan(0);
+      expect(p.monogram.length).toBeGreaterThan(0);
       expect(p.blurb.length).toBeGreaterThan(0);
     }
     const names = BOT_ARCHETYPES.map((id) => BOT_PROFILES[id].name);
-    const avatars = BOT_ARCHETYPES.map((id) => BOT_PROFILES[id].avatar);
+    const shorts = BOT_ARCHETYPES.map((id) => BOT_PROFILES[id].short);
+    const monograms = BOT_ARCHETYPES.map((id) => BOT_PROFILES[id].monogram);
     expect(new Set(names).size).toBe(BOT_ARCHETYPES.length);
-    expect(new Set(avatars).size).toBe(BOT_ARCHETYPES.length);
+    // `short` and `monogram` are both used as standalone labels, so a
+    // collision would make two seats indistinguishable in the setup summary
+    // or on the felt rather than merely look untidy.
+    expect(new Set(shorts).size).toBe(BOT_ARCHETYPES.length);
+    expect(new Set(monograms).size).toBe(BOT_ARCHETYPES.length);
   });
 
   it("keeps every parameter inside its meaningful range", () => {
@@ -242,7 +248,7 @@ describe("profile coherence", () => {
 
   it("separates the bluff rates of the passive and aggressive seats", () => {
     // A profile that bluffed often while dividing down its bet EVs would not
-    // describe any real player. Note this is deliberately *not* a claim that
+    // describe any real player. Note this is deliberately not a claim that
     // bluffRate is monotone in aggression across the whole roster: it is not,
     // and cannot be, because the professor sits at aggression 1 with bluffRate
     // 0, a pure maximiser bluffs when the EV says to and never as a style.
@@ -322,7 +328,7 @@ describe("professor is the neutral baseline", () => {
     }
   });
 
-  it("leaves EVs untouched — the tilt is exactly the identity", () => {
+  it("leaves EVs untouched: the tilt is exactly the identity", () => {
     const choice = chooseAction(
       base("professor", {
         evByAction: { Fold: 0, "Call $10": -4, "Raise to $30": -1 },
@@ -345,7 +351,7 @@ describe("tiltEv", () => {
 
   it("makes aggression monotone across zero", () => {
     // The naive `ev * aggression` inverts below zero: a maniac would become the
-    // *least* willing to fire a losing bluff. Check both signs.
+    // least willing to fire a losing bluff. Check both signs.
     for (const ev of [-12, -1, 3, 25]) {
       expect(tiltEv(ev, 2.2)).toBeGreaterThan(tiltEv(ev, 1));
       expect(tiltEv(ev, 1)).toBeGreaterThan(tiltEv(ev, 0.55));
@@ -513,7 +519,7 @@ describe("bluffing", () => {
     expect(costFor("rock")).toBe(50); // prefers 1/2
     expect(costFor("tag")).toBe(75); // 0.66 rounds to the 3/4 rung
     expect(costFor("lag")).toBe(75); // prefers 3/4
-    expect(costFor("maniac")).toBe(100); // prefers pot — but not the all-in rung
+    expect(costFor("maniac")).toBe(100); // prefers pot, but not the all-in rung
   });
 
   it("keeps the resized bet legal and internally consistent", () => {

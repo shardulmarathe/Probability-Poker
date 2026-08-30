@@ -1,7 +1,7 @@
 /**
  * Recovering the session seed a recorded hand was dealt from.
  *
- * A `TableHandReport` stores the *hand* seed, `handSeed(sessionSeed, n)`, but
+ * A `TableHandReport` stores the hand seed, `handSeed(sessionSeed, n)`, but
  * `engine.deal` derives that value itself, from the table's session seed and
  * hand number. So to make the real engine deal a recorded hand, the session
  * seed has to be run backwards out of the recorded one.
@@ -80,7 +80,7 @@ export function unmix32(y: number): number {
 /**
  * A session seed `s` with `handSeed(s, handNumber) === handSeedValue`.
  *
- * Not *the* session seed the hand was originally dealt from, `hashSeed` is
+ * Not the session seed the hand was originally dealt from, `hashSeed` is
  * two-to-one in neither direction but the pair `(seed, handNumber)` is free, so
  * this fixes the hand number and solves for the seed. It deals the same cards,
  * which is the entire requirement, and it makes the replay reproducible from

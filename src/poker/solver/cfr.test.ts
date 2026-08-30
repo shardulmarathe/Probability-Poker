@@ -411,7 +411,7 @@ describe("river subgame solve", () => {
     );
     expect(solved.hands[0].count).toBe(1081);
 
-    // The substantive claim is that the widest river still *solves*, and that
+    // The substantive claim is that the widest river still solves, and that
     // is deterministic: exploitability is a pure function of the strategy.
     expect(mbb).toBeLessThan(60);
 

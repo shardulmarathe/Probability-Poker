@@ -2,7 +2,7 @@
  * The table a player configures before sitting down.
  *
  * Kept separate from the engine's `TableConfig` (blinds) because these are
- * *choices* rather than rules: how many seats, how deep, who to play against,
+ * choices rather than rules: how many seats, how deep, who to play against,
  * and how much the interface is allowed to tell you. It persists to
  * localStorage so a reload drops you back at the same table rather than a
  * default one.
@@ -27,7 +27,7 @@ import { MAX_SEATS, MIN_SEATS } from "../poker/table/position";
  * sideways preference. Drill is the one that says nothing until you are wrong:
  * the equity behind it is computed either way, it is simply not printed unless
  * the action you took cost you more than `DRILL_THRESHOLD_BB` big blinds
- * against the model. That distinction is the whole mode — a trainer that
+ * against the model. That distinction is the whole mode - a trainer that
  * narrates every hand teaches you to read the narration, not the spot.
  *
  * Drill judges folds, checks and calls only, and the blurb says so rather than
@@ -42,7 +42,7 @@ export const TABLE_MODES: { id: TableMode; name: string; blurb: string }[] = [
   {
     id: "fair",
     name: "Fair Play",
-    blurb: "Nothing revealed. Just poker — can you beat the math?",
+    blurb: "Nothing revealed. Just poker, can you beat the math?",
   },
   {
     id: "drill",

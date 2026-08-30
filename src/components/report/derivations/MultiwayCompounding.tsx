@@ -83,8 +83,8 @@ function Multiway({
       <Lead>
         Winning means being strictly best, which is a conjunction: beat this one{" "}
         <em>and</em> that one <em>and</em> the next. If the matchups were
-        independent the field equity would be their product —{" "}
-        <span className="font-mono text-gold-soft">{pct(product)}</span> here — and
+        independent the field equity would be their product,{" "}
+        <span className="font-mono text-gold-soft">{pct(product)}</span> here, and
         they are not independent, because every opponent draws from the same deck
         and the same board. So the true figure sits between that product and the
         smallest pairwise number ({pct(weakest.value)}), which is where{" "}
@@ -110,7 +110,7 @@ function Multiway({
         </div>
         <div className="mt-2 text-ivory/60">
           this run: outright wins {e.wins.toLocaleString()}, chops{" "}
-          {e.ties.toLocaleString()}, losses {e.losses.toLocaleString()} — pot
+          {e.ties.toLocaleString()}, losses {e.losses.toLocaleString()}, pot
           share {pct(e.equity)} against an outright win rate of {pct(e.pWin)}.
         </div>
       </Calc>
@@ -118,12 +118,12 @@ function Multiway({
       <Lead>
         The field is not sampled one opponent at a time. Every seat's hole cards
         are proposed together from that seat's own range, and if any two seats
-        want the same card the whole tuple is thrown away and redrawn — so what
+        want the same card the whole tuple is thrown away and redrawn, so what
         survives is <span className="font-mono">Π p(hᵢ)</span> conditioned on the
         hands being disjoint, which is symmetric under relabelling the seats.
         Sampling seat by seat instead would let the first seat drawn quietly
         block the ones behind it, and the answer would depend on the order the
-        chairs happen to be numbered in — see{" "}
+        chairs happen to be numbered in. See{" "}
         <span className="font-mono">poker/equity/multiway.ts</span>.
       </Lead>
       <Why>

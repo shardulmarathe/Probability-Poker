@@ -6,7 +6,7 @@
  * seed is the same, so the deck is the same and nothing is being invented about
  * what anybody held.
  *
- * Everything *after* the substitution is invented, and that is the point this
+ * Everything after the substitution is invented, and that is the point this
  * module refuses to be quiet about. Opponents cannot be replayed past a change:
  * the moves they made were answers to a question that no longer got asked, and
  * a raise they folded to was never offered. So their responses are re-derived
@@ -134,7 +134,7 @@ const SIZE_VERB: Record<string, string> = { bet: "Bet", raise: "Raise" };
  * offers a human, plus the minimum and the jam, so the sizes on offer are ones
  * the seat was actually shown.
  *
- * The size it *chose* is then added whatever it was. No-Limit sizing is a
+ * The size it chose is then added whatever it was. No-Limit sizing is a
  * continuous range and the ladder is only the presets, so a seat that dragged
  * the slider to $63 has taken a line that no rung names, and a list of
  * alternatives that cannot show you what you did is not a list of alternatives.

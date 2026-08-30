@@ -3,7 +3,7 @@
  *
  * The only concept that never computes on mount. A river solve is hundreds of
  * milliseconds of synchronous CFR, so it runs on the button and nowhere else,
- * and `run` stays null until the reader asks — which is why selecting this tab
+ * and `run` stays null until the reader asks - which is why selecting this tab
  * is instant even though the thing it demonstrates is the most expensive
  * computation in the product.
  *
@@ -113,7 +113,7 @@ export function EquilibriumConcept() {
         much better off would I have been had I always taken this action instead?
         Actions that would have done better accumulate regret, and the next pass
         plays each action in proportion to its accumulated positive regret. The
-        <em> average</em> of all those strategies — not the last one — converges to
+        <em> average</em> of all those strategies (not the last one) converges to
         equilibrium. This one is Discounted CFR, which discounts early regret
         because the early passes were played against a worse opponent: itself, at
         the start.
@@ -134,8 +134,8 @@ export function EquilibriumConcept() {
           {run ? "Solve it again" : "Solve a river spot"}
         </RunButton>
         <span className="text-xs text-ivory/45">
-          A one-pair bluff-catching range out of position — middle pair through
-          overpair — against a range of top pair or better in position. $100 pot,
+          A one-pair bluff-catching range out of position (middle pair through
+          overpair) against a range of top pair or better in position. $100 pot,
           $200 behind, and the board below.
         </span>
       </div>
@@ -196,7 +196,7 @@ export function EquilibriumConcept() {
             </ResponsiveContainer>
           </Well>
           <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
-            Exploitability in mbb/h — thousandths of a big blind per hand — at a
+            Exploitability in mbb/h (thousandths of a big blind per hand) at a
             big blind of ${run.bigBlind}. It fell by a factor of{" "}
             {(run.points[0].mbb / Math.max(1e-9, run.points[run.points.length - 1].mbb)).toFixed(0)}{" "}
             over these {CHECKPOINTS[CHECKPOINTS.length - 1]} iterations and would
@@ -219,7 +219,7 @@ export function EquilibriumConcept() {
       <HowCalculated label="Why It Is Tested Against Toy Games">
         <Heading>Kuhn poker and push/fold charts</Heading>
         <Lead>
-          The solver's tests do not check that it plays well — "plays well" is not
+          The solver's tests do not check that it plays well: "plays well" is not
           a testable claim. They check it against Kuhn poker, a three-card game
           whose equilibrium has a known closed form, and against published Nash
           push/fold charts for short-stack heads-up play. Both are external
@@ -231,13 +231,13 @@ export function EquilibriumConcept() {
           A public tree with a few dozen nodes and a vector of hands at each is
           tractable in a browser; the whole game is not, and would need card
           abstraction and days of compute. The river is where the abstraction is
-          least lossy — there are no cards to come, so a hand is exactly its
-          showdown strength — which makes it the honest place to stop.
+          least lossy. There are no cards to come, so a hand is exactly its
+          showdown strength, which makes it the honest place to stop.
         </Lead>
         <Why>
           An equilibrium is not the best way to play any particular table: a read
           beats it against anyone exploitable, which is what the rest of this page
-          is for. It is the floor — the strategy nobody can beat — and therefore
+          is for. It is the floor (the strategy nobody can beat) and therefore
           the yardstick that says whether a clever line was clever or just lucky.
         </Why>
       </HowCalculated>

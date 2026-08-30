@@ -7,7 +7,7 @@
  * per event, and adds exactly one thing that table did not need: a seat's
  * position is now a number rather than "top" or "bottom".
  *
- * What is *not* here any more: `FeltBackground` and `Rail`. Both existed in
+ * What is not here any more: `FeltBackground` and `Rail`. Both existed in
  * `components/ui` as well, and both had drifted, the felt in texture opacity,
  * the rail into a different font, colour and radius from the one used on the
  * review page one hop away. This file keeps only what is specific to a table
@@ -127,7 +127,7 @@ export const potCentre = (felt: FeltSize): SeatPoint => ({
  * right instead of under it, and the arc dropped from a 0.02H crown to 0.12H,
  * which is where the reclaimed 38px went. The board itself moved from 0.40H to
  * 0.50H: the felt's old fault was a top-heavy ellipse over an empty lower
- * third, and the fix is to put the community cards *in* that third rather than
+ * third, and the fix is to put the community cards in that third rather than
  * to shrink anything.
  *
  * The design this round was handed asked for a 0.20H crown over a 0.34H board.
@@ -154,7 +154,7 @@ export const boardTop = (felt: FeltSize): number =>
  * equal steps and the seats take the interior points, which comes out symmetric
  * at every table size without a table of hand-tuned coordinates.
  *
- * The arc gives the *top edge* of an opponent's card, not its centre. That is
+ * The arc gives the top edge of an opponent's card, not its centre. That is
  * the whole difficulty of this layout: at four-handed one seat sits directly
  * above the board, and a seat centred on the arc grows both upward (off the
  * felt) and downward (into the community cards) as its contents change. Pinning
@@ -310,7 +310,7 @@ const BUBBLE_SKIN = {
  *
  * A bubble centred on the seat that owns it hangs half its width past that
  * seat, and the seats at the ends of the arc sit within half a bubble of the
- * screen edge, so on a phone the rightmost bot's "Running simulations…" was
+ * screen edge, so on a phone the rightmost bot's "Running simulations..." was
  * sliced off by the viewport. Edge seats anchor their bubble to the inside
  * instead of centring it.
  */
@@ -332,7 +332,7 @@ const ALIGN: Record<BubbleAlign, string> = {
 /**
  * How far a bubble sits from the chair it belongs to.
  *
- * A seat on the top arc pushes its chips *downward*, toward the pot, and says
+ * A seat on the top arc pushes its chips downward, toward the pot, and says
  * what it did in the same direction, so the bet pill and the bubble were
  * landing in the same place and printing through each other. `clearance` is
  * "there is a bet pill in this slot": the bubble steps past it rather than over
@@ -372,14 +372,13 @@ export function SpeechBubble({
 }
 
 /*
- * `ThoughtPocket` used to live here: the placement box that hung a bot's whole
- * decision transcript off its own chair. It is gone, and the reason is
- * arithmetic rather than taste. A chair on the top arc opens downward, toward
- * the pot, so the transcript, an opaque panel roughly 250px tall, landed
- * squarely on the flop, and at four-handed the chair it hung from is the one
- * directly above the board. There is no direction it could open in that clears
- * both the community cards and the neighbouring chairs; the cloth is simply
- * full. `TableGame` docks it in the bottom-left of the bed instead, below the
+ * There is no placement box here hanging a bot's decision transcript off its own
+ * chair, and the reason is arithmetic rather than taste. A chair on the top arc
+ * opens downward, toward the pot, so the transcript, an opaque panel roughly
+ * 250px tall, lands squarely on the flop, and at four-handed the chair it would
+ * hang from is the one directly above the board. No direction clears both the
+ * community cards and the neighbouring chairs; the cloth is simply full.
+ * `TableGame` docks it in the bottom-left of the bed instead, below the
  * board and beside the hero, and names the seat inside the panel so the
  * narration is still attached to a player.
  */

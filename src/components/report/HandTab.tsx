@@ -8,12 +8,12 @@
  *
  * ## Why there are derivations on a factual tab
  *
- * Four of them, all collapsed. They used to be a fifteen-screen Math tab, which
- * meant a reader who wondered what the `±` on an equity bar was doing there had
- * to leave the bar, find the tab, and scroll past nine unrelated sections to
- * reach the answer. Each one now hangs off the figure that raises it, shut
- * until asked: the ± and the field-versus-pairwise gap on the head-to-head
- * panel, the runout distribution under the "Final hand" column.
+ * Four of them, all collapsed, each hanging off the figure that raises it: the
+ * `±` and the field-versus-pairwise gap on the head-to-head panel, the runout
+ * distribution under the "Final hand" column. Collecting them into a tab of
+ * their own would mean a reader who wondered what the `±` was doing there had to
+ * leave the bar, find the tab, and scroll past unrelated sections to reach the
+ * answer.
  */
 
 import { useMemo } from "react";
@@ -103,7 +103,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                   has a sign, and the sign is the thing worth colouring. */}
               <Stat
                 label={isHero ? "Your result" : `${seatName(focus)} result`}
-                value={you ? (you.net >= 0 ? `+${money(you.net)}` : `−${money(-you.net)}`) : "—"}
+                value={you ? (you.net >= 0 ? `+${money(you.net)}` : `−${money(-you.net)}`) : "-"}
                 tone={resultTone(you?.net)}
               />
               <Stat label="Total pot" value={money(totalPot)} />
@@ -123,8 +123,8 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
           <Heading>The record, not a replay</Heading>
           <Lead>
             A hand is written down the moment it ends: the cards, every chip
-            movement, and the equity estimate behind each bot's move. The seed —{" "}
-            <span className="font-mono text-gold-soft">{report.seed}</span> — is
+            movement, and the equity estimate behind each bot's move. The seed,{" "}
+            <span className="font-mono text-gold-soft">{report.seed}</span>, is
             enough to deal this hand again card for card, which is what makes the
             numbers on the other tabs checkable rather than merely plausible.
           </Lead>
@@ -198,13 +198,13 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                       <CardRow cards={s.hole} size="xs" empty="not shown" />
                     </td>
                     <td className="py-2 pr-3 text-xs text-ivory/70">
-                      {s.final?.name ?? (s.status === "folded" ? "mucked" : "—")}
+                      {s.final?.name ?? (s.status === "folded" ? "mucked" : "-")}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
                       {money(s.invested)}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                      {s.won > 0 ? money(s.won) : "—"}
+                      {s.won > 0 ? money(s.won) : "-"}
                     </td>
                     <td
                       className={`py-2 pr-3 text-right font-mono text-xs ${
@@ -221,10 +221,10 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
         </Scroller>
         {/* Face-up mucked cards are the one thing on this table a poker player
             may read as a bug rather than a feature, so the answer stays on the
-            page — but it is an answer, and an answer belongs behind the
+            page - but it is an answer, and an answer belongs behind the
             question. Nobody scanning a results table has asked it yet. */}
         <Reveal tone="quiet" label="Why mucked hands are face up here">
-          Every seat's cards are shown, including the ones that mucked — a review
+          Every seat's cards are shown, including the ones that mucked. A review
           is the one place where hindsight is the point. At the table those hands
           stay face down.
         </Reveal>
@@ -266,13 +266,13 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                 <p>
                   <span className="text-ivory/45">Won by · </span>
                   <span className="text-gold-soft">
-                    {p.winners.map(seatName).join(", ") || "—"}
+                    {p.winners.map(seatName).join(", ") || "-"}
                   </span>
                 </p>
                 <p className="leading-relaxed text-ivory/55">
                   {p.cap > p.floor ? (
                     <>
-                      Cut at {money(p.cap)} a seat — the most the shortest live
+                      Cut at {money(p.cap)} a seat: the most the shortest live
                       seat in it could put up. The layer takes every chip each
                       seat committed between {money(p.floor)} and {money(p.cap)};{" "}
                       {p.contributors.length} seat
@@ -306,7 +306,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
           <Why>
             Without the layering, a short stack that got all-in for {money(20)}{" "}
             could take down a pot swollen by two deeper seats betting {money(200)}{" "}
-            at each other afterwards — chips it never had the option to match.
+            at each other afterwards, chips it never had the option to match.
           </Why>
         </HowCalculated>
       </Section>
@@ -346,7 +346,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                         <Tag tone={ACTION_TONE[a.action] ?? "neutral"}>{a.action}</Tag>
                       </span>
                       <span className="shrink-0 font-mono text-[0.68rem] text-ivory/55">
-                        {a.cost > 0 ? money(a.cost) : "—"}
+                        {a.cost > 0 ? money(a.cost) : "-"}
                         <span className="ml-2 text-ivory/35">pot {money(a.potBefore)}</span>
                       </span>
                     </div>
@@ -372,7 +372,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
           <p className="text-sm text-ivory/55">
             {report.decisions.length === 0 && report.actions.length > 0
               ? "These bars are built from the simulation records the table kept, and this hand was restored from the archive, which does not store them. The action list above is complete."
-              : "No seat ran an equity estimate this hand — the pot was uncontested before anyone had to price a decision."}
+              : "No seat ran an equity estimate this hand. The pot was uncontested before anyone had to price a decision."}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -417,13 +417,13 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
                 {e.threat && (
                   <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/55">
                     {seatName(e.threat.seat)} held the most equity against{" "}
-                    {isHero ? "you" : seatName(focus)} here —{" "}
+                    {isHero ? "you" : seatName(focus)} here,{" "}
                     <span className="font-mono text-ivory/80">
                       {pct(1 - e.threat.equity)}
                     </span>{" "}
                     head-to-head
                     {e.threat.source === "estimate"
-                      ? `, by ${isHero ? "your" : "that"} seat's own estimate — its cards are not on the record.`
+                      ? `, by ${isHero ? "your" : "that"} seat's own estimate: its cards are not on the record.`
                       : "."}
                   </p>
                 )}
@@ -440,7 +440,7 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             equity against each opponent taken <em>alone</em>. They come apart
             fast. A hand can be a 60% favourite over every seat individually and
             still be an underdog to the field, because beating all of them at
-            once is a conjunction, not an average. The “vs field” figure here is
+            once is a conjunction, not an average. The "vs field" figure here is
             the estimate the seat acted on at the time, against ranges; the bars
             below are settled after the fact from the cards everyone actually
             had, so the two are answers to different questions.
@@ -456,16 +456,16 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             driving your equity down; the rest were along for the ride.
           </Lead>
           <Why>
-            Multiway, the question that matters is never “am I ahead?” — it is
-            “who exactly am I behind?”. One seat with a live draw sets the price
+            Multiway, the question that matters is never "am I ahead?". It is
+            "who exactly am I behind?". One seat with a live draw sets the price
             of the whole pot.
           </Why>
           <Heading>These bars are the real numbers, not estimates</Heading>
           <Lead>
             At the table an equity figure is always a guess about cards you
             cannot see: a bot runs a simulation against the <em>range</em> it has
-            you on. Once the hand is over that guesswork is unnecessary — every
-            hole card is on the record — so each bar here is settled by dealing
+            you on. Once the hand is over that guesswork is unnecessary: every
+            hole card is on the record, so each bar here is settled by dealing
             the two actual hands against each other over the actual board, and
             counting. A chop splits, so a bar is pot share, not win rate.
           </Lead>
@@ -479,15 +479,15 @@ export function HandTab({ report, focus, seatName, isHero }: Props) {
             </div>
           </Calc>
           <Lead>
-            From the flop on, “runouts” means all of them — 1081 boards on the
-            flop, 44 on the turn, one on the river — so the number is exact.
+            From the flop on, "runouts" means all of them: 1081 boards on the
+            flop, 44 on the turn, one on the river, so the number is exact.
             Preflop there are 1.7 million, so it is sampled 20,000 times from the
             hand's own seed and marked{" "}
             <span className="font-mono text-gold-soft">±</span>; it is
             reproducible and accurate to about a quarter of a point.{" "}
             <span className="font-mono text-gold-soft">·est</span> would mark a
             seat whose cards the record does not hold, falling back to the
-            estimate — you should not normally see one.
+            estimate. You should not normally see one.
           </Lead>
           <Why>
             The tempting shortcut is to take the opponent's stored equity against

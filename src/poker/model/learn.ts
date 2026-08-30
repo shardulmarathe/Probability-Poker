@@ -67,7 +67,7 @@ export interface HandObservation {
  * large majority of decisions: most hands end in a fold, and a player who folds
  * 80% of their big blind is telling you a great deal about themselves.
  *
- * What a fold *does* teach:
+ * What a fold does teach:
  *   - How often this player takes this action at this node. P(fold | river,
  *     facing-raise) is fully observable and is exactly the "fold to a river
  *     raise" number every tracker in the world reports.
@@ -82,7 +82,7 @@ export interface HandObservation {
  * So an unattributed observation writes to the two bucket-free levels and stops.
  * That is not a consolation prize. Those levels are the shrinkage target for the
  * bucket-conditioned ones, so unattributed data still moves every bucket's
- * estimate, it moves them all *together*, compressing the likelihood ratio
+ * estimate, it moves them all together, compressing the likelihood ratio
  * between buckets. Which is precisely correct: learning that a player raises
  * constantly, without ever seeing what they raise with, should make a raise mean
  * less, not make it mean "strong". That single mechanism is where the bluffer
@@ -171,7 +171,7 @@ export function observeMany(model: LikelihoodModel, observations: Observation[])
  *     statistic and the one that makes the per-node row sum to 1.
  *
  * ONE BUCKET PER HAND IS AN ASSUMPTION, and it is only true while the bucket is
- * a *preflop* hand class. `buckets.ts` classes are board-relative: the same two
+ * a preflop hand class. `buckets.ts` classes are board-relative: the same two
  * cards are Air on the flop and TwoPair by the river, and the model conditions
  * on which. A caller recording a real hand off a board therefore has to bucket
  * each decision against the board as it stood on that street and pass the

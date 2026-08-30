@@ -158,7 +158,7 @@ function LearnedModel({
   return (
     <>
       <Lead>
-        Every likelihood elsewhere in this review came from a fixed prior — a model of
+        Every likelihood elsewhere in this review came from a fixed prior, a model of
         poker in general, not of the seat sitting in that chair. This panel is the
         other half: what the same machinery says once it has watched somebody
         play. Each decision {who} took is one observation, filed by the hand class
@@ -218,7 +218,7 @@ function LearnedModel({
             </table>
           </Scroller>
           <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
-            One row per decision, not per hand — each decision was taken at its
+            One row per decision, not per hand, each decision was taken at its
             own node with its own class, so a hand that was air on the flop and a
             monster on the river contributes to both rows. These are the counts
             that make P(action | class) estimable at all; the {session.unattributed}{" "}
@@ -246,7 +246,7 @@ function LearnedModel({
       {learned && untouched && node && (
         <>
           <Heading>
-            P(action | tier) at this seat's last node —{" "}
+            P(action | tier) at this seat's last node,{" "}
             {STREET_LABEL[node.street as Street] ?? node.street}, {node.position},{" "}
             {node.facing.replace("-", " ")}
           </Heading>
@@ -309,7 +309,7 @@ function LearnedModel({
           <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
             Gold means this session's play has moved the estimate off the prior;
             the grey figure beside it is where the prior had it. Each column is
-            the average over the buckets in that tier — three of the nine rungs
+            the average over the buckets in that tier, three of the nine rungs
             each, uniformly, because weighting them would need a range this module
             deliberately does not depend on.
           </p>
@@ -318,8 +318,8 @@ function LearnedModel({
 
       <Heading>The update, in one line</Heading>
       <Lead>
-        Raw frequencies swing wildly on small samples — one raise out of one hand
-        is not a 100% raiser — so every probability is a posterior mean with a
+        Raw frequencies swing wildly on small samples, one raise out of one hand
+        is not a 100% raiser, so every probability is a posterior mean with a
         Dirichlet prior behind it.{" "}
         <span className="font-mono">model/likelihood.ts</span> writes it as:
       </Lead>
@@ -348,7 +348,7 @@ function LearnedModel({
           No data returns the prior mean; total → ∞ returns the empirical
           frequency. The only generalisation is that the prior mean is now
           supplied by a coarser estimate instead of being pinned at{" "}
-          {num(LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM, 2)} — which is what
+          {num(LEARNING_PRIOR_ALPHA / LEARNING_PRIOR_DENOM, 2)}, which is what
           turns one Beta update into a hierarchy.
         </div>
       </Calc>
@@ -356,7 +356,7 @@ function LearnedModel({
       {walk && node && bucket !== null && (
         <>
           <Heading>
-            The hierarchy, walked — P({node.action} | {bucketName(bucket)}) here
+            The hierarchy, walked: P({node.action} | {bucketName(bucket)}) here
           </Heading>
           <Lead>
             Nine hand classes × {STREETS.length} streets × {POSITIONS.length}{" "}
@@ -365,7 +365,7 @@ function LearnedModel({
             few hundred decisions. Most cells are empty forever, so the lookup
             starts at the prior and walks coarse to fine, each level using only
             the evidence the finer ones did not see. A level with no data is the
-            identity — it hands its parent's estimate straight through, which is
+            identity, it hands its parent's estimate straight through, which is
             what decides whether the model is useful after fifty hands or only
             after five thousand.
           </Lead>
@@ -386,8 +386,8 @@ function LearnedModel({
                   <td className="py-2 pr-3 font-mono text-[0.65rem] text-ivory/40">
                     generated, no data
                   </td>
-                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">—</td>
-                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">—</td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">-</td>
+                  <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/40">-</td>
                   <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/75">
                     {pct(walk.prior, 1)}
                   </td>
@@ -426,7 +426,7 @@ function LearnedModel({
             finest level that saw it, by inclusion and exclusion over the six
             cells. Summing that column returns the total number of decisions
             recorded. The two coarsest levels pool over hand classes, so their
-            evidence is discounted — prior strength {POOLED_STRENGTH} against{" "}
+            evidence is discounted, prior strength {POOLED_STRENGTH} against{" "}
             {PRIOR_STRENGTH}, i.e. {POOLED_STRENGTH / PRIOR_STRENGTH} pooled
             observations move a bucket about as far as one attributed observation
             does.
@@ -447,7 +447,7 @@ function LearnedModel({
       <Lead>
         That is not a consolation prize. The bucket-free levels are the shrinkage
         target for the bucket-conditioned ones, so unattributed data moves every
-        class's estimate <em>together</em> — which compresses the likelihood ratio
+        class's estimate <em>together</em>, which compresses the likelihood ratio
         between classes. Learning that a player raises constantly, without ever
         seeing what they raise with, should make a raise mean <em>less</em>, not
         make it mean "strong". That is where a bluffer discount comes from, and it
@@ -458,7 +458,7 @@ function LearnedModel({
         The live table does not learn. <span className="font-mono">model/decider.ts</span>{" "}
         prices every hand
         against a fresh prior model that is never written to, and nothing in the
-        app calls the accumulator — so the numbers above are what this session's
+        app calls the accumulator, so the numbers above are what this session's
         own play <em>would</em> teach, rebuilt from the archive after the fact,
         not a read any bot acted on. The machinery is real and tested; the wiring
         from the table into it is the piece that does not exist yet.
@@ -471,7 +471,7 @@ function LearnedModel({
           one table into {session.cellSpace.toLocaleString()} means each cell sees
           a few hundredths of the data, and a cell with three observations in it
           produces a confident-looking number that is mostly noise. The backoff is
-          not a refinement of the conditioning — it is the thing that makes
+          not a refinement of the conditioning. It is the thing that makes
           conditioning affordable at all.
         </Lead>
         <Heading>Why position is dropped first</Heading>

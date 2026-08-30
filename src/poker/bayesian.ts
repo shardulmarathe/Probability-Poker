@@ -23,7 +23,7 @@ export function normalize(b: BeliefDistribution): BeliefDistribution {
  * Bayesian update: posterior(tier) ∝ prior(tier) * P(action | tier).
  *
  * The likelihood table defaults to the fixed `ACTION_LIKELIHOODS`, but callers
- * pass the *learned* table (derived from observed player behavior) so the bot
+ * pass the learned table (derived from observed player behavior) so the bot
  * adapts to how this specific opponent actually plays.
  */
 export function updateBelief(

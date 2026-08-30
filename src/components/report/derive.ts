@@ -2,12 +2,12 @@
  * Everything the hand review reads out of a finished `TableHandReport`.
  *
  * The report is a factual record, cards, chips, actions, and the decisions the
- * bots actually priced. It is deliberately *not* a set of conclusions, so every
+ * bots actually priced. It is deliberately not a set of conclusions, so every
  * derived quantity on the review pages is computed here, in one place, from
  * that record alone. Nothing here invents an input: if a number cannot be
  * recovered from what the engine wrote down, the review says so.
  *
- * Two things are *recomputed* rather than read back, and both are recomputed
+ * Two things are recomputed rather than read back, and both are recomputed
  * from the record's own contents. `streetEquities` settles each head-to-head by
  * running the two seats' real hole cards out over the real board (see
  * `headsUpEquity`), post-hand every card is face up, so the honest answer is
@@ -20,7 +20,7 @@
  * facing) for every action the seat took, renormalised after each factor.
  *
  * It deliberately does NOT project the three-tier belief onto the chart through
- * `bayesian.tierOf`. That is a *preflop* Chen score, and the sampler was
+ * `bayesian.tierOf`. That is a preflop Chen score, and the sampler was
  * migrated off it precisely because on K-7-2-9-4 it calls 7-2 weak when it is
  * two pair (see `../../poker/equity/multiway.ts`, "WHAT A SEAT'S HAND IS DRAWN
  * FROM"). Drawing the superseded distribution beside the claim that it is the
@@ -100,7 +100,7 @@ function streetIndex(street: Street): number {
  * One column of the review's street-by-street narrative.
  *
  * `actionsUpTo` is the count of actions folded into the read, so a street's
- * entry is the table's read *entering* that street, which is what makes the
+ * entry is the table's read entering that street, which is what makes the
  * sequence of charts a story about narrowing rather than a set of snapshots
  * taken at arbitrary moments.
  */
@@ -155,7 +155,7 @@ const TIER_LIKELIHOODS = ACTION_LIKELIHOODS;
  * The table's read on every seat after the first `count` actions.
  *
  * Deliberately a local re-derivation of `decider.readsFromActions` rather than
- * a call to it: the review needs the read at an arbitrary *prefix* of the hand,
+ * a call to it: the review needs the read at an arbitrary prefix of the hand,
  * which that function has no way to express, and the whole point of the panel
  * is to show the intermediate states.
  */
@@ -307,7 +307,7 @@ export interface RangeView {
  * `decider.opponentRanges` for one seat, at an arbitrary prefix of the hand.
  *
  * A local re-derivation for the same reason `readsAfter` is one: the review
- * needs the range as it stood *entering* a street, and `opponentRanges` only
+ * needs the range as it stood entering a street, and `opponentRanges` only
  * knows how to fold in a whole hand from a live `TableState`. Every step is the
  * same step, in the same order, off the same model, the flat prior with the
  * dead cards removed, one `P(action | bucket, street, position, facing)` factor
@@ -459,7 +459,7 @@ export function rangeView(
   for (let i = 0; i < GRID_CELLS; i++) if (grid[i] > maxCell) maxCell = grid[i];
 
   // One classification pass, read twice: the nine-rung ladder the engine works
-  // in, and the three-tier collapse the meters speak. Both are the *same*
+  // in, and the three-tier collapse the meters speak. Both are the same
   // board-relative judgement at two resolutions, which is why they can no
   // longer disagree the way a preflop band and a postflop bucket did.
   const classes = classifyAll(makeBoardContext(Uint8Array.from(board)));
@@ -474,7 +474,7 @@ export function rangeView(
     tierWeight[tier === "weak" ? 0 : tier === "medium" ? 1 : 2] += w;
   }
 
-  // Rank cells by weight *per combo*, the density the sampler actually sees -
+  // Rank cells by weight per combo, the density the sampler actually sees -
   // and walk down until half the mass is covered.
   const order: number[] = [];
   for (let i = 0; i < GRID_CELLS; i++) if (cellCombos[i] > 0) order.push(i);
@@ -711,9 +711,9 @@ export interface StreetEquity {
 /**
  * Per-street equity from the reviewing seat's point of view.
  *
- * The decisions decide *who* appears, a matchup is on the panel iff one of the
+ * The decisions decide who appears, a matchup is on the panel iff one of the
  * two seats priced a decision naming the other, which is exactly "we were both
- * still in the pot here". They do not decide the *number*. A bot's recorded
+ * still in the pot here". They do not decide the number. A bot's recorded
  * `perOpponent[x]` is its own cards against a hand sampled from its read on x,
  * so it is only ever the equity of the seat that recorded it; inverting it to
  * fill in the other chair produces a figure the reviewing seat's real cards
@@ -775,7 +775,7 @@ export function streetEquities(
       } else if (estimated.has(seat)) {
         // No cards on record for the opponent, a hand that ended before this
         // seat was ever dealt in should not happen, but the reviewing seat's
-        // own estimate is at least *its* equity, so fall back rather than lie.
+        // own estimate is at least its equity, so fall back rather than lie.
         vs.push({
           seat,
           equity: estimated.get(seat)!,

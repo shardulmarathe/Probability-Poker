@@ -149,7 +149,7 @@ describe("evaluate vs brute-force reference", () => {
 
     for (let n = 0; n < DEALS && failures.length < 5; n++) {
       dealt++;
-      // Partial Fisher–Yates: 5 board cards + two 2-card holdings.
+      // Partial Fisher-Yates: 5 board cards + two 2-card holdings.
       for (let i = 0; i < 9; i++) {
         const j = i + Math.floor(rand() * (52 - i));
         const t = deck[i];
@@ -187,7 +187,7 @@ describe("evaluate vs brute-force reference", () => {
   });
 });
 
-describe("evaluate — tricky paths", () => {
+describe("evaluate: tricky paths", () => {
   it("reads A-2-3-4-5 as a five-high straight, not ace-high", () => {
     const wheel = [c(14, "s"), c(2, "h"), c(3, "d"), c(4, "c"), c(5, "s"), c(13, "h")];
     const sixHigh = [c(6, "s"), c(5, "h"), c(4, "d"), c(3, "c"), c(2, "s"), c(13, "d")];
@@ -260,7 +260,7 @@ describe("evaluate — tricky paths", () => {
 });
 
 // Ported verbatim from scripts/simulate.ts §1.
-describe("evaluate — simulate.ts sanity checks", () => {
+describe("evaluate: simulate.ts sanity checks", () => {
   it("classifies a royal flush as a straight flush", () => {
     const royal = evaluate([
       c(14, "s"), c(13, "s"), c(12, "s"), c(11, "s"), c(10, "s"), c(2, "h"), c(3, "d"),

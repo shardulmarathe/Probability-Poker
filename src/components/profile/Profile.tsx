@@ -1,46 +1,29 @@
 /**
  * The player profile.
  *
- * Everything on this page is derived from the hand archive and nothing else -
+ * Everything on this page is derived from the hand archive and nothing else:
  * `computeStats` for the tracker line, `classifyStats` for the style read,
- * `analyzeHands` for the leaks. No number here is stored; storing a derived
- * figure is how a profile ends up disagreeing with the hands it was computed
- * from.
+ * `analyzeHands` for the leaks. No number here is stored, because storing a
+ * derived figure is how a profile ends up disagreeing with the hands it was
+ * computed from.
  *
- * The EV analysis is the one expensive thing (a pair of Monte Carlo runs per
- * decision), so it happens off the first paint and over a bounded window of
- * recent hands. The page renders its cheap half immediately and fills the rest
- * in, rather than blocking on a second of arithmetic.
+ * The EV analysis is the one expensive step, a pair of Monte Carlo runs per
+ * decision, so it runs after the first paint and over a bounded window of
+ * recent hands (`EV_WINDOW`). The page renders its cheap half immediately and
+ * fills the rest in rather than blocking on a second of arithmetic.
  *
- * Presentation note: this page used to put every one of those numbers in its
- * own rounded box inside another rounded box, six panels, each a grid of six
- * bordered tiles. The boxes were doing no work, so they are gone. Sections are
- * a heading, a hairline and content; metrics are grouped by whitespace. The
- * only remaining surfaces are the ones where the container is genuinely the
- * object: the style verdict, and the empty state.
+ * The page answers its own question first and offers the detail second.
+ * Immediately visible: the session headline, the tracker line, the style
+ * verdict with its confidence caveat, the two EV totals, and the top three
+ * leaks. Behind a `Reveal`: the positional table, the cumulative curve, the
+ * per-street split, and leaks four onward. Every closed `Reveal` states its own
+ * headline number in its `summary`, because a folded section that says nothing
+ * forces the reader to open it to find out whether it was worth opening.
  *
- * That argument had a second half it had not got to. Removing the boxes made
- * the page cheaper to look at without making it shorter: six sections, all
- * expanded, came to 3,473px, and a reader asking the only question this page
- * exists to answer, "how am I doing, and what should I fix", had to scroll
- * past a six-row positional table, a cumulative curve and a per-street
- * breakdown to reach the ranked leaks that are the answer. Boxes were never
- * the clutter; simultaneity was.
- *
- * So the page now paints its answer and offers the rest. Open: the session
- * headline, the tracker line, the style verdict with its confidence caveat,
- * the two EV totals and the top three leaks. Behind a `Reveal`: the positional
- * table, the curve, the per-street split and leaks four onward, each with a
- * `summary` that states its own headline number while closed, because a folded
- * section that says nothing makes the reader open it to discover it was not
- * worth opening.
- *
- * Nothing about the arithmetic moved. Every summary above is derived from
- * `stats` and `session`, which are computed exactly as before, on the same
- * schedule, over the same `EV_WINDOW`. Deferring the *computation* to the
- * moment a section opens would be the obvious next step and the wrong one: the
- * closed summaries need those numbers, so it would trade a scroll for a
- * spinner and make the summary lie until it was expanded.
+ * Those summaries are why the computation is not deferred to the moment a
+ * section opens: the closed rows need the same `stats` and `session` the open
+ * ones do, so deferring would trade a scroll for a spinner and leave the
+ * summary lying until it was expanded.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -204,7 +187,7 @@ export default function Profile() {
           title="Your profile"
           lede={
             empty
-              ? "Everything here is computed from hands you have finished — tracker stats, a style read with the confidence it deserves, and what each mistake cost."
+              ? "Everything here is computed from hands you have finished: tracker stats, a style read with the confidence it deserves, and what each mistake cost."
               : `Computed from ${hands.length} finished hand${hands.length === 1 ? "" : "s"}${
                   storedCount > 0
                     ? `, ${storedCount} of them restored from this browser's archive`
@@ -228,7 +211,7 @@ export default function Profile() {
         {/*
          * ------------------------ Whose profile ------------------------
          *
-         * `seatCount` is the widest table the *archive* holds, never the table
+         * `seatCount` is the widest table the archive holds, never the table
          * sitting now. The picker therefore lists chairs that have played, so
          * a four-handed archive read at a six-max table no longer offers Seat 5
          * and Seat 6 and then profiles them from nothing. The fix is in
@@ -326,13 +309,13 @@ export default function Profile() {
               title="What your mistakes cost"
               lede={
                 hands.length > EV_WINDOW
-                  ? `Priced over your most recent ${EV_WINDOW} hands — each decision costs two simulations, so the window is bounded.`
+                  ? `Priced over your most recent ${EV_WINDOW} hands. Each decision costs two simulations, so the window is bounded.`
                   : `Priced over all ${priced.length} recorded hand${priced.length === 1 ? "" : "s"}.`
               }
             >
               {pricing && !session ? (
                 <p className="py-6 text-sm text-ivory/50" data-testid="pricing">
-                  Pricing {priced.length} hand{priced.length === 1 ? "" : "s"}…
+                  Pricing {priced.length} hand{priced.length === 1 ? "" : "s"}...
                 </p>
               ) : !session ? (
                 <EmptyState
@@ -344,7 +327,7 @@ export default function Profile() {
                   }
                 >
                   This seat has not yet made a decision the model can put a
-                  number on — that needs a hand you took past the blinds.
+                  number on. That needs a hand you took past the blinds.
                 </EmptyState>
               ) : (
                 <div className="space-y-6">
@@ -397,7 +380,7 @@ export default function Profile() {
                 <LeakList session={session} onReplay={openReplay} />
               ) : (
                 <p className="py-6 text-sm text-ivory/50">
-                  {pricing ? "Pricing…" : "Nothing priced yet."}
+                  {pricing ? "Pricing..." : "Nothing priced yet."}
                 </p>
               )}
             </Group>
@@ -408,13 +391,12 @@ export default function Profile() {
         {!empty && (
           <div className="mt-14 flex flex-wrap items-center justify-between gap-3 border-t border-ivory/10 pt-5">
             {/*
-             * A promise, and now an unconditional one. This line was briefly
-             * computed from a sync state, because an account could copy hands
-             * off the device and a fixed sentence would have been a lie printed
-             * directly above the button that uploaded them. There is no account
-             * and no endpoint any more, so the original wording is exactly true
-             * again: the archive is localStorage and nothing reads it but this
-             * browser.
+             * An unconditional promise, and safe to state as one: the archive
+             * is localStorage, there is no account and no endpoint, and nothing
+             * reads it but this browser. Were a sync path ever added, this
+             * sentence would have to become a function of its state rather than
+             * a constant, or it would be false directly above the control that
+             * made it so.
              */}
             <p className="text-[0.72rem] text-ivory/40" data-testid="storage-notice">
               Stored locally in this browser. Nothing leaves the device.

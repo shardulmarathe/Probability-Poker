@@ -36,7 +36,7 @@ export function hashSeed(...parts: number[]): number {
 export function makeRng(seed: number): Rng {
   // xoshiro's state must not be all-zero, and it mixes slowly out of a
   // low-entropy start, so expand the seed through SplitMix32 rather than
-  // dropping it into the state directly. Advancing the Weyl counter *before*
+  // dropping it into the state directly. Advancing the Weyl counter before
   // mixing means seed 0 still yields four distinct, well-spread words; since
   // mix32 is injective at most one of them can be zero.
   const s = new Uint32Array(4);

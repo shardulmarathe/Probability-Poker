@@ -3,7 +3,7 @@
  *
  * Six thousand trials per opponent count, memoised on the count alone. The seed
  * is fixed so the ladder from one opponent to five is a comparison rather than
- * five unrelated samples — change the seed and the reader would be watching
+ * five unrelated samples - change the seed and the reader would be watching
  * sampling noise instead of the compounding this concept is about.
  */
 
@@ -39,7 +39,7 @@ export function MultiwayConcept() {
         against three of them. It has to beat this one <em>and</em> that one{" "}
         <em>and</em> the next, and the field's chance of holding <em>something</em>{" "}
         compounds with every extra seat. Below is A♥K♥ on Q♥7♦2♣ against a growing
-        field of flat ranges — the same estimator the table runs, six thousand
+        field of flat ranges, the same estimator the table runs, six thousand
         trials, computed here:
       </Lead>
 
@@ -62,7 +62,7 @@ export function MultiwayConcept() {
           value={
             Object.values(result.perOpponent).length > 0
               ? pct(Math.min(...Object.values(result.perOpponent)))
-              : "—"
+              : "-"
           }
           note="head-to-head"
         />
@@ -72,7 +72,7 @@ export function MultiwayConcept() {
         P(beat all) ≤ min&#8202;ᵢ P(beat i)
         <div className="mt-2 text-ivory/60">
           and the estimator measures the left side directly rather than assuming
-          the matchups are independent — they are not, because every opponent
+          the matchups are independent. They are not, because every opponent
           draws from the same deck and runs out on the same board.
         </div>
       </Calc>
@@ -80,7 +80,7 @@ export function MultiwayConcept() {
       <Lead>
         The second consequence is that "how often do I win" stops being the number
         that matters. A k-way chop is worth 1/k of the pot, so the value of a
-        holding is its pot share — wins plus a fraction for every split — and
+        holding is its pot share (wins plus a fraction for every split) and
         heads-up those two coincide closely enough that people forget they are
         different quantities.
       </Lead>

@@ -103,7 +103,7 @@ export default function AppShell() {
           <NavLink
             to="/"
             data-testid="brand"
-            aria-label="Probability Poker — home"
+            aria-label="Probability Poker home"
             className="flex shrink-0 items-center gap-1.5 font-display text-base font-semibold tracking-tight text-ivory transition hover:text-gold-soft sm:text-[0.95rem] sm:tracking-wide"
           >
             <span aria-hidden className="text-gold">
@@ -166,7 +166,7 @@ export default function AppShell() {
            *
            * A slot rather than a prop because this component cannot read the
            * table. `AppShell` is the layout route and `TableProvider` mounts
-           * *inside* its `<Outlet />` (see App.tsx), so `useTable()` here would
+           * inside its `<Outlet />` (see App.tsx), so `useTable()` here would
            * throw on `/` and `/learn`. The table portals into this node
            * instead, which keeps the provider exactly where it is and leaves
            * the node empty on every route that has nothing to hang.

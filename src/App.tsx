@@ -29,7 +29,7 @@ export default function App() {
          */}
         <Route element={<AppShell />}>
           <Route path="/" element={<Home />} />
-          {/* The concepts page needs no table — it works its examples with
+          {/* The concepts page needs no table - it works its examples with
               live engine calls of its own, so it sits outside the provider. */}
           <Route path="/learn" element={<LearnPage />} />
           {/*

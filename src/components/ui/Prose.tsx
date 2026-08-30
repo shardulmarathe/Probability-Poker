@@ -111,14 +111,12 @@ export function Why({
 /**
  * Anything the reader can open, closed until they do.
  *
- * The shape this product kept getting wrong. It learned, correctly, that a
- * `title=` attribute is invisible on every touch device, and then generalised
- * that into "print the explanation on the screen permanently". Counted across
- * the app that came to 78 always-on prose slots: a hint under every control, a
- * subtitle under every heading, a lede under every title, and thirty-one boxes
- * explaining things nobody had asked about yet. Text nobody asked for is not
- * more visible than text behind a control, it is less: it is the noise the eye
- * learns to skip, and it pushes the thing you came for below the fold.
+ * A `title=` attribute is invisible on every touch device, but the answer to
+ * that is not to print every explanation on the screen permanently: a hint
+ * under every control, a subtitle under every heading and a lede under every
+ * title add up to prose the eye learns to skip, and they push the thing the
+ * reader came for below the fold. Text nobody asked for is less visible than
+ * text behind a control, not more.
  *
  * So: a summary you can read at a glance, and one control that reveals the
  * rest. `defaultOpen` exists for the handful of places where the body IS the
@@ -169,8 +167,8 @@ export function Reveal({
          * The summary is the whole point of a closed row: it is the number you
          * came for, and a closed section that says nothing is worse than an
          * open one. At 390px a single truncating line clipped them mid-figure
-         * ("−$13816 model · −$25416 hind…"), which is the one outcome worse
-         * than either — a number cut in half reads as a broken number rather
+         * ("−$13816 model · −$25416 hind..."), which is the one outcome worse
+         * than either - a number cut in half reads as a broken number rather
          * than an abbreviated one.
          */}
         <span className="flex min-w-0 flex-col items-start gap-x-2.5 gap-y-0.5 sm:flex-row sm:items-baseline">

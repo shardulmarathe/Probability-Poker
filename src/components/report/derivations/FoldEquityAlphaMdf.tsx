@@ -4,7 +4,7 @@
  * Lifted out of `MathTab`'s "Fold Equity, α and MDF" section unchanged. It sits
  * against the per-move EV columns on the Play tab, which already print α and
  * MDF for every bet: those two numbers are exact arithmetic and need no
- * apology, but what a bet is actually *worth* needs the equity against the
+ * apology, but what a bet is actually worth needs the equity against the
  * hands that do not fold, and that is what this derivation supplies.
  */
 
@@ -49,7 +49,7 @@ export function FoldEquityAlphaMdf({ report, focus, seatName }: DerivationProps)
             ) ? (
             <EmptyPanel title="The seats that bet were not priced by the engine">
               A fold-equity breakdown is recorded by the decider, so it exists
-              for the seats the engine plays and not for a human one — which
+              for the seats the engine plays and not for a human one, which
               runs no Monte Carlo and leaves no estimate of how often a bet got
               through. The threshold every one of those bets had to clear is
               arithmetic, though, and it is below.
@@ -58,7 +58,7 @@ export function FoldEquityAlphaMdf({ report, focus, seatName }: DerivationProps)
             <EmptyPanel title="Nothing was bet">
               Fold equity is the value of a bet nobody calls, so it is priced
               only for bets and raises. Every seat this hand checked, called or
-              folded — actions that have no fold-equity term — so there is
+              folded (actions that have no fold-equity term) so there is
               none to show.
             </EmptyPanel>
           )}
@@ -161,7 +161,7 @@ function AlphaLadder({
         </div>
         <div className="mt-2 text-ivory/60">
           s is the increment risked beyond any call and Pot is the pot once that
-          call is in — the frame <span className="font-mono">model/decider.ts</span>{" "}
+          call is in, the frame <span className="font-mono">model/decider.ts</span>{" "}
           sizes bets in. A pure bluff
           breaks even at α; below that it is losing money, above it, it prints.
         </div>
@@ -203,7 +203,7 @@ function FoldEquityWorked({
       <Lead>
         A bet wins two different ways and the showdown formula only counts one of
         them. Every other derivation here prices a call: chips in, pot share
-        out. A bet also wins whenever nobody calls it at all — and that branch is
+        out. A bet also wins whenever nobody calls it at all, and that branch is
         the whole reason a hand with no showdown value can be worth betting.
       </Lead>
 
@@ -211,14 +211,14 @@ function FoldEquityWorked({
       <Calc>
         EV(bet s) = P(fold) · Pot + (1 − P(fold)) · [ E_continue · (Pot + 2s) − s ]
         <div className="mt-2 text-ivory/60">
-          The bracket is the same arithmetic a call gets — E·(Pot + s) − (1 − E)·s
-          — with E_continue substituted for the win rate. That identity is why
+          The bracket is the same arithmetic a call gets, E·(Pot + s) − (1 − E)·s,
+          with E_continue substituted for the win rate. That identity is why
           this extends the old formula rather than competing with it.
         </div>
       </Calc>
 
       <Heading>
-        {seatName(d.seat)}, {STREET_LABEL[d.street].toLowerCase()} — every size the
+        {seatName(d.seat)}, {STREET_LABEL[d.street].toLowerCase()}, every size the
         engine priced
       </Heading>
       <Scroller>
@@ -261,13 +261,13 @@ function FoldEquityWorked({
                     {pct(b.pFold, 1)}
                   </td>
                   <td className="py-2 pr-3 text-right font-mono text-xs text-gold-soft">
-                    {size !== null ? pct(size / (pot + size), 1) : "—"}
+                    {size !== null ? pct(size / (pot + size), 1) : "-"}
                   </td>
                   <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                    {size !== null ? pct(pot / (pot + size), 1) : "—"}
+                    {size !== null ? pct(pot / (pot + size), 1) : "-"}
                   </td>
                   <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                    {b.simulations > 0 ? pct(b.eContinue, 1) : "—"}
+                    {b.simulations > 0 ? pct(b.eContinue, 1) : "-"}
                   </td>
                   <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/50">
                     {b.callers.toFixed(2)}
@@ -297,13 +297,13 @@ function FoldEquityWorked({
         MDF are exact arithmetic on the pot of {pot}
         {opening
           ? ""
-          : " — left blank here because this seat was facing a bet, so the label carries a total rather than the increment α is defined on"}
+          : ", left blank here because this seat was facing a bet, so the label carries a total rather than the increment α is defined on"}
         .
       </p>
 
       <Heading>Where α comes from</Heading>
       <Lead>
-        Set E_continue to zero — a pure bluff, no equity at all — and the formula
+        Set E_continue to zero (a pure bluff, no equity at all) and the formula
         collapses to <span className="font-mono">P(fold)·Pot − (1 − P(fold))·s</span>,
         which is zero exactly at:
       </Lead>
@@ -318,14 +318,14 @@ function FoldEquityWorked({
         <div className="mt-1">
           {ladder.map((rung) => (
             <div key={rung.fraction}>
-              {rung.fraction === 2 ? "twice pot" : `${rung.fraction * 100}% pot`} — bet{" "}
+              {rung.fraction === 2 ? "twice pot" : `${rung.fraction * 100}% pot`}: bet{" "}
               {rung.size.toFixed(1)}: α = {pct(rung.alpha, 1)}, MDF ={" "}
               {pct(rung.mdf, 1)}
             </div>
           ))}
         </div>
         <div className="mt-2 text-ivory/60">
-          These are the published numbers — 33.3, 42.9, 50, 66.7 — and they are a
+          These are the published numbers (33.3, 42.9, 50, 66.7) and they are a
           closed-form result from the literature rather than a property of this
           code, which is exactly why{" "}
           <span className="font-mono">ev.test.ts</span> pins all four against the
@@ -361,7 +361,7 @@ function FoldEquityWorked({
               {pct(Math.abs(eRange - chosen.eContinue), 1)}
             </span>{" "}
             here. Pricing a bet against the wrong one of them systematically
-            overvalues betting — it turns every missed draw into a "profitable"
+            overvalues betting, it turns every missed draw into a "profitable"
             bet against a range that has already folded its air, which is a worse
             failure than never bluffing at all.
           </Lead>
@@ -382,8 +382,8 @@ function FoldEquityWorked({
                 {chosen.pFoldEach.length === 1 ? "" : "s"} at once; equity against
                 the callers is measured against the{" "}
                 {chosen.callers.toFixed(2)} that stayed, on average. Two forces
-                pull on it — the folders being weak pulls it down, the field
-                getting smaller pushes it up — and with a field this size the
+                pull on it, the folders being weak pulls it down, the field
+                getting smaller pushes it up, and with a field this size the
                 second one wins.
               </>
             )}
@@ -433,7 +433,7 @@ function FoldEquityWorked({
           That form factorises an expectation of a product. Heads-up it is exact
           because the field size is the constant one; multiway both the hero's
           share and the field size are random, and they are{" "}
-          <em>negatively correlated</em> — the hero takes a smaller fraction of
+          <em>negatively correlated</em>, the hero takes a smaller fraction of
           the pot in exactly the simulations where more opponents stayed to
           contest it. By that correlation E[share]·(Pot + E[k]·s) is strictly
           greater than E[share·(Pot + k·s)] whenever k varies at all, and the gap
@@ -445,13 +445,13 @@ function FoldEquityWorked({
           So the call term is accumulated one simulation at a time, with that
           simulation's own share and its own field, and never reassembled out of
           the two marginal means. E_continue and the caller count survive only as
-          reporting — which is what they are doing in this panel.
+          reporting, which is what they are doing in this panel.
         </Lead>
         <Why>
           Two independent errors, both flattering to aggression, both removed. The
           one remaining approximation is that P(all fold) is taken to be the
           product of the per-opponent marginals, which ignores the weak coupling
-          card removal creates between their ranges — and that too runs one way,
+          card removal creates between their ranges, and that too runs one way,
           so the bot is slightly over-optimistic about bluffing into a field.
         </Why>
       </HowCalculated>

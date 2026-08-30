@@ -16,7 +16,7 @@ import vercel from "../vercel.json";
  * again.
  */
 
-/** Every `path="…"` in the router, minus the catch-all. */
+/** Every `path="..."` in the router, minus the catch-all. */
 function routerPaths(): string[] {
   return [...appSource.matchAll(/path="([^"]+)"/g)]
     .map((m) => m[1])
@@ -38,7 +38,7 @@ function match(url: string) {
 
 describe("vercel.json covers the router", () => {
   it("finds the routes it is checking", () => {
-    // Guards the regex above: if App.tsx stops using path="…" this test would
+    // Guards the regex above: if App.tsx stops using path="..." this test would
     // silently pass by checking nothing.
     const paths = routerPaths();
     expect(paths.length).toBeGreaterThanOrEqual(8);
@@ -78,7 +78,7 @@ describe("vercel.json covers the router", () => {
  * `vercel.json` is validated against a closed schema before anything is built,
  * and an unknown top-level key is a hard error, not a warning, and not
  * something any local command reports. A `"_comment"` array explaining why this
- * file uses `routes` instead of `rewrites` therefore failed *every* production
+ * file uses `routes` instead of `rewrites` therefore failed every production
  * deploy for a day while `npm run build`, `tsc` and CI all stayed green,
  * because none of them read this file. The explanation lives in the comment
  * above instead, where it costs nothing.

@@ -81,7 +81,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
- * Sims a *heads-up* decision runs, per street. Later streets get fewer because
+ * Sims a heads-up decision runs, per street. Later streets get fewer because
  * fewer cards are unknown, so each sample carries more information.
  */
 export const TABLE_DECISION_SIMS: Record<Exclude<Street, "showdown">, number> = {
@@ -101,7 +101,7 @@ export const MIN_DECISION_SIMS = 5000;
 /**
  * A multiway sim scores one hand per opponent where a heads-up sim scores one,
  * so the cost of a fixed sample count grows with the field. Dividing by the
- * opponent count holds the *work* per decision roughly constant instead of the
+ * opponent count holds the work per decision roughly constant instead of the
  * sample count, a six-handed pot must not cost five times a heads-up one on
  * the live gameplay path.
  */
@@ -134,7 +134,7 @@ export function handActions(state: TableState): ActionRecord[] {
  *
  * Each seat starts on the same prior and is moved by `updateBelief` for each
  * action it took, a raise shifts weight to `strong`, a check to `weak`. This
- * is deliberately *public* information only: no seat's hole cards are consulted,
+ * is deliberately public information only: no seat's hole cards are consulted,
  * so a bot's read on you is exactly what you could work out yourself, and the
  * Study mode that displays these is showing the bots' actual information set
  * rather than a privileged one.
@@ -184,12 +184,12 @@ export function opponentsOf(state: TableState, seat: number): number[] {
  * Would a call by `seat` close the action, is the pot it is priced against
  * already the final one?
  *
- * The test is that no opponent still owes chips. That is *not* the same as
+ * The test is that no opponent still owes chips. That is not the same as
  * `state.bettingClosed` one action early, and the difference is deliberate: a
  * big blind holding its option has matched the bet but not acted, so it can
  * still raise. A raise behind does not grow the pot the hero's call was priced
  * into, it hands the hero a fresh decision at a fresh price, which is priced on
- * its own when it arrives. Only chips that arrive *without* another hero
+ * its own when it arrives. Only chips that arrive without another hero
  * decision in between can make the price a forecast rather than a quotation, and
  * those are exactly the chips a seat still owes.
  *
@@ -241,7 +241,7 @@ export const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
 /**
  * Which model describes each seat.
  *
- * A learned model is a claim about *one player*. `opponentMemory` accumulates
+ * A learned model is a claim about one player. `opponentMemory` accumulates
  * one for the human seat, and pointing it at every seat would be a category
  * error: it would tell a bot that the seat across the table folds to river bets
  * 71% of the time on the evidence of somebody else's folds. So the model is a
@@ -250,7 +250,7 @@ export const OPPONENT_MODEL: LikelihoodModel = createLikelihoodModel("poker");
  *
  * Three consequences the tests pin. The engine's own tests get a fresh prior and
  * stay deterministic; a bot modelling another bot is untouched; and an empty
- * learned model is *bit-identical* to the default, because `betaMean(0, 0, m)`
+ * learned model is bit-identical to the default, because `betaMean(0, 0, m)`
  * is exactly `m` at every level of the backoff, so a model with no cells cannot
  * move a single lookup.
  */
@@ -276,7 +276,7 @@ export function modelForSeat(seat: number, model: LikelihoodModel): SeatModels {
 /**
  * How much of the board a decision on each street could see.
  *
- * Exported because anything that *writes* the likelihood model has to bucket a
+ * Exported because anything that writes the likelihood model has to bucket a
  * decision against the same board prefix this reads it back with, or the counts
  * are filed under one hand class and looked up under another. See
  * `lib/opponentMemory.handObservations`.
@@ -378,11 +378,11 @@ function actionByBucket(
  *   1. Start from a flat prior. Before anybody acts, every combo the deck still
  *      allows is equally likely, that is what "dealt at random" means. The
  *      familiar 0.40 / 0.35 / 0.25 tilt toward strength is not a prior at all,
- *      it is the *posterior* after a seat has chosen to play, and deriving it
+ *      it is the posterior after a seat has chosen to play, and deriving it
  *      rather than assuming it is what lets a limp and a three-bet disagree.
  *   2. Multiply each combo by `P(action | bucket(combo), street, position,
  *      facing)` for every action the seat took, with `bucket` measured against
- *      the board *as it stood on that street*. This is where `buckets.ts` pays
+ *      the board as it stood on that street. This is where `buckets.ts` pays
  *      off: on K-7-2 the combo 7-2 is two pair and gets the weight a bet
  *      deserves, where a preflop Chen score would have filed it under trash and
  *      folded it out of the continuing range.
@@ -470,7 +470,7 @@ export function uncontestedEquity(): MultiwayEquity {
  *
  * The substitution in the middle is the whole point of this function, and it is
  * the single easiest thing to get wrong in the move from heads-up to multiway:
- * EV is driven by the *share of the pot* a holding expects to collect, and that
+ * EV is driven by the share of the pot a holding expects to collect, and that
  * is `equity`, not `pWin`. Heads-up the two are within a tie's width of each
  * other, a chop is worth exactly half, and ties are rare, which is why
  * `actionEv` could take `pWin` and be right. Four-handed, a hand that chops a
@@ -860,7 +860,7 @@ export function priceCall(
     // so it neither folds to the call nor adds to the pot. It stays in the
     // field because it is still in the hand.
     if (owes === 0) return { range, foldByCombo: NO_FOLD, owes: 0 };
-    // Every seat behind is priced at the price *it* is being offered, what it
+    // Every seat behind is priced at the price it is being offered, what it
     // owes against the pot it would be calling into. Not one shared fraction:
     // the small blind is getting a materially better price than a seat that has
     // yet to put in a chip, and folding it out at the same rate would be pricing
@@ -907,13 +907,13 @@ const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
 
 /**
  * Turn an equity estimate into a move. Split out of the two entry points below
- * so the synchronous and asynchronous paths differ in *nothing* but how the
+ * so the synchronous and asynchronous paths differ in nothing but how the
  * Monte Carlo was scheduled.
  *
  * Three prices are formed here, not one, and the point of the third is that all
  * of them are measured against the same pot.
  *
- *   - Checks, folds and *closing* calls: `actionEv`. It assumes the hand goes to
+ *   - Checks, folds and closing calls: `actionEv`. It assumes the hand goes to
  *     showdown for the pot as it stands, which is exactly right when nobody left
  *     can add a chip.
  *   - Bets and raises: `foldEquityEv`, once per candidate size. This is the

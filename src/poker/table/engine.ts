@@ -48,7 +48,7 @@ import {
 /**
  * A table is a `TableState` plus the handful of things the lifecycle needs that
  * one hand's state does not carry: the blinds, the rebuy level, and the records
- * accumulated while a hand plays. It *extends* `TableState` rather than
+ * accumulated while a hand plays. It extends `TableState` rather than
  * wrapping it, so every primitive, and every bot, which is handed a
  * `TableState`, keeps working on it unchanged.
  */
@@ -186,7 +186,7 @@ export function startHand(table: Table): Table {
   table.lastReport = null;
   table.status = "playing";
   table.log = [
-    `Hand #${table.handNumber} — ${table.seats[table.button].name} on the button.`,
+    `Hand #${table.handNumber}: ${table.seats[table.button].name} on the button.`,
   ];
 
   deal(table);
@@ -281,7 +281,7 @@ export function applyAction(
     return;
   }
   const next = nextToAct(table, seat);
-  // Unreachable: an open round means some *other* active seat still owes an
+  // Unreachable: an open round means some other active seat still owes an
   // action, and `nextToAct` scans every seat but this one. Saying so beats
   // parking a null in `toAct`, where it would surface as a frozen table.
   if (next === null) throw new Error("betting is open but no seat can act");

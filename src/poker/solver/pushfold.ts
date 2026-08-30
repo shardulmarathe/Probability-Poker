@@ -21,7 +21,7 @@
  *  - Preflop all-in equity is estimated, not enumerated. An exact 169x169
  *    matrix means C(48,5) = 1.7M runouts for each of ~14k class matchups; that
  *    is off by many orders of magnitude from anything that can run in a test.
- *    Instead every matchup is scored on the *same* sampled boards (common
+ *    Instead every matchup is scored on the same sampled boards (common
  *    random numbers), which is what makes the differences between neighbouring
  *    hands, the only thing a push/fold threshold depends on, far more
  *    accurate than the absolute equities. `equityStandardError` reports the
@@ -83,7 +83,7 @@ export function classSize(cls: number): number {
  * no card in common, the exact card-removal weight between two chart cells.
  *
  * Counted in closed form rather than by a 1326x1326 scan: the only combo of Y
- * holding *both* of a given combo's cards is that combo itself, so inclusion-
+ * holding both of a given combo's cards is that combo itself, so inclusion-
  * exclusion over the two per-card counts is exact.
  */
 export const classCompatibility: Float64Array = (() => {
@@ -150,7 +150,7 @@ const equityCache = new Map<string, EquityMatrix>();
  * class's combos that the board leaves alive, and then every pair of
  * representatives is scored.
  *
- * Dealing the board *first* and the hands second is not the same experiment as
+ * Dealing the board first and the hands second is not the same experiment as
  * dealing the hands first, and the difference is not small. A board with a king
  * on it leaves KK only three combos instead of six, so under uniform board
  * sampling every surviving KK combo stands in for half as many real deals as it
@@ -160,7 +160,7 @@ const equityCache = new Map<string, EquityMatrix>();
  * restores a uniform distribution over (hand, hand, board) triples.
  *
  * All 14k matchups share the board, which is deliberate: absolute equities move
- * together under a lucky board, so their *differences*, which is what decides
+ * together under a lucky board, so their differences, which is what decides
  * whether A5o shoves at 15bb, carry far less error than the per-matchup
  * standard error suggests.
  */

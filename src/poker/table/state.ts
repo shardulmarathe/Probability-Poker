@@ -2,7 +2,7 @@
  * Seat-indexed table state for an N-handed game.
  *
  * This replaces the heads-up `GameState`, where every quantity was a
- * `Record<"player" | "bot", …>` and "the other player" was a function call.
+ * `Record<"player" | "bot", ...>` and "the other player" was a function call.
  * With three or more seats those assumptions all break: there is no single
  * opponent, a street ends when action returns to the last aggressor rather than
  * when both sides have acted, and unequal stacks split the pot into layers.
@@ -38,7 +38,7 @@ export interface TableSeat {
   /**
    * Whether this seat may still raise, as opposed to only call or fold.
    *
-   * These come apart in No-Limit: an all-in for *less than a full raise* does
+   * These come apart in No-Limit: an all-in for less than a full raise does
    * not reopen the betting. Seats that already acted still owe the extra chips,
    * so they must act again, but they are not allowed to re-raise. `hasActed`
    * alone cannot express that, because it would either skip them (wrong, they
@@ -156,7 +156,7 @@ export function openingActor(state: TableState): number | null {
  * the big blind still gets its option after a round of limps: posting the blind
  * left `hasActed` false even though `streetCommit` already equals `currentBet`.
  *
- * With nobody able to act the round is trivially closed. A *single* seat able
+ * With nobody able to act the round is trivially closed. A single seat able
  * to act is NOT enough on its own: preflop, one live seat facing an unmatched
  * blind still owes a decision. It closes only once that seat has acted and
  * matched, like any other. The "everyone else is all-in, run the board out"
@@ -198,7 +198,7 @@ export function resetStreetBetting(state: TableState): void {
  *
  * `increment` is how much the bet level went up (null for a check, call, or
  * fold). A bet or raise puts everyone else back in the decision, but it only
- * *reopens* their right to raise if it was a full-sized raise. A short all-in
+ * reopens their right to raise if it was a full-sized raise. A short all-in
  * that raises by less than the last raise leaves already-acted seats owing the
  * difference with no option to re-raise, which is the standard rule.
  */

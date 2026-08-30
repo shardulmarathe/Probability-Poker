@@ -92,7 +92,7 @@ function BayesUpdate({
       <Heading>The question</Heading>
       <Lead>
         Nobody can see a seat's cards, so the table keeps a probability
-        distribution over how strong the hand is — weak, medium or strong — and
+        distribution over how strong the hand is (weak, medium or strong) and
         revises it after every public action. Priors start at the model's opening
         read:
       </Lead>
@@ -114,12 +114,12 @@ function BayesUpdate({
       </Calc>
 
       <Heading>
-        This hand — {seatName(seat)} on the {String(street).toLowerCase()}
+        This hand: {seatName(seat)} on the {String(street).toLowerCase()}
       </Heading>
       <Lead>
         {seatName(seat)} chose to{" "}
         <strong className="uppercase text-gold-soft">{label}</strong>. These are
-        the three numbers this update was multiplied by — the flat table, one row
+        the three numbers this update was multiplied by, the flat table, one row
         per action, the same on every street and in every seat:
       </Lead>
       <Calc>
@@ -180,7 +180,7 @@ function BayesUpdate({
         The distribution the sampler drew this seat's hands from was reweighted
         by a different row: the same action conditioned on the{" "}
         <em>class of hand on this board</em>, plus the street, the position and
-        what the seat was facing. Same action, same hand, nine answers —{" "}
+        what the seat was facing. Same action, same hand, nine answers,{" "}
         {applied.street}, {applied.position}, {applied.facing.replace("-", " ")}:
       </Lead>
       <Calc>
@@ -191,7 +191,7 @@ function BayesUpdate({
         ))}
         <div className="mt-2 text-ivory/60">
           spread from {num(Math.min(...applied.byBucket), 3)} to{" "}
-          {num(Math.max(...applied.byBucket), 3)} — a factor of{" "}
+          {num(Math.max(...applied.byBucket), 3)}, a factor of{" "}
           {num(
             Math.max(...applied.byBucket) / Math.max(1e-9, Math.min(...applied.byBucket)),
             2
@@ -202,7 +202,7 @@ function BayesUpdate({
       </Calc>
       <Lead>
         The report records no likelihoods, so both rows above are recomputed
-        rather than read back — but neither is a guess. The three-tier table is a
+        rather than read back, but neither is a guess. The three-tier table is a
         constant, the conditioned model is a fixed prior with no player data in
         it, and the node (street, position, facing) is fully determined by the
         action record. Re-running the lookup returns what ran at the table.

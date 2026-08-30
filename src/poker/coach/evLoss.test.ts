@@ -104,7 +104,7 @@ const FAST = { simulations: 600, hindsightRunouts: 300 };
 // ---------------------------------------------------------------------------
 
 describe("priceAction", () => {
-  it("prices folding at zero — the baseline every other line is measured against", () => {
+  it("prices folding at zero: the baseline every other line is measured against", () => {
     expect(priceAction("fold", 0, 40, 100, 0.9)).toBe(0);
     expect(priceAction("fold", 0, 40, 100, 0.1)).toBe(0);
   });
@@ -157,7 +157,7 @@ describe("model EV vs hindsight EV", () => {
       A(0, "flop", "bet", 60, 0, 30),
       A(1, "flop", "call", 90, 30, 30),
       A(1, "turn", "bet", 120, 0, 50),
-      A(0, "turn", "call", 170, 50, 50), // index 6 — the decision under test
+      A(0, "turn", "call", 170, 50, 50), // index 6, the decision under test
     ],
   });
 
@@ -187,9 +187,9 @@ describe("model EV vs hindsight EV", () => {
     expect(call.hindsightEvChosen).toBeLessThan(0);
 
     // Read the hindsight column alone and the lesson is "you should have
-    // folded"…
+    // folded"...
     expect(call.hindsightBestAction).toBe("fold");
-    // …but under the model lens folding was the single WORST line available.
+    // ...but under the model lens folding was the single WORST line available.
     const foldModelEv = call.alternatives.find((a) => a.action === "fold")!.modelEv;
     const worstModelEv = Math.min(...call.alternatives.map((a) => a.modelEv));
     expect(foldModelEv).toBe(worstModelEv);
@@ -211,7 +211,7 @@ describe("model EV vs hindsight EV", () => {
     actions: [
       A(0, "preflop", "call", 15, 5, 5),
       A(1, "preflop", "bet", 20, 0, 45),
-      A(0, "preflop", "call", 65, 45, 45), // index 2 — the decision under test
+      A(0, "preflop", "call", 65, 45, 45), // index 2, the decision under test
     ],
     seed: 4242,
   });
@@ -424,7 +424,7 @@ describe("EV loss is never positive", () => {
           if (d.action === d.hindsightBestAction) {
             expect(d.hindsightEvLoss).toBe(0);
           }
-          // …and a zero loss always means the chosen line matched the best EV.
+          // ...and a zero loss always means the chosen line matched the best EV.
           if (d.modelEvLoss === 0) {
             expect(d.modelEvChosen).toBe(d.modelEvBest);
           }

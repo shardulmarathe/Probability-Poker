@@ -10,7 +10,7 @@ type Size = "xs" | "sm" | "md" | "lg" | "xl";
 const SIZES: Record<Size, string> = {
   // Table-row size: fits inside a line of body text without setting the row
   // height, which is what lets a hand be shown as cards in the same cell that
-  // used to print `3s 5s` in mono. Fixed rather than fluid — it sits in a data
+  // used to print `3s 5s` in mono. Fixed rather than fluid - it sits in a data
   // table, and a card that changes height with the viewport reflows the row.
   xs: "h-[1.55rem] w-[1.15rem] text-[0.62rem] rounded-[0.2rem]",
   sm: "h-[clamp(2.75rem,9vw,3rem)] w-[clamp(2rem,6.7vw,2.25rem)] text-[clamp(0.75rem,2.4vw,1rem)] rounded-lg",

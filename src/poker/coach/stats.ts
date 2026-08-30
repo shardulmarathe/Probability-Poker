@@ -8,7 +8,7 @@
  * then the percentage has thrown them away. Pairs add. So a session merges into
  * a lifetime figure by integer addition, which is also exactly the shape the
  * `player_stats` table in db/migrations/001_persistence.sql stores
- * (`vpip_n`/`vpip_d`, `af_aggressive`/`af_passive`, …), see `toPlayerStatsRow`.
+ * (`vpip_n`/`vpip_d`, `af_aggressive`/`af_passive`, ...), see `toPlayerStatsRow`.
  *
  * Each stat below states its definition in full. That is not decoration: a
  * subtly wrong VPIP is worse than no VPIP, because it looks authoritative and
@@ -22,7 +22,7 @@
  *    counts toward neither VPIP nor the aggression denominators.
  *  - An all-in call is still a call. Nothing here reads the label or the size,
  *    which is what makes that true: `rules.ts` emits `{type:"call", cost:
- *    toCall}` unconditionally, only the *label* consults the stack, and
+ *    toCall}` unconditionally, only the label consults the stack, and
  *    `engine.ts` copies that straight into `ActionRecord.cost`. So the recorded
  *    cost of a short all-in call OVERSTATES the chips the seat actually put in
  *    (`commitChips` moves what the stack holds). Every counter here is a count
@@ -84,7 +84,7 @@ export interface StatCounters {
    * Fold to 3-bet%.
    * n: the seat folded.
    * d: hands where the seat made the opening raise, was 3-bet, and acted again
-   *    *still facing the 3-bet*. A cold 4-bet landing in between removes the
+   *    still facing the 3-bet. A cold 4-bet landing in between removes the
    *    opportunity rather than creating a fold: the seat is answering the
    *    4-bet, and counting that here is the standard way this stat inflates.
    * The seat's response to the 3-bet only, a 4-bet that later folds to a 5-bet
@@ -104,7 +104,7 @@ export interface StatCounters {
 
   /**
    * AFq. Aggression Frequency, (bets + raises) / (bets + raises + calls +
-   * folds), POSTFLOP. The share of postflop *decisions* that were aggressive.
+   * folds), POSTFLOP. The share of postflop decisions that were aggressive.
    * Checks are excluded here too, which is what keeps AFq comparable to AF:
    * both ask what the seat did when it had chips to commit or fold.
    * Bounded 0..1, so unlike AF it stays meaningful for a seat that never calls.
@@ -144,7 +144,7 @@ export interface StatCounters {
    * Fold to flop c-bet%.
    * n: the seat folded to it.
    * d: hands where somebody else was the preflop aggressor, bet the flop, and
-   *    the seat then had to act facing *that* bet, nothing raised in between.
+   *    the seat then had to act facing that bet, nothing raised in between.
    *    A raise of the c-bet ahead of the seat removes the opportunity: the
    *    seat's fold answers the raise, and scoring it here inflates the stat.
    */
@@ -279,7 +279,7 @@ interface PreflopScan {
 
 /**
  * One ordered pass over the preflop action, which is where every stat that
- * depends on *sequence* rather than on totals is decided.
+ * depends on sequence rather than on totals is decided.
  *
  * `raises` counts voluntary aggression only. The big blind post is the implicit
  * first bet and is not an `ActionRecord`, so `raises === 1` is precisely "an
@@ -322,7 +322,7 @@ function scanPreflop(actions: ActionRecord[], seat: number): PreflopScan {
         awaitingFoldToThreeBet = true;
       } else if (raises > 2) {
         // A cold 4-bet reached us before we got to act. Whatever we do next
-        // answers *that*, so the 3-bet never got its answer and this hand is
+        // answers that, so the 3-bet never got its answer and this hand is
         // not an observation of the stat at all, arm nothing, count nothing.
         // (Our own 4-bet cannot land here: the block above already consumed
         // the flag on our action, before this one folds it into `raises`.)

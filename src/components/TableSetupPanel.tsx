@@ -4,31 +4,26 @@
  * Everything here edits one `TableSetup` and persists it, so the choice
  * survives a reload and the game reads exactly what was chosen. The opponent
  * picker is the point of the screen: a table of five identical maniacs plays
- * nothing like a table of five nits, and being able to *see* the roster before
+ * nothing like a table of five nits, and being able to see the roster before
  * the cards come out is what makes that a lesson rather than a surprise.
  *
- * It is closed by default now. Open, this panel was 943px of form — nineteen
- * controls, nine permanent blurbs and 239 words standing between the landing
- * page and a single card. The overwhelming majority of arrivals want the table
- * they already have, and the ones who do not are not helped by being shown a
- * radiogroup they have to read before they can decline it. So the closed state
- * is a sentence stating the four things that actually change how the hand plays
- * — seats, depth, mode, and who is in the other chairs — and one control that
- * opens the editor. Nothing was removed; every control and every blurb is one
- * click away.
+ * The panel is closed by default. Most arrivals want the table they already
+ * have, and the ones who do not are not helped by being shown a radiogroup they
+ * must read before they can decline it. Closed, it is one sentence naming the
+ * four things that change how the hand plays (seats, depth, mode, and who is in
+ * the other chairs) plus one control that opens the editor. Every control and
+ * every blurb is one click away.
  *
- * The summary names the opponents rather than counting them. "Table
- * configured" would be the useless version: the difference between Wildfire Wes
- * and Nickel Nate is the difference between two games, and a player who cannot
- * see which one they are about to play has not been told anything.
+ * The summary names the opponents rather than counting them. "Table configured"
+ * would say nothing: the difference between a Hyper-Aggressive table and an
+ * Ultra-Tight one is the difference between two games, and a player who
+ * cannot see which they are about to play has not been told anything.
  *
- * Two things that used to be invisible are still on the screen, just not all at
- * once. The mode blurbs ("Nothing revealed. Just poker") and what stack depth
- * *means* both lived only in `title=` attributes or source comments, which no
- * touch device and no player has ever seen. They are now the `Tabs` hints,
- * shown on hover and on keyboard focus over the option they describe, which
- * keeps them attached to their control instead of stacking four permanent
- * italic sentences down the left column.
+ * The mode blurbs ("Nothing revealed. Just poker") and the meaning of each
+ * stack depth are `Tabs` hints, shown on hover and on keyboard focus over the
+ * option they describe. A `title=` attribute would be invisible on every touch
+ * device, and four permanent sentences down the left column would push the
+ * controls off the screen; a hint attached to its own control is neither.
  */
 
 import { useState } from "react";
@@ -80,23 +75,24 @@ const SEAT_HINTS: Record<number, string> = {
  * close to two different games.
  */
 const DEPTH_HINTS: Record<number, string> = {
-  20: "Short. Nearly every hand is settled before the flop — this is close to push-or-fold poker.",
+  20: "Short. Nearly every hand is settled before the flop. This is close to push-or-fold poker.",
   50: "Shallow. A raise and one bet commits the stack, so postflop play is short and sharp.",
   100: "Standard. The depth almost all published strategy assumes. Start here.",
   200: "Deep. Almost every decision is postflop, and an early mistake compounds down three streets.",
 };
 
 /**
- * "Textbook Tara" → "Tara".
+ * The roster's compact label, e.g. "Tight Aggressive" as "TAG".
  *
- * The epithet is the personality and the given name is what you would call
- * them at the table. Six of these have to sit on one line at 390px, and
- * "Textbook Tara, Callin' Carla, Wildfire Wes, Riverboat Rey" does not; the
- * given names do, and they are still unambiguous across the seven archetypes.
+ * Up to five of these have to sit on one line at 390px, which the full
+ * descriptors do not: "Expected Value Baseline, Calling Station,
+ * Hyper-Aggressive" is already over budget at three. `short` is a field on the
+ * profile rather than something derived from `name` here, because the obvious
+ * derivation (take the last word) maps both "Tight Passive" and "Loose
+ * Aggressive" onto their second word and loses the distinction that matters.
  */
 function shortName(id: BuiltArchetype): string {
-  const full = BOT_PROFILES[id].name;
-  return full.slice(full.lastIndexOf(" ") + 1);
+  return BOT_PROFILES[id].short;
 }
 
 /**
@@ -188,7 +184,7 @@ export default function TableSetupPanel({ table }: { table: TableSetupHandle }) 
 
               <Field
                 label="Stack depth"
-                aside={`${setup.stackBb} big blinds — ${money(stack)} at ${money(setup.smallBlind)}/${money(setup.bigBlind)}`}
+                aside={`${setup.stackBb} big blinds: ${money(stack)} at ${money(setup.smallBlind)}/${money(setup.bigBlind)}`}
               >
                 <Tabs
                   label="Stack depth in big blinds"
@@ -245,11 +241,11 @@ export default function TableSetupPanel({ table }: { table: TableSetupHandle }) 
                       table nobody had asked for; checked, it is the one thing
                       the reader needs to know about the table they now have,
                       which is the rule the rest of the app follows for a
-                      warning about *this* state. */}
+                      warning about this particular state. */}
                   {setup.observer && (
                     <span className="mt-0.5 block text-xs leading-relaxed text-ivory/55">
                       No seat for you. The bots play each other with every hand
-                      face up — the fastest way to watch a style get punished.
+                      face up: the fastest way to watch a style get punished.
                     </span>
                   )}
                 </span>
@@ -286,12 +282,12 @@ export default function TableSetupPanel({ table }: { table: TableSetupHandle }) 
                 ))}
               </div>
 
-              {/* The blurbs under each pick stay on screen — reading them IS
+              {/* The blurbs under each pick stay on screen - reading them IS
                   choosing an opponent. What does not is the paragraph above
                   them promising the numbers are real, which is a claim about
                   the engine rather than about this table. */}
               <Reveal tone="quiet" label="How literal are these descriptions?">
-                Each plays a fixed, measurable style — the percentages in their
+                Each plays a fixed, measurable style: the percentages in their
                 descriptions are the ones they actually hit.
               </Reveal>
             </div>
@@ -364,10 +360,10 @@ function BotPicker({
     <div className="min-w-0">
       <div className="flex items-center gap-2">
         <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center border text-xl ${RADIUS.control}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center border font-display text-[0.7rem] font-semibold tracking-tight ${RADIUS.control}`}
           style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
         >
-          {profile.avatar}
+          {profile.monogram}
         </span>
         <select
           data-testid={`bot-${index}`}

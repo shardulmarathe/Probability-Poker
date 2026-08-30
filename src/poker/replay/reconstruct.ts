@@ -6,7 +6,7 @@
  * feeds the recorded actions back to `applyAction` one at a time.
  *
  * The guarantee is `fidelity`. Reconstruction is only worth anything if it
- * produces the *same* hand, so the replay finishes by comparing the report the
+ * produces the same hand, so the replay finishes by comparing the report the
  * engine just built against the one it was given, board, hole cards, side-pot
  * layout, every seat's net, and each re-derived action record. Without that
  * check a replay is a plausible story about a hand rather than the hand, and it
@@ -84,7 +84,7 @@ export function recordedAction(
 }
 
 const cards = (codes: number[]): string =>
-  codes.map((c) => decodeCard(c).id).join(" ") || "—";
+  codes.map((c) => decodeCard(c).id).join(" ") || "-";
 
 const nums = (values: number[]): string => `[${values.join(", ")}]`;
 
@@ -236,7 +236,7 @@ function runPass(
 /**
  * Entry stacks tightened by what the record already pins down.
  *
- * `ActionRecord.toCall` is what the seat *owed*, clamped to what it had, so a
+ * `ActionRecord.toCall` is what the seat owed, clamped to what it had, so a
  * seat that folded facing more than its stack recorded its exact remaining
  * chips without meaning to. Adding back what it had already invested recovers
  * the stack it sat down with, and only for the seats where `entryStacks` had to

@@ -13,7 +13,7 @@
  *    thousands of nodes; the readout is revealed with `:hover` / `:focus` in
  *    CSS, so opening a cell costs a repaint and never a React render. The only
  *    state here is the zoom toggle, which belongs to the grid as a whole.
- *  - Encode magnitude in colour alone. Weight drives *lightness* across a
+ *  - Encode magnitude in colour alone. Weight drives lightness across a
  *    single hue, which survives greyscale and every common colour deficiency,
  *    and it independently drives the width of a bar along the bottom of each
  *    cell. Either channel alone is enough to rank two cells.
@@ -48,14 +48,11 @@ const RANKS = "AKQJT98765432";
 export function RangeGridStyles() {
   return (
     <style>{`
-/* The cap keeps the grid from stretching to whatever width it is handed. It
-   used to be 28rem everywhere, on the argument that a wider chart becomes
-   wallpaper, and that argument held while the chart sat in a single column
-   with prose underneath it. In the two-column layout the Ranges tab now uses
-   it did the opposite: a 470px square floating in a 1500px panel with the
-   right half empty, and a Zoom button offered to fix the problem the layout
-   had created. 44rem is 704px, ~50px cells, which is the size a hand chart is
-   printed at everywhere else in poker. */
+/* The cap keeps the grid from stretching to whatever width it is handed. 44rem
+   is 704px, about 50px cells, which is the size a hand chart is printed at
+   everywhere else in poker. A tighter cap of 28rem suits a single column with
+   prose underneath, but in the Ranges tab's two-column layout it leaves a 470px
+   square floating in a 1500px panel with the right half empty. */
 .rg-wrap { position: relative; max-width: 28rem; }
 @media (min-width: 1024px) { .rg-wrap { max-width: 44rem; } }
 .rg-scroll { overflow: visible; }

@@ -111,7 +111,7 @@ function Equilibrium({
   return (
     <>
       <Lead>
-        Every other number in this review prices a decision against a <em>read</em> —
+        Every other number in this review prices a decision against a <em>read</em>,
         what these opponents, with these tendencies, are likely holding. An
         equilibrium asks a different question: what strategy could not be beaten
         by <em>any</em> opponent, including one who knew it in advance and played
@@ -121,7 +121,7 @@ function Equilibrium({
       {state.status === "working" && (
         <div className="flex h-[6rem] items-center justify-center gap-3 text-sm text-ivory/55">
           <span className={`h-2 w-2 animate-pulse bg-gold-soft ${RADIUS.marker}`} />
-          Solving the river…
+          Solving the river...
         </div>
       )}
 
@@ -155,7 +155,7 @@ function Equilibrium({
             <Stat
               label="Exploitability"
               value={`${solved.exploitChips.toFixed(2)}`}
-              note={`chips/hand — ${pct(solved.exploitPotShare, 2)} of the pot`}
+              note={`chips/hand: ${pct(solved.exploitPotShare, 2)} of the pot`}
             />
           </StatGrid>
 
@@ -167,7 +167,7 @@ function Equilibrium({
             {seatName(focus)} held a hand ranked {solved.handRank} of{" "}
             {solved.handTotal} by showdown strength inside its own solved range,
             facing a pot of {solved.pot}. This is the mix the solved strategy
-            plays with <em>that specific holding</em> at that node — not with the
+            plays with <em>that specific holding</em> at that node, not with the
             range in aggregate:
           </Lead>
           <div className="space-y-1.5" data-testid="equilibrium-mix">
@@ -192,7 +192,7 @@ function Equilibrium({
             always did the same thing with the same hand would be readable and
             therefore beatable. "{seatName(focus)} took the{" "}
             {solved.matched ? moveLabel(solved.matched) : solved.actual.action}{" "}
-            branch" is not a verdict — it is a comparison against a distribution.
+            branch" is not a verdict. It is a comparison against a distribution.
           </p>
 
           <Note label="What this solve assumed">
@@ -200,7 +200,7 @@ function Equilibrium({
               <li>
                 <strong>Stack depth.</strong> The hand record carries no stack
                 sizes, so the subgame was solved at an effective stack of{" "}
-                {solved.stack} chips — the largest commitment the river actually
+                {solved.stack} chips, the largest commitment the river actually
                 saw, floored at one pot. Change the depth and the equilibrium
                 changes.
               </li>
@@ -219,8 +219,8 @@ function Equilibrium({
                   : " Every move replayed here landed on a rung exactly."}
               </li>
               <li>
-                <strong>Exploitability in chips.</strong> mbb/h — thousandths of a
-                big blind per hand — is the standard unit, and the record carries
+                <strong>Exploitability in chips.</strong> mbb/h, thousandths of a
+                big blind per hand, is the standard unit, and the record carries
                 no blind level, so it is quoted here in chips and as a share of
                 the pot instead.
               </li>
@@ -238,7 +238,7 @@ function Equilibrium({
           better off would I have been had I always taken this action instead? That
           quantity is regret, and the next iteration plays each action in
           proportion to its accumulated positive regret. The <em>average</em> of
-          the strategies over all iterations — not the last one — is what
+          the strategies over all iterations (not the last one) is what
           converges to equilibrium.
         </Lead>
         <Heading>Exploitability is the only honest test</Heading>
@@ -247,14 +247,14 @@ function Equilibrium({
           poker: it bets strong hands and folds weak ones, because the payoffs
           force that much. What a broken solver cannot do is drive exploitability
           down. Exploitability is how much a perfect counter-strategy beats the
-          profile for — computed here exactly, by best-responding at every node
-          rather than by running a second solver — and it is zero exactly at
+          profile for, computed here exactly, by best-responding at every node
+          rather than by running a second solver, and it is zero exactly at
           equilibrium and never negative in a two-player zero-sum game.
         </Lead>
         <Calc>
           exploitability = ½ · [ BR(player 0) + BR(player 1) ]
           <div className="mt-2 text-ivory/60">
-            reported in mbb/h — thousandths of a big blind per hand — so that a
+            reported in mbb/h (thousandths of a big blind per hand) so that a
             number from one game is comparable with a number from another. 50
             mbb/h means a perfect opponent takes 0.05 big blinds per hand off this
             strategy.
@@ -270,7 +270,7 @@ function Equilibrium({
           self-congratulation.
         </Lead>
         <Why>
-          An equilibrium is not the best way to play these opponents — a read
+          An equilibrium is not the best way to play these opponents, a read
           beats it against anybody exploitable, which is what the rest of this review
           is for. It is the floor: the strategy that cannot be beaten, so it is
           the yardstick that tells you whether a "clever" line was clever or just

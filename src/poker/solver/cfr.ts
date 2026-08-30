@@ -16,7 +16,7 @@
  * t^b/(t^b+1), and contributions to the average strategy by (t/(t+1))^g on each
  * iteration t."
  *
- * Representation: a *public* tree, the betting sequence, carried in typed
+ * Representation: a public tree, the betting sequence, carried in typed
  * arrays, with every node holding a whole vector of private hands at once. That
  * is what makes the river tractable: the public tree has a few dozen nodes, and
  * a node's work is a handful of passes over a Float64Array of hands rather than
@@ -77,7 +77,7 @@ export const VANILLA_CFR: DcfrParams = {
 
 /**
  * t^e/(t^e+1), with the two limits the presets need. Applied to the accumulated
- * value *after* iteration t's contribution is added, which is what makes the
+ * value after iteration t's contribution is added, which is what makes the
  * paper's own equivalence hold: multiplying by t'/(t'+1) for every t' in [t, T]
  * leaves iteration t weighted t/(T+1), i.e. linear.
  */
@@ -109,7 +109,7 @@ export interface PublicTree {
   /**
    * Terminal payoff, in chips, expressed for player 0. A fold terminal pays
    * this constant to player 0 (and its negation to player 1). A showdown
-   * terminal pays this much to whoever wins, so *both* players scale by +this.
+   * terminal pays this much to whoever wins, so both players scale by +this.
    */
   readonly value: Float64Array;
   /** Parallel to `children`. Diagnostics only; nothing hot reads it. */
@@ -196,7 +196,7 @@ export function flattenTree(root: TreeSpec): PublicTree {
  * so a terminal costs O(hands) rather than O(hands^2).
  *
  * Both methods overwrite `out` and are indexed from the hero's point of view:
- * `out[i]` is a sum over the *villain's* hands j that are compatible with hero
+ * `out[i]` is a sum over the villain's hands j that are compatible with hero
  * hand i (no shared cards, card removal is the interaction's job, not the
  * caller's).
  */
@@ -394,7 +394,7 @@ export function createSolver(
       }
     }
     // Eq. (1) with the DCFR discount, and Eq. (5)'s numerator with the gamma
-    // weight. Both multiply *after* the add, see `discount` for why that is
+    // weight. Both multiply after the add, see `discount` for why that is
     // what makes the paper's own equivalences hold.
     const r = regret[node];
     const acc = stratSum[node];
@@ -554,10 +554,10 @@ export function riverHands(range: Range, board: ArrayLike<number>): RiverHands {
  * Showdown and card removal for two sorted river hand vectors.
  *
  * `showdown` is two linear sweeps. Walking hero hands in strength order, the
- * villain reach that hero *beats* only ever grows, so it is a running sum; the
+ * villain reach that hero beats only ever grows, so it is a running sum; the
  * blocked part of it is the running sum restricted to villain hands holding one
  * of hero's two cards, which is 52 more accumulators. A villain hand holding
- * *both* of hero's cards is hero's own combo, which ties rather than losing, so
+ * both of hero's cards is hero's own combo, which ties rather than losing, so
  * it is never in either running sum and the two card corrections can't
  * double-count. That single observation is why this is O(n) and not O(n^2).
  */
@@ -686,7 +686,7 @@ const DEFAULT_RAISE_FRACTIONS = [1] as const;
 /**
  * The river betting tree, out-of-position player first (player 0 = OOP).
  *
- * Payoffs are net chips *shifted so the game is zero-sum*: the pot that both
+ * Payoffs are net chips shifted so the game is zero-sum: the pot that both
  * players brought into the river is dead money split evenly in the baseline, so
  * winning it is worth pot/2 rather than pot. Nothing about the strategies
  * changes, it is a constant shift, but exploitability is only meaningful as a

@@ -14,12 +14,10 @@
  *
  * ## Where the hands come from
  *
- * The archive, not the table. This page used to read `history` off
- * `TableContext`, which is component state: it dies with the tab. That was
- * survivable while `/review` was reachable only by playing a hand and clicking
- * through from the felt, and stopped being survivable the moment the shell put
- * Review in the navigation, a player with fifty archived hands could land here
- * directly, or simply reload, and be told they had never played one while
+ * The archive, not the table. Reading `history` off `TableContext` would tie
+ * this page to component state, which dies with the tab: Review is reachable
+ * from the navigation, so a player with fifty archived hands can land here
+ * directly or simply reload, and would be told they had never played one while
  * `/profile` two tabs over listed all fifty.
  *
  * So the archive is the source of truth and the session is the part of it that
@@ -77,7 +75,7 @@ type TabId = "hand" | "ranges" | "play";
  *
  * They no longer earn that line. Three tabs, labelled with the three nouns a
  * reader would have used, and each panel opens with a titled section that says
- * the same thing again — "The Board", "Opponent Ranges", "Your Hand" — under a
+ * the same thing again - "The Board", "Opponent Ranges", "Your Hand" - under a
  * page header that already reads "Hand review". A fourth statement of which tab
  * you are on is the noise the eye learns to skip, and it cost the first 44px of
  * every panel to say it.
@@ -236,10 +234,9 @@ export default function HandReview() {
          * felt, but not a row of its own: it sits in the header line beside the
          * title it returns from. Nav handles all other movement.
          *
-         * The "N hands" rail that used to sit here is gone rather than moved:
-         * the strip at the foot of the page already opens with "All 12 of your
-         * hands", so the header was printing a count the page states again 800
-         * pixels lower.
+         * No hand count in the header: the strip at the foot of the page already
+         * opens with "All 12 of your hands", so a count here would be the same
+         * figure stated twice, 800 pixels apart.
          */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <BackLink to="/table">Table</BackLink>
@@ -344,7 +341,7 @@ export default function HandReview() {
                 </ButtonLink>
               }
             >
-              Every hand you finish is opened up here — the cards, the chips, the
+              Every hand you finish is opened up here: the cards, the chips, the
               range the table had you on, and what each of your decisions was
               worth against it. Nothing has finished yet, in this session or in
               this browser's archive.
@@ -354,10 +351,9 @@ export default function HandReview() {
           <>
             {/*
              * Row two: the three tabs, and the seat everything on them is
-             * written from. The seat picker used to be a scrolling chip row on
-             * a line of its own under the label "Reviewing from", which is a
-             * whole row of a reading page spent on six mutually exclusive
-             * values. It is the same choice, folded into the tab bar.
+             * written from. The seat picker is folded into the tab bar rather
+             * than given a line of its own, which would spend a whole row of a
+             * reading page on six mutually exclusive values.
              */}
             <div className="mt-4">
               <StickyTabs>
@@ -424,7 +420,7 @@ export default function HandReview() {
             {restored && (
               <div className="mt-4">
                 <Note label="Restored from this browser's archive" testId="review-restored">
-                  Storage keeps the hand, not the bots' simulation records — so
+                  Storage keeps the hand, not the bots' simulation records, so
                   the head-to-head equity, the engine's own pricing and the
                   worked derivations are empty here. Everything rebuilt from the
                   action record is unaffected.
@@ -524,7 +520,7 @@ export default function HandReview() {
                           ? mine.net >= 0
                             ? `+${money(mine.net)}`
                             : `−${money(-mine.net)}`
-                          : "—"}
+                          : "-"}
                       </p>
                     </Link>
                   );
@@ -534,7 +530,7 @@ export default function HandReview() {
                 <p className="mt-3 text-[0.8rem] text-ivory/45">
                   {hands.length - STRIP} older hand
                   {hands.length - STRIP === 1 ? " is" : "s are"} still in the
-                  archive — step back through them with ‹, or read them all at
+                  archive: step back through them with the arrows, or read them all at
                   once on{" "}
                   <Link
                     to="/profile"

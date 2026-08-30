@@ -155,7 +155,7 @@ function viaMultiwayWorkerTransport(req: EquityRequest) {
   );
 }
 
-describe("equity pool — sharding", () => {
+describe("equity pool: sharding", () => {
   it("splits sims exactly, with a distinct seed per shard", () => {
     const shards = planShards(4001, 0xabc);
     expect(shards.reduce((n, s) => n + s.sims, 0)).toBe(4001);
@@ -191,7 +191,7 @@ describe("equity pool — sharding", () => {
   });
 });
 
-describe("equity pool — determinism", () => {
+describe("equity pool: determinism", () => {
   it("is a pure function of seed and sim count", () => {
     const j = job(0xc0ffee);
     expect(runEquitySync(j)).toEqual(runEquitySync(j));
@@ -225,7 +225,7 @@ describe("equity pool — determinism", () => {
   });
 });
 
-describe("equity pool — worker and in-process paths agree", () => {
+describe("equity pool: worker and in-process paths agree", () => {
   it("produces identical results across the message boundary", () => {
     for (const board of [0, 3, 4, 5]) {
       const j = job(0x5eed + board, board, 4000);
@@ -240,7 +240,7 @@ describe("equity pool — worker and in-process paths agree", () => {
   });
 });
 
-describe("equity pool — sharding vs a single stream", () => {
+describe("equity pool: sharding vs a single stream", () => {
   it("agrees with an unsharded run to within sampling error", () => {
     // Different streams, so not identical, but four shards of one estimator
     // must still estimate the same quantity.
@@ -263,7 +263,7 @@ describe("equity pool — sharding vs a single stream", () => {
   });
 });
 
-describe("equity pool — multiway", () => {
+describe("equity pool: multiway", () => {
   it("routes a multiway job through the same shard plan as a heads-up one", () => {
     // The split must stay a function of (seed, sims) only. A multiway job that
     // planned its own shards, by field size, say, would make the answer
@@ -510,7 +510,7 @@ async function freshPool(cores: number): Promise<typeof import("./pool")> {
   return import("./pool");
 }
 
-describe("equity pool — worker path", () => {
+describe("equity pool: worker path", () => {
   const warnings: unknown[][] = [];
 
   beforeAll(() => {
@@ -615,7 +615,7 @@ describe("equity pool — worker path", () => {
    * `SHARD_TIMEOUT_MS` started at `postMessage`, which for the first job a
    * worker ever gets is before the worker has executed a line. The browser is
    * still fetching and compiling the module graph behind `equity.worker.ts`,
-   * and on a loaded machine that outruns the 400ms a *shard* is allowed. The
+   * and on a loaded machine that outruns the 400ms a shard is allowed. The
    * deadline then retired four healthy workers, and since `MAX_POOL_BUILDS` is
    * 2 the second occurrence latched `unavailable`, so every decision for the
    * rest of the page ran on the main thread. Observed in a Rosetta-translated

@@ -9,7 +9,7 @@
  * projection onto the only 169 classes a poker player thinks in.
  *
  * That claim is load-bearing, so it is worth saying what it costs: the grid can
- * only be a *projection*, never the thing itself. A cell holds up to 12 combos
+ * only be a projection, never the thing itself. A cell holds up to 12 combos
  * that a board splits, on K-7-2 the 7-2 cell contains twelve two-pair hands,
  * but on K-Q-J it contains twelve pieces of air with different backdoors, so
  * the cell number is their total weight and the chart cannot show the spread
@@ -39,11 +39,11 @@ import { RangeGrid } from "./RangeGrid";
 /**
  * The derivations that belong to this tab.
  *
- * All four used to be sections of a `Math` tab four clicks and fifteen screens
- * away from the chart they explain. They render inside the disclosure the
- * caller opens, next to the number that raised the question: the bucket ladder
- * beside the bucket bars, the Bayes worked example beside the three-tier
- * narrowing strip it moves.
+ * All four render inside the disclosure the caller opens, next to the number
+ * that raised the question: the bucket ladder beside the bucket bars, the Bayes
+ * worked example beside the three-tier narrowing strip it moves. Collected onto
+ * a tab of their own they would sit several clicks away from the chart they
+ * explain.
  */
 import {
   BayesWorked,
@@ -164,7 +164,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
         />
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <CardRow label="Board" cards={board} empty="Pre-flop — no board yet" />
+          <CardRow label="Board" cards={board} empty="Pre-flop, no board yet" />
           {heroHole.length > 0 && (
             <CardRow
               label={isHero ? "Your cards" : `${seatName(focus)}'s cards`}
@@ -240,7 +240,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)] lg:gap-6">
                 <RangeGrid
                   testId={`grid-${view.seat}`}
-                  title={`${seatName(view.seat)} — ${street.label}`}
+                  title={`${seatName(view.seat)}: ${street.label}`}
                   values={view.grid}
                   max={view.maxCell}
                   dead={(cell) => view.cellCombos[cell] === 0}
@@ -253,7 +253,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                     lo: "0%",
                     hi: `${(view.maxCell * 100).toFixed(1)}%`,
                     caption:
-                      "Shading and the bar across each cell both carry the same number — the chance this seat holds that exact class. Hatched cells are fully blocked. Tap a cell to read it.",
+                      "Shading and the bar across each cell both carry the same number: the chance this seat holds that exact class. Hatched cells are fully blocked. Tap a cell to read it.",
                   }}
                 />
 
@@ -273,13 +273,13 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                   <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/50">
                     Half this read's weight sits in{" "}
                     <span className="font-mono text-gold-soft">{view.half.combos}</span>{" "}
-                    combinations — {pct(view.half.fraction, 0)} of what the seat can
+                    combinations, {pct(view.half.fraction, 0)} of what the seat can
                     still hold.
                     {view.half.fraction > 0.42
                       ? " Barely narrower than a coin toss over the deck: this seat has told the table almost nothing yet."
                       : view.half.fraction > 0.2
                         ? " A real lean, but a long way from a pinned range."
-                        : " Tight — the actions this seat took carry a lot of information."}
+                        : " Tight: the actions this seat took carry a lot of information."}
                   </p>
 
                   {board.length >= 3 && (
@@ -317,7 +317,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                         summary={cardText(board)}
                       >
                         Every combination in the range, classified against{" "}
-                        <span className="font-mono">{cardText(board)}</span> —
+                        <span className="font-mono">{cardText(board)}</span>,
                         the nine rungs the engine works in. The three bars
                         above are these same nine collapsed into thirds, not a
                         separate pre-flop judgement, so the two cannot
@@ -336,8 +336,8 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           <Lead>
             A read is not a list of hands, and it is not a mood either. It is one
             weight on each of the 1326 two-card combinations a deck can make. No
-            seat's hole cards are ever consulted to build it — only the board and
-            the bets — so the chart drawn here is exactly the distribution the
+            seat's hole cards are ever consulted to build it, only the board and
+            the bets. So the chart drawn here is exactly the distribution the
             bots' equity estimates were sampled from.
           </Lead>
           <Heading>Where the weights come from</Heading>
@@ -360,7 +360,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           </Calc>
           <Lead>
             The class is measured against the board <em>as it stood when the
-            action was taken</em> — a flop bet is scored against the flop, never
+            action was taken</em>: a flop bet is scored against the flop, never
             against the river the hand later ran out to. That is what makes 7-2
             a hand rather than a joke: on K-7-2 it has flopped two pair, so a bet
             from it is unremarkable and the weight stays. A pre-flop ranking
@@ -371,7 +371,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           <Lead>
             Each cell is the total weight of the 6, 4 or 12 combinations it
             holds. Pairs run down the diagonal, suited hands sit above it and
-            offsuit below — AKs one step right of AA, AKo one step below. Weight
+            offsuit below: AKs one step right of AA, AKo one step below. Weight
             is drawn twice over: as lightness, and as the width of the bar along
             the bottom of each cell, so the ranking survives greyscale and colour
             blindness. Hatched cells hold no combinations at all.
@@ -385,7 +385,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           </Lead>
           <Why>
             This is the honest version of "putting someone on a hand". Nobody
-            knows the two cards. What you can know is how the weight is spread —
+            knows the two cards. What you can know is how the weight is spread,
             and how much narrower it got when they raised.
           </Why>
         </HowCalculated>
@@ -406,7 +406,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
       >
         {/* Not the charts above in miniature. This is the coarse
             `weak / medium / strong` read the table also keeps, moved by Bayes on
-            the flat action table — it is recorded with every decision and read
+            the flat action table - it is recorded with every decision and read
             by the coach, but it is not what the sampler drew from. Saying so is
             cheaper than letting the two be mistaken for each other, and it is
             cheaper still said once, when asked: the subtitle already tells the
@@ -421,7 +421,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           A second, coarser read the table keeps alongside the ranges above:
           three numbers per seat, moved by Bayes after every public action. It
           ignores the board, so it is the one place a hand is still judged the
-          way it looked before the flop — useful for watching a seat's story
+          way it looked before the flop, useful for watching a seat's story
           tighten, not for pricing a hand.
         </Reveal>
         <div className="mt-4 space-y-4">
@@ -532,9 +532,9 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
                 <CardRow cards={heroHole} />
                 <p className="mt-3 text-sm leading-relaxed text-ivory/70">
                   <span className="font-mono text-gold-soft">{blockers.removed}</span>{" "}
-                  of 1326 combinations —{" "}
+                  of 1326 combinations ({" "}
                   <span className="font-mono">{pct(blockers.removed / 1326)}</span> of
-                  the deck — cannot be in anybody else's hand.
+                  the deck) cannot be in anybody else's hand.
                 </p>
                 {board.length > 0 && (
                   <p className="mt-1 text-sm text-ivory/50">
@@ -577,7 +577,7 @@ export function RangesTab({ report, focus, seatName, isHero }: Props) {
           <Heading>What it does to a specific hand</Heading>
           <Lead>
             Pocket aces come in six combinations. Hold one ace yourself and three
-            of those six are impossible — the chance an opponent has aces is
+            of those six are impossible: the chance an opponent has aces is
             halved before a single action is considered. The same arithmetic runs
             through every class sharing a rank with your hand, which is what the
             chart above is showing.

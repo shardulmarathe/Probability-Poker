@@ -18,7 +18,7 @@
  * A player who conflates them learns exactly the wrong lesson, "I lost, so it
  * was wrong", which is why the two are never merged into one field, never
  * averaged, and never share a name. `modelEvLoss` is the coaching number.
- * `hindsightEvLoss` exists to be shown *next to* it, so the gap between them can
+ * `hindsightEvLoss` exists to be shown next to it, so the gap between them can
  * be named out loud as variance rather than mistaken for skill.
  *
  * Sign convention, matching `player_stats`/`decisions` in
@@ -40,7 +40,7 @@
  *    rung of `sizingLadder`) and the seat's own size is used whenever the seat
  *    itself bet or raised.
  *  - `TableHandReport` carries no stacks, so this module cannot tell a seat that
- *    *chose* to call from one that was all-in and had no raise available. The
+ *    chose to call from one that was all-in and had no raise available. The
  *    aggressive alternative is therefore always priced; `alternatives` lists
  *    exactly what was considered, so a counterfactual is visible rather than
  *    hidden.

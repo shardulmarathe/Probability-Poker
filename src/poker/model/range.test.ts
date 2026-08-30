@@ -275,7 +275,7 @@ describe("13x13 grid projection", () => {
     expect(13 * 6 + 78 * 4 + 78 * 12).toBe(COMBO_COUNT);
   });
 
-  it("tracks card removal — blocking one ace drops AA from 6 combos to 3", () => {
+  it("tracks card removal: blocking one ace drops AA from 6 combos to 3", () => {
     const r = uniformRange();
     removeCards(r, [code("As")]);
     const grid = toGrid(r);

@@ -158,7 +158,7 @@ describe("readsFromActions", () => {
     expect(twice[0].strong).toBeGreaterThan(once[0].strong);
   });
 
-  it("reads only public actions — never a seat's cards", () => {
+  it("reads only public actions: never a seat's cards", () => {
     // Two tables dealt from different seeds hold different cards; identical
     // action histories must therefore produce identical reads.
     const a = readsFromActions([record(0, "bet"), record(1, "call")], 3);
@@ -266,7 +266,7 @@ describe("equityRequest", () => {
     expect(opponentsOf(table, 0)).toEqual([1, 3]);
   });
 
-  it("includes all-in seats — they can still win the pot", () => {
+  it("includes all-in seats: they can still win the pot", () => {
     const table = dealt(["tag", "rock", "nit"]);
     table.seats[1].status = "allin";
     expect(equityRequest(table, 0).opponents).toContain(1);
@@ -354,7 +354,7 @@ describe("tableDecider", () => {
     }
   });
 
-  it("is deterministic — the same state decides the same way twice", () => {
+  it("is deterministic: the same state decides the same way twice", () => {
     const table = dealt(["lag", "maniac", "station", "tag"]);
     const seat = table.toAct as number;
     const a = FAST(table, seat, table.config);
@@ -586,7 +586,7 @@ describe("foldByBucket", () => {
     // Worth pinning explicitly, because it sets every bluff frequency this file
     // measures. Against a half-pot bet the minimum defence frequency is
     // 1 − alpha = 2/3, i.e. an opponent that folds more than 1/3 of its range
-    // is beatable by betting *any* two cards. This assertion used to read
+    // is beatable by betting any two cards. This assertion used to read
     // `toBeGreaterThan` and the prior folded 46.4% here, 13 points past the
     // bound, which was a standing subsidy on aggression that the EV maximiser
     // correctly collected by betting almost everything. `likelihood.ts`'s
@@ -722,7 +722,7 @@ describe("opponentRanges", () => {
 
   it("reads a seat that bets three streets as holding the board's hands", () => {
     // The headline: on K-7-2-9-4 the combo 7-2 is two pair, and a seat that has
-    // driven the betting is *more* likely to hold it, not less. The preflop
+    // driven the betting is more likely to hold it, not less. The preflop
     // Chen score the estimator used to bucket by said the opposite, and every
     // equity number inherited that.
     const board = [
@@ -803,7 +803,7 @@ describe("opponentRanges", () => {
     expect(blocking.equity).toBeGreaterThan(not.equity + 4 * not.se);
   });
 
-  it("reads only public actions — never a seat's cards", () => {
+  it("reads only public actions: never a seat's cards", () => {
     const board = [makeCard(13, "s"), makeCard(7, "h"), makeCard(2, "d")];
     const hero: [Card, Card] = [makeCard(14, "h"), makeCard(14, "c")];
     const a = driven(hero, board, ["flop"]);
@@ -958,7 +958,7 @@ describe("bluffing, end to end", () => {
     const strong = betRate({ seats: 4, keep: isStrong, trials: 1200 });
     // eslint-disable-next-line no-console
     console.log(
-      `3 opponents — air ${(100 * air.rate).toFixed(1)}% of ${air.n}, ` +
+      `3 opponents, air ${(100 * air.rate).toFixed(1)}% of ${air.n}, ` +
         `strong ${(100 * strong.rate).toFixed(1)}% of ${strong.n}`
     );
     expect(strong.n).toBeGreaterThan(20);
@@ -1304,7 +1304,7 @@ describe("actionContexts", () => {
 // Injecting a learned model
 // ---------------------------------------------------------------------------
 //
-// `opponentMemory` accumulates a model of the *human* seat. Two things have to
+// `opponentMemory` accumulates a model of the human seat. Two things have to
 // be true for that to be safe to plug in: an empty one must change nothing at
 // all, and a populated one must change only the seat it is a claim about.
 

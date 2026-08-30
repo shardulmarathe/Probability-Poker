@@ -38,7 +38,7 @@ export function EvConcept() {
       <Lead>
         Expected value is what an action is worth on average, measured from the
         moment you take it. Chips already in the pot are not yours and do not
-        enter the arithmetic — only the chips you risk now and the pot you can
+        enter the arithmetic: only the chips you risk now and the pot you can
         win. That is what makes folding correct sometimes: fold is the zero
         baseline, and any line worth less than zero is worse than walking away.
       </Lead>
@@ -82,7 +82,7 @@ export function EvConcept() {
         </div>
         <div className="mt-2 text-ivory/60">
           {callSize > 0
-            ? `${((pot / callSize) || 0).toFixed(1)} to 1 on the money. Set EV(call) to zero and solve — no Monte Carlo involved.`
+            ? `${((pot / callSize) || 0).toFixed(1)} to 1 on the money. Set EV(call) to zero and solve: no Monte Carlo involved.`
             : "Nothing to call, so any equity at all is profit."}
         </div>
       </Calc>
@@ -98,12 +98,12 @@ export function EvConcept() {
         <div className="mt-2 text-ivory/60">
           E_continue is the equity against the hands that <em>do not</em> fold,
           which is always worse than equity against the whole range when folding
-          is strength-correlated — the hands that fold are the weak ones, so what
+          is strength-correlated: the hands that fold are the weak ones, so what
           is left facing the bet is the strong tail.
         </div>
       </Calc>
       <Lead>
-        Set E_continue to zero — a pure bluff with no equity whatsoever — and the
+        Set E_continue to zero (a pure bluff with no equity whatsoever) and the
         expression collapses to <span className="font-mono">P(fold)·Pot − (1 − P(fold))·s</span>,
         which is zero at exactly one frequency:
       </Lead>
@@ -121,8 +121,8 @@ export function EvConcept() {
             <tr className="text-left text-[0.6rem] uppercase tracking-wider text-ivory/45">
               <th className="py-2 pr-3">Bet</th>
               <th className="py-2 pr-3 text-right">Size at ${pot}</th>
-              <th className="py-2 pr-3 text-right">α — must work</th>
-              <th className="py-2 pr-3 text-right">MDF — they must defend</th>
+              <th className="py-2 pr-3 text-right">α: must work</th>
+              <th className="py-2 pr-3 text-right">MDF: they must defend</th>
             </tr>
           </thead>
           <tbody>
@@ -150,7 +150,7 @@ export function EvConcept() {
         </table>
       </Scroller>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
-        Computed from the formula above at the pot you picked — and they come out
+        Computed from the formula above at the pot you picked, and they come out
         at the published 33.3 / 42.9 / 50 / 66.7 whatever the pot is, because α
         depends only on the ratio. An opponent who folds more often than α can be
         beaten by betting any two cards; MDF is the share of range they have to

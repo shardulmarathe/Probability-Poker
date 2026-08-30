@@ -103,7 +103,7 @@ function CategoryShape({
         equity estimate, different thing recorded: the <em>category</em> of the
         best hand rather than whether it won. The run deals out of the deck{" "}
         {seatName(villain.seat)}'s cards left behind, which is the only way the
-        opponent enters this chart at all — what a hand can <em>become</em>
+        opponent enters this chart at all, what a hand can <em>become</em>
         depends on the cards it can still see, not on what it is up against.
       </Lead>
 
@@ -183,7 +183,7 @@ function CategoryShape({
               {run.unknown} board card{run.unknown === 1 ? "" : "s"} still to
               come and {run.runouts.toLocaleString()} distinct runouts the deck
               allowed. The estimate drew {SHAPE_SIMS.toLocaleString()} of them at
-              random, with repeats — so where the deck allows fewer than that,
+              random, with repeats, so where the deck allows fewer than that,
               every runout is hit many times and the shape is exact to within
               rounding.
             </>
@@ -209,7 +209,7 @@ function CategoryShape({
       <Why>
         Two hands can share a win rate and be nothing alike. One that gets there
         by making flushes plays differently from one that gets there by making
-        top pair — same average, different shape, different bets. The win
+        top pair, same average, different shape, different bets. The win
         probability is one number off this whole distribution; the distribution
         is what a strategy is built on.
       </Why>

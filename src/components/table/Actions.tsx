@@ -12,14 +12,13 @@
  * a slider do not coexist on a 390px screen, and shrinking the desktop layout
  * until they do produces a slider nobody can hit.
  *
- * On a wide screen it now moves into a popover that opens *upward*, over the
- * felt. The sizing panel used to sit in the flow above the buttons on every
- * decision, all 140px of it, and it was the single largest reason Fold and Call
- * were ~240px below the fold at 1440x760. It is also the wrong default: most
- * decisions are taken at the rung already selected, so the common case is now
- * one click on `Raise to $150` and the ladder is one click away for the rest.
- * Nothing was deleted, the slider and all five rungs are the same control in a
- * different place, and they cost the column no height at all.
+ * On a wide screen the ladder lives in a popover that opens upward, over the
+ * felt. In the flow above the buttons it would cost 140px on every decision,
+ * which is most of what puts Fold and Call below the fold at 1440x760 on a page
+ * whose whole purpose is the moment one of them is pressed. It is also the wrong
+ * default: most decisions are taken at the rung already selected, so the common
+ * case is one click on `Raise to $150`, and the slider and all five rungs are
+ * one click away for the rest at no cost in column height.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -164,7 +163,7 @@ export function ActionBar({
               onClick={() => setSheet(true)}
               className="min-w-0 flex-1"
             >
-              {commit.type === "bet" ? "Bet…" : "Raise…"}
+              {commit.type === "bet" ? "Bet..." : "Raise..."}
             </ActionButton>
           ) : (
             /*
@@ -179,12 +178,12 @@ export function ActionBar({
                 /*
                  * One surface, not two.
                  *
-                 * The panel and its confirm button used to be separate boxes
-                 * with a gap between them, and because the popover grows
-                 * upward from the split button, that gap landed exactly on the
-                 * coach line: the confirm read as a detached button sitting on
-                 * top of "calling is −EV". The wrapper carries the border and
-                 * the opaque ground now, and `SizingPanel` goes bare inside it.
+                 * The wrapper carries the border and the opaque ground, and
+                 * `SizingPanel` goes bare inside it. As two boxes with a gap
+                 * between them the gap would land on the coach line, because the
+                 * popover grows upward from the split button, leaving the confirm
+                 * reading as a detached button sitting on top of "calling is
+                 * −EV".
                  */
                 <div
                   className={`absolute bottom-full right-0 z-40 mb-2 w-[21rem] max-w-[calc(100vw-1.5rem)] border p-3 ${RADIUS.surface}`}
@@ -327,7 +326,7 @@ function SizingPanel({
   const fill = max > min ? ((preview.cost - min) / (max - min)) * 100 : 100;
   const behind = stack - preview.cost;
   // Measured exactly as `sizingLadder` measures it: the call is not part of the
-  // raise, so the fraction is over the pot *after* calling. Any other formula
+  // raise, so the fraction is over the pot after calling. Any other formula
   // puts "156% pot" next to a highlighted "½ pot" rung.
   const potAfterCall = pot + toCall;
   const potShare =
@@ -423,7 +422,7 @@ function Sheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal>
       {/* A scrim, not a blur. `backdrop-filter` here covered the whole viewport
-          — including the felt, its weave and every card on it — and had to
+          - including the felt, its weave and every card on it - and had to
           re-filter all of it on each frame the sheet animated in. The sheet is
           opaque; nothing behind it needed to be legible in the first place. */}
       <button

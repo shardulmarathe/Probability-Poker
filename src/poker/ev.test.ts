@@ -210,7 +210,7 @@ describe("foldEquityEv", () => {
     expect(r.pFold).toBeCloseTo(0.6 ** 3, 10);
   });
 
-  it("is deterministic — the same seed gives the same numbers", () => {
+  it("is deterministic: the same seed gives the same numbers", () => {
     const args = {
       hole: AIR,
       opponents: 2,
@@ -303,11 +303,10 @@ describe("the continuing range", () => {
   });
 
   it("selects against both hands, and by the published amounts", () => {
-    // This used to be a bare console.log with no `expect` in it, a test that
-    // could not fail. The numbers it printed are worth keeping, so they are
-    // pinned instead: the selection effect costs air three-quarters of its
-    // equity and top pair about a ninth of its own, and the fold rate barely
-    // moves between the two because the model folds on the OPPONENT's hand.
+    // The numbers are pinned rather than printed, so this can actually fail:
+    // the selection effect costs air three-quarters of its equity and top pair
+    // about a ninth of its own, and the fold rate barely moves between the two
+    // because the model folds on the OPPONENT's hand.
     const sharp = foldBelow(BOARD, HandBucket.WeakPair);
     const rows: string[] = [];
     const seen: Record<string, [number, number, number]> = {};
@@ -574,7 +573,7 @@ describe("alpha", () => {
     console.log("alpha / MDF crossings:\n  " + rows.join("\n  "));
   });
 
-  it("is a genuine crossing — losing below alpha, winning above", () => {
+  it("is a genuine crossing: losing below alpha, winning above", () => {
     for (const [pot, bet, alpha] of TABLE) {
       expect(pureBluff(pot, bet, alpha - 0.02).ev).toBeLessThan(0);
       expect(pureBluff(pot, bet, alpha + 0.02).ev).toBeGreaterThan(0);

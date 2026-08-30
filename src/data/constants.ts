@@ -17,7 +17,7 @@ export const INITIAL_BELIEF: BeliefDistribution = {
 
 /**
  * Default likelihood of each player action given the opponent's true strength
- * tier: P(action | tier). These are the *fallback* values used before any hands
+ * tier: P(action | tier). These are the fallback values used before any hands
  * have been observed. Once the learned opponent model has data it supplies the
  * likelihoods instead (see `learnedActionLikelihoods` in `poker/bayesian.ts`).
  */

@@ -148,7 +148,7 @@ describe("learning from folds", () => {
   });
 
   it("moves every bucket together, compressing the likelihood ratio", () => {
-    // 40 raises at this node, no showdown ever. The model cannot say *what* they
+    // 40 raises at this node, no showdown ever. The model cannot say what they
     // raise with, only that they raise constantly, so the raise must lose
     // information, not gain it.
     const model = createLikelihoodModel();
@@ -217,7 +217,7 @@ describe("learning is directional", () => {
     expect(after.weak / before.weak).toBeGreaterThan(10);
     // The ratio is pinned rather than bounded, because where it lands is the
     // result: 8.20 before, 0.8995 after. It has not merely collapsed to 1, it
-    // has crossed it, this player raises weak hands *more* often than strong
+    // has crossed it, this player raises weak hands more often than strong
     // ones, which is what "habitual bluffer" means and is strictly stronger
     // evidence than indistinguishability. Two decades of the prior's
     // discrimination, undone by 30 showdowns.
@@ -226,7 +226,7 @@ describe("learning is directional", () => {
     expect(after.strong / after.weak).toBeLessThan((before.strong / before.weak) / 8);
 
     // Headline: a raise used to push "strong" from 25% to 59%. It now pushes it
-    // *down*, and makes "weak" the most likely tier instead.
+    // down, and makes "weak" the most likely tier instead.
     const fresh = posteriorAfterRaise(createLikelihoodModel());
     const posterior = posteriorAfterRaise(model);
     expect(fresh.strong).toBeCloseTo(0.602, 4);

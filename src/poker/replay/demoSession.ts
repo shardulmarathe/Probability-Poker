@@ -1,13 +1,12 @@
 /**
  * Sixty hands against a bluffer, run in a few seconds.
  *
- * This exists because the most interesting claim this product makes is also the
- * one nobody has ever seen. The bots do not merely play well, they learn the
- * person opposite them: watch a seat bluff often enough and `P(bet | air)` in
- * the likelihood model climbs from the shared poker prior towards what that
- * seat actually does, and the read the table holds on them shifts onto air.
- * `lib/opponentMemory.test.ts` measures exactly that, and the README leads with
- * the numbers.
+ * The bots do not only play well, they learn the person opposite them: watch a
+ * seat bluff often enough and `P(bet | air)` in the likelihood model climbs from
+ * the shared poker prior toward what that seat actually does, and the read the
+ * table holds on them shifts onto air. `lib/opponentMemory.test.ts` measures
+ * exactly that, and the README quotes the numbers. This module makes the effect
+ * observable in the product rather than only in a test.
  *
  * A visitor will never see it. The model needs on the order of sixty hands
  * before it can say anything a confidence interval would defend, and a hand at
@@ -52,7 +51,7 @@ export const DEMO_HANDS = 60;
  * Simulations per bot decision.
  *
  * Far below the table's own budget, and deliberately. This run exists to move a
- * likelihood model, which is driven by the *actions* the bluffer takes and the
+ * likelihood model, which is driven by the actions the bluffer takes and the
  * cards it shows down, not by how finely the bots priced their replies. The
  * measured experiment in `opponentMemory.test.ts` uses the same 200, and that
  * is the reason to leave this number alone even though lowering it is faster.

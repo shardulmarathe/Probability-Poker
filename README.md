@@ -6,7 +6,7 @@
 
 **[Play it →](https://probabilitypoker.vercel.app)**
 
-An educational, probability-focused **No-Limit Texas Hold'em** table for 2–6
+An educational, probability-focused **No-Limit Texas Hold'em** table for 2-6
 seats, built for a Stanford probability course. You play against bots that make
 every decision from a **Bayesian range model over all 1,326 hole-card
 combinations**, **multiway Monte Carlo equity**, and **expected value with fold
@@ -55,7 +55,7 @@ for bit.
 
 | Route | What it is |
 | --- | --- |
-| `/table` | The 2–6 seat No-Limit table |
+| `/table` | The 2-6 seat No-Limit table |
 | `/review` | Hand review, timeline, ranges, EV table, the full derivation |
 | `/replay/:seed` | Replay any hand from its deal seed, with counterfactuals |
 | `/profile` | Your archive and playing-style statistics |
@@ -69,7 +69,7 @@ for bit.
 | **Board-relative hand classes** | 9 classes ordered by measured equity, audited with Earth Mover's Distance (`src/poker/model/buckets.ts`, `model/distribution.ts`) |
 | **Conditional probability** | `P(action \| bucket, street, position, facing)`, 648 cells (`src/poker/model/likelihood.ts`) |
 | **Bayesian inference** | Belief updates and range reweighting (`src/poker/bayesian.ts`, `model/decider.ts`) |
-| **Hierarchical shrinkage** | Six-level backoff with inclusion–exclusion, so each observation counts once (`src/poker/model/likelihood.ts`) |
+| **Hierarchical shrinkage** | Six-level backoff with inclusion-exclusion, so each observation counts once (`src/poker/model/likelihood.ts`) |
 | **Monte Carlo simulation** | Multiway equity by whole-tuple rejection sampling (`src/poker/equity/multiway.ts`) |
 | **Interval estimation** | Wilson score intervals, not `p̂ ± 1.96·SE` (`src/poker/core/stats.ts`) |
 | **Expected value & fold equity** | `EV(bet s) = P(fold)·Pot + (1−P(fold))·[E_continue·(Pot+2s) − s]` (`src/poker/ev.ts`) |
@@ -94,8 +94,8 @@ for bit.
    than the whole range. Calls that don't close the action are re-priced against
    the pot the seats behind will build, on the same basis a raise is priced -
    otherwise the two aren't comparable.
-4. **argmax, then personality.** Seven archetypes, from Nickel Nate (nit) to
-   Wildfire Wes (maniac), bend the pure-EV answer with entry discipline, bluff
+4. **argmax, then personality.** Seven archetypes, from Ultra-Tight to
+   Hyper-Aggressive, bend the pure-EV answer with entry discipline, bluff
    frequency and an aggression tilt. The record shows both the EV table and what
    the profile actually did.
 5. **Learn from you.** Finished hands are folded into a likelihood model scoped
@@ -121,7 +121,7 @@ src/
     solver/       Discounted CFR, exploitability, push/fold validation
     replay/       reconstruct and re-simulate a hand from its seed
     coach/        EV-loss attribution and playing-style stats
-    handEvaluator.ts   bit-parallel 5–7 card evaluation
+    handEvaluator.ts   bit-parallel 5-7 card evaluation
     ev.ts              expected value, fold equity, call pricing
   store/        React context wiring the engine to the UI
   workers/      equity shard worker
@@ -129,7 +129,7 @@ src/
 
 ## Rules & betting
 
-- No-Limit Texas Hold'em, **2–6 seats**; default table is 4 seats at 100 big
+- No-Limit Texas Hold'em, **2-6 seats**; default table is 4 seats at 100 big
   blinds with **$5/$10** blinds.
 - Standard No-Limit raise sizing: a raise must increase the bet by at least as
   much as the last raise did, and preflop the big blind counts as the opening

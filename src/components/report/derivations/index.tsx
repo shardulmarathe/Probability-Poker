@@ -3,7 +3,7 @@
  *
  * These were one 2,550-line `MathTab`, a single scroll 13,085px tall sitting in
  * the tab bar as though it were a peer of a three-screen tab. The content was
- * never the problem — a reader who wants to know why the interval is Wilson's
+ * never the problem - a reader who wants to know why the interval is Wilson's
  * rather than `p̂ ± 1.96·SE` is exactly the reader this product is for. The
  * problem was that the question and its answer were four clicks and fifteen
  * screens apart.
@@ -15,7 +15,7 @@
  *
  * ## The contract
  *
- * Every export takes the same props and renders the body of a disclosure — no
+ * Every export takes the same props and renders the body of a disclosure - no
  * heading, no `Section` wrapper, no outer surface. The caller owns the label
  * and the disclosure chrome, because the caller knows what question the reader
  * just asked. A derivation that cannot be built from the record must render its

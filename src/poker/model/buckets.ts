@@ -1,7 +1,7 @@
 /**
  * Board-relative strength classes for a hole-card combo.
  *
- * This replaces `bayesian.tierOf` everywhere a *postflop* judgement is needed.
+ * This replaces `bayesian.tierOf` everywhere a postflop judgement is needed.
  * `tierOf` scores a holding with a Chen preflop formula on every street, so on
  * K-7-2-9-4 it still calls 7-2 "weak", a hand that has flopped two pair and is
  * beating most of the deck. Bucketing an opponent's range with that is not a
@@ -138,7 +138,7 @@ export const BUCKET_NAMES: Record<HandBucket, string> = {
  * combos and 236 of them score exactly 5. These cuts give roughly
  * 2 / 2 / 2 / 4 / 7 / 8 / 18 / 24 / 33 percent of the deck per band, top to
  * bottom, which is the shape a preflop range chart actually has. Even cuts on
- * the score's *range* would put 0.5% in the top band and 42% in one middle one.
+ * the score's range would put 0.5% in the top band and 42% in one middle one.
  */
 const PREFLOP_BANDS: readonly number[] = [12, 10, 9, 8, 7, 6, 5, 3];
 
@@ -277,7 +277,7 @@ export function makeBoardContext(board: ArrayLike<number>): BoardContext {
     }
   }
 
-  // With fewer than five cards this is the board's best *partial* hand; it is
+  // With fewer than five cards this is the board's best partial hand; it is
   // only compared for equality against a seven-card score when len === 5, and
   // only its category is consulted otherwise.
   const boardScore = len > 0 ? scoreInts(cards, len) : 0;

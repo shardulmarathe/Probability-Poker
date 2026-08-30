@@ -2,7 +2,7 @@
  * A weighted distribution over every hole-card combination an opponent can hold.
  *
  * The three-tier belief in `../bayesian.ts` says how likely an opponent is to be
- * "strong"; it cannot say *which* hands those are, so it cannot know that the
+ * "strong"; it cannot say which hands those are, so it cannot know that the
  * ace of hearts sitting in our own hand makes the nut heart flush impossible for
  * him. A range over all C(52,2) = 1326 combos can: `removeCards` zeroes every
  * combo containing a known card, and blockers fall out of that single operation

@@ -36,5 +36,5 @@ export function CardRow({
 
 /** Card codes as text, for use inside prose. */
 export function cardText(codes: number[]): string {
-  return codes.map((c) => decodeCard(c).id).join(" ") || "—";
+  return codes.map((c) => decodeCard(c).id).join(" ") || "-";
 }

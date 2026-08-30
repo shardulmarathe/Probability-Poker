@@ -28,7 +28,7 @@ interface StatSpec {
 
 const pctText = (c: Counter): string => {
   const p = percent(c);
-  return p === null ? "—" : `${p.toFixed(1)}%`;
+  return p === null ? "-" : `${p.toFixed(1)}%`;
 };
 
 const pctFraction = (c: Counter): number | null => {
@@ -73,7 +73,7 @@ const STAT_SPECS: StatSpec[] = [
     blurb: "Postflop bets + raises per call",
     format: (c) => {
       const r = rate(c.af);
-      return r === null ? "—" : r.toFixed(2);
+      return r === null ? "-" : r.toFixed(2);
     },
     // AF is unbounded; 3 is the top of the meter, not of the stat.
     fraction: (c) => {
@@ -116,7 +116,7 @@ export function TrackerOverall({ stats }: { stats: PlayerStats }) {
       {thin && (
         <p className="mb-3 text-[0.8rem] leading-snug text-ivory/50" data-testid="thin-sample">
           {stats.total.hands === 0
-            ? "No hands yet — these fill in as you play."
+            ? "No hands yet. These fill in as you play."
             : `From ${stats.total.hands} hand${stats.total.hands === 1 ? "" : "s"}. Every figure below still swings by tens of points with each new one; they start meaning something around ${THIN_SAMPLE}.`}
         </p>
       )}
@@ -277,7 +277,7 @@ export function SessionHeadline({ stats }: { stats: PlayerStats }) {
       />
       <Stat
         label="Won at showdown"
-        value={t.wsd.d > 0 ? `${t.wsd.n}/${t.wsd.d}` : "—"}
+        value={t.wsd.d > 0 ? `${t.wsd.n}/${t.wsd.d}` : "-"}
         note={t.wsd.d > 0 ? pctText(t.wsd) : "no showdowns yet"}
       />
     </StatGrid>

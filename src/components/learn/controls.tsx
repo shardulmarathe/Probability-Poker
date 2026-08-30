@@ -4,7 +4,7 @@
  * They sat at the top of `LearnPage.tsx` while the page was one 1,283-line file
  * that rendered all seven concepts at once. The page is now a selector plus
  * whichever concept is chosen, so each concept lives in its own module under
- * `concepts/` — and two modules that both need `Choice` must not reach into
+ * `concepts/` - and two modules that both need `Choice` must not reach into
  * each other to get it. That is how the report ended up with two copies of a
  * dozen primitives, which then drifted within days. One copy, here.
  *

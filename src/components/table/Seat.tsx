@@ -3,14 +3,14 @@
  *
  * The same component draws all of them, at three densities: the hero's seat
  * (cards big enough to read at a glance), a full opponent card on a wide
- * screen, and a compact one on a phone, where six seats have to share 390
- * pixels and anything more than an avatar and a stack does not fit.
+ * screen, and a compact one on a phone, where six seats share 390 pixels and
+ * anything more than a monogram and a stack does not fit.
  *
- * A seat has four states and they are told apart by *elevation*, not by colour
- * alone. Live seats sit slightly proud of the cloth. The seat on the clock is
- * lifted further and lit gold. An all-in seat keeps its height but is ringed in
- * oxblood, because its chips are already in the middle. A folded seat lies flat
- *, no lift, no shadow, no colour in the face, no cards, which is what a
+ * A seat has four states, told apart by elevation rather than by colour alone.
+ * Live seats sit slightly proud of the cloth. The seat on the clock is lifted
+ * further and lit gold. An all-in seat keeps its height but is ringed in
+ * oxblood, because its chips are already in the middle. A folded seat lies
+ * flat: no lift, no shadow, no colour in the face and no cards, which is what a
  * player who is out of the hand looks like from across a table.
  */
 
@@ -69,6 +69,22 @@ export interface SeatViewProps {
 
 type SeatState = "idle" | "active" | "allin" | "folded";
 
+/**
+ * The seat chip's monogram, e.g. "TAG" for Tight Aggressive.
+ *
+ * These were emoji, which needed no sizing thought because one glyph fills a
+ * circle at any type size. A monogram is two or three characters, so it has to
+ * be set small enough that "TAG" does not touch the border of a 28px chip and
+ * tight enough that it still reads as one mark rather than three letters.
+ * Semibold rather than regular because at this size a light weight disappears
+ * against the felt.
+ *
+ * The human seat has no profile, so it monograms as "YOU" on the same footing
+ * as the bots rather than falling back to a person glyph.
+ */
+const MONOGRAM = "font-display font-semibold tracking-tight text-ivory/85";
+const HUMAN_MONOGRAM = "YOU";
+
 function seatState(seat: TableSeat, active: boolean): SeatState {
   if (seat.status === "folded" || seat.status === "out") return "folded";
   if (active) return "active";
@@ -96,7 +112,7 @@ export function SeatView(props: SeatViewProps) {
 
   // The bottom seat speaks upward; the top arc speaks down, toward the pot.
   const side = atBottom ? "top" : "bottom";
-  // …and a seat at either end of the arc opens its bubble inward, so a phone
+  // ...and a seat at either end of the arc opens its bubble inward, so a phone
   // never slices one off at the viewport edge.
   const align = bubbleAlign(point.x);
   // The bet pill and the bubble both hang off the same edge of a chair. When
@@ -143,7 +159,7 @@ export function SeatView(props: SeatViewProps) {
         <FullSeat {...props} state={state} />
       )}
 
-      {/* The chips this seat has pushed out, sitting between it and the pot —
+      {/* The chips this seat has pushed out, sitting between it and the pot  - 
           out of the flow, so a seat that grows cannot shove the board down.
           The hero's go inside its own card instead, since its info panel is
           already right there and the space above it is the pot readout's. */}
@@ -241,7 +257,7 @@ function Commit({
  *
  * `beside` is the showdown case, where this prints next to the seat's stack.
  * At the same size and weight those two numbers read as one statement, and a
- * seat that rebought showed "Textbook Tara  $1000  \u2212$1000", which looks like
+ * seat that rebought showed "Tight Aggressive  $1000  \u2212$1000", which looks like
  * arithmetic that does not add up rather than like the two different facts it
  * is: what she has in front of her, and what this hand cost her. A hairline
  * rule and a step down in size separate them without a label, which is the
@@ -335,11 +351,22 @@ function HeroSeat({ seat, position, reveal, won, net, profile, state, bigBlind, 
         {...skin.props}
       >
         <div className="flex min-w-0 flex-nowrap items-center gap-2">
-          <span
-            className={`pp-avatar leading-none ${narrow ? "text-lg" : "text-xl sm:text-2xl"}`}
-          >
-            {profile?.avatar ?? "\u{1F9D1}"}
-          </span>
+          {/*
+           * Only a bot gets a monogram here. The hero's seat is already named
+           * "You" on the line beside it, and "YOU  You" reads as a duplicate
+           * rather than as an identifier. The circular chips on the opponent
+           * skins keep their monogram either way, because there the mark is the
+           * visual anchor and the name sits underneath it.
+           */}
+          {profile && (
+            <span
+              className={`pp-avatar leading-none ${MONOGRAM} ${
+                narrow ? "text-[0.62rem]" : "text-[0.7rem]"
+              }`}
+            >
+              {profile.monogram}
+            </span>
+          )}
           <span className="min-w-0 truncate font-display text-sm tracking-wide text-ivory">
             {seat.name}
           </span>
@@ -430,10 +457,10 @@ function FullSeat({
       >
         <div className="flex items-center gap-1.5">
           <span
-            className="pp-avatar flex h-8 w-8 items-center justify-center rounded-full border text-lg"
+            className={`pp-avatar flex h-8 w-8 items-center justify-center rounded-full border text-[0.6rem] ${MONOGRAM}`}
             style={avatarStyle(state, won)}
           >
-            {profile?.avatar ?? "\u{1F464}"}
+            {profile?.monogram ?? HUMAN_MONOGRAM}
           </span>
           <Badge label={position} tone={position === "BTN" ? "dealer" : "blind"} />
         </div>
@@ -444,7 +471,7 @@ function FullSeat({
           <Stack seat={seat} settled={settled} />
           <Net net={net} beside />
         </div>
-        {/* Study's addition is the *live* read, not the static one. The
+        {/* Study's addition is the live read, not the static one. The
             archetype names the style in a line; the full blurb lives on hover
             and on the setup screen, because three lines of prose per seat is
             more vertical space than the top-centre chair has above the board. */}
@@ -496,12 +523,12 @@ function CompactSeat({ seat, position, profile, reveal, won, state, settled }: S
       )}
 
       <span
-        className={`pp-avatar flex h-7 w-7 items-center justify-center rounded-full border text-lg ${
+        className={`pp-avatar flex h-7 w-7 items-center justify-center rounded-full border text-[0.55rem] ${MONOGRAM} ${
           won ? "pp-seat-won" : ""
         }`}
         style={avatarStyle(state, won)}
       >
-        {profile?.avatar ?? "\u{1F9D1}"}
+        {profile?.monogram ?? HUMAN_MONOGRAM}
       </span>
       <span className="mt-0.5 flex items-center gap-1">
         <Badge label={position} tone={position === "BTN" ? "dealer" : "quiet"} />

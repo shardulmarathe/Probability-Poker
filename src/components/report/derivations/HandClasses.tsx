@@ -86,7 +86,7 @@ function BucketLadder({
         replaced a preflop score that was being applied on every street: on
         K-7-2-9-4 a Chen-style score still files 7-2 under <em>weak</em>, when it
         has flopped two pair and is beating most of the deck. Bucketing an
-        opponent's range with that is not a small inaccuracy — it puts the made
+        opponent's range with that is not a small inaccuracy, it puts the made
         hands in the wrong bin, and every equity number sampled out of those bins
         inherits the error.
       </Lead>
@@ -147,7 +147,7 @@ function BucketLadder({
           </div>
           <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
             This is the range the sampler drew that seat's cards from, weighed by
-            class rather than by chart cell — the same numbers the Ranges tab
+            class rather than by chart cell, the same numbers the Ranges tab
             paints, read along the strength axis instead of the 13×13 one.
           </p>
         </>
@@ -157,8 +157,8 @@ function BucketLadder({
       <Lead>
         The order of the ladder is load-bearing: downstream code aggregates
         "belief mass at or above class k", which only means anything if the index
-        is monotone in strength. The cut points were placed by measurement — every
-        combo rolled out on forty random boards per street — and two of the
+        is monotone in strength. The cut points were placed by measurement, every
+        combo rolled out on forty random boards per street, and two of the
         answers are not what intuition says.
       </Lead>
       <Calc>
@@ -169,7 +169,7 @@ function BucketLadder({
           A bare flush draw or open-ender with no pair measures 0.514 on the flop
           and 0.392 on the turn against a random hand; bottom pair measures 0.571
           and 0.550. Draws feel stronger than that because they are usually held
-          alongside something — and this class is what is left once that something
+          alongside something, and this class is what is left once that something
           has been classified on its own.
         </div>
         <div className="mt-3">
@@ -177,7 +177,7 @@ function BucketLadder({
         </div>
         <div className="mt-1 text-ivory/60">
           0.776 / 0.796 on the flop, 0.773 / 0.756 on the turn, 0.783 / 0.791 on
-          the river — the sign of the gap flips with the boards drawn, so the test
+          the river, the sign of the gap flips with the boards drawn, so the test
           asserts they are close rather than pretending the ladder is sharper than
           the game is.
         </div>
@@ -202,7 +202,7 @@ function BucketLadder({
           Searching all 9! orderings for the one whose Earth Mover's Distance
           matrix is most monotone away from the diagonal returns <em>this</em>{" "}
           order, on every street. The only alternative that ever ties it is the
-          one that swaps Top Pair and Overpair — the single adjacency the
+          one that swaps Top Pair and Overpair, the single adjacency the
           measurement above already declines to order. Hands sharing a class are
           about three times closer in EMD than hands from different ones, and
           roughly 99% of combos have their nearest neighbour inside their own
@@ -211,12 +211,12 @@ function BucketLadder({
         <Heading>What it does not excuse</Heading>
         <Lead>
           The tails. On Ks-7s-Qc the flop puts a backdoor flush and a gutshot to
-          Broadway in the same draw class, 21.1 EMD bins apart — further than Air
+          Broadway in the same draw class, 21.1 EMD bins apart, further than Air
           is from Weak Pair. On a four-flush board, Monster holds both a straight
           flush and the same straight losing to every diamond. Nine hand-crafted
           classes have nowhere to put "ace-high with a gutshot". Fixing that means
           more classes, and the class count is frozen by the keys the learned
-          model persists — so it is not a change that can be made in one file.
+          model persists, so it is not a change that can be made in one file.
         </Lead>
         <Why>
           Every range chart, every reweighting and every simulated opponent hand

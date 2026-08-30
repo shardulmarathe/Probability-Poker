@@ -2,40 +2,37 @@
  * The concepts surface: the probability, without a hand attached.
  *
  * The hand review answers "what happened in that hand". This page answers "what
- * is this number, and why is it that number", the same seven ideas the engine is
- * built out of, each one demonstrated by running the engine here, in the
- * browser, on cards the page names out loud.
+ * is this number, and why is it that number", over the same seven ideas the
+ * engine is built out of, each one demonstrated by running the engine in the
+ * browser on cards the page names out loud.
  *
  * Two rules it shares with the review, and they are the reason it is a page
  * rather than a document:
  *
- *   - Nothing is illustrated with a figure somebody typed in. Every probability,
- *     interval, class and exploitability is computed when the concept renders or
- *     when the reader presses the button that runs it. Where an example needs
- *     specific cards, the cards are the example and the numbers are the engine's.
- *   - The vocabulary is the review's vocabulary, the same `HowCalculated` folds,
- *     the same `Calc` blocks, the same fractions, so a student who learns the
- *     idea here recognises it the moment it turns up next to their own hand.
+ *   - Nothing is illustrated with a figure somebody typed in. Every
+ *     probability, interval, class and exploitability is computed when the
+ *     concept renders, or when the reader presses the button that runs it.
+ *     Where an example needs specific cards, the cards are the example and the
+ *     numbers are the engine's.
+ *   - The vocabulary is the review's vocabulary: the same `HowCalculated`
+ *     folds, the same `Calc` blocks, the same fractions, so a student who
+ *     learns the idea here recognises it the moment it appears next to their
+ *     own hand.
  *
- * ONE CONCEPT AT A TIME. This page was 7,298px — nine screens in a single
- * scroll, with seven chips at the top that were in-page `#` anchors. Seven
- * excellent interactive explanations stacked end to end do not read as seven
- * explanations; they read as a textbook chapter, and the reader who came to
- * understand pot odds had to scroll past a Monte Carlo convergence table and a
- * 540-cell likelihood prior to reach it. The chips are now a real selector and
- * only the chosen concept is mounted.
- *
- * That is a correctness win as well as a length one. Four convergence runs, a
+ * One concept is mounted at a time. Seven interactive explanations stacked end
+ * to end read as a textbook chapter rather than as seven explanations, and a
+ * reader who came to understand pot odds would have to scroll past a Monte
+ * Carlo convergence table and a 540-cell likelihood prior to reach it. Mounting
+ * one at a time is also what keeps the page cheap: four convergence runs, a
  * generated likelihood model, a six-thousand-trial multiway sample and a river
- * solve were all kicked off by a single navigation to `/learn`. Each concept now
- * pays for itself, when it is asked for.
+ * solve would otherwise all be triggered by a single navigation to `/learn`.
  *
  * The selection lives in the query string rather than in `useState`, so
- * `/learn?c=bayes` opens on Bayes and the concept a reader is looking at is a
- * thing they can send to somebody. It is deliberately *not* a route: `/learn` is
- * one entry in the router and in `vercel.json`, and a path per concept would be
- * seven more rows in a table that has already 404'd this page once by drifting
- * out of step with the router.
+ * `/learn?c=bayes` opens on Bayes and the concept a reader is looking at is
+ * something they can send to somebody. It is deliberately not a route: `/learn`
+ * is one entry in the router and one in `vercel.json`, and a path per concept
+ * would be seven more rows in a table that must stay in step with the router
+ * (see `src/routes.test.ts`).
  */
 
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -52,11 +49,10 @@ export default function LearnPage() {
   // unknown `?c=` value falls through to the first concept rather than rendering
   // an empty page.
   //
-  // The hash is read as a fallback because this page used to BE seven `#`
-  // anchors, and those are exactly the links a reader would have bookmarked or
-  // sent to someone. Ignoring them does not 404, which would at least be
-  // honest; it silently serves Monte Carlo to somebody who asked for Bayes.
-  // The ids were chosen to match the old anchor names for this reason.
+  // The hash is read as a fallback because this page was once seven in-page `#`
+  // anchors, which are exactly the links a reader may have bookmarked or shared.
+  // Ignoring one does not 404; it silently serves Monte Carlo to somebody who
+  // asked for Bayes. The concept ids match those anchor names for this reason.
   const requested = params.get("c") || hash.replace(/^#/, "");
   const active = CONCEPTS.find((c) => c.id === requested) ?? CONCEPTS[0];
 
@@ -90,8 +86,8 @@ export default function LearnPage() {
          * "fill" row would compress "EV, pot odds, fold equity" to an ellipsis.
          * No `showHint`: each concept prints its own one-line lede as the first
          * thing in its panel, which is where the review puts its tab blurbs too,
-         * and a second copy pinned above the row would be the always-on prose
-         * this sweep exists to remove.
+         * and a second copy pinned above the row would be prose the reader has
+         * to skip past twice.
          */}
         <div className="mt-5" data-testid="concept-selector">
           <Tabs
@@ -127,7 +123,7 @@ export default function LearnPage() {
         >
           The hand review shows you what happened; this page shows you why any of
           it means anything. Every figure above was computed by the same modules
-          the table plays with —{" "}
+          the table plays with:{" "}
           <span className="font-mono">
             poker/monteCarlo.ts, poker/model/likelihood.ts,
             poker/model/buckets.ts, poker/ev.ts, poker/equity/multiway.ts

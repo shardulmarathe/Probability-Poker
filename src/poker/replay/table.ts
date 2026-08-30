@@ -10,7 +10,7 @@
  *
  * "As far as they matter" is the interesting half. Entry stacks are genuinely
  * not recoverable: a seat that finished with chips could have started with any
- * amount above what it put in. What *is* recoverable is the only thing the
+ * amount above what it put in. What is recoverable is the only thing the
  * lifecycle reads them for, whether a seat ran out. A seat recorded `allin`
  * started with exactly its `invested`; every other seat started with strictly
  * more, and any such value replays identically, because each of its recorded
@@ -101,14 +101,14 @@ export function replayBlocker(report: TableHandReport): string | null {
  *
  * At the moment the first seat acts the pot holds exactly the two blinds, and
  * what that seat owes is the big blind less whatever it already posted. Three-
- * handed and up the opener posted nothing, so its `toCall` *is* the big blind;
+ * handed and up the opener posted nothing, so its `toCall` is the big blind;
  * heads-up the opener is the small blind, and the two facts give a pair of
  * equations instead.
  *
  * Returns the fallback rather than a wrong answer whenever the arithmetic does
  * not come out whole, a blind posted short by an already-crippled stack breaks
  * the premise, and a silently wrong blind would produce a hand that replays
- * *almost* correctly, which is worse than one that visibly does not.
+ * almost correctly, which is worse than one that visibly does not.
  */
 export function inferBlinds(report: TableHandReport): TableConfig {
   const first = report.actions.find((a) => a.street === "preflop");
@@ -153,7 +153,7 @@ export function resolveConfig(
  *
  * The `+ 1` on the floor is load-bearing. A seat given exactly its `invested`
  * would be marked all-in the moment it finished paying, which changes both the
- * side-pot layout and whether the round is closed, so a seat that did *not*
+ * side-pot layout and whether the round is closed, so a seat that did not
  * bust must start with strictly more than it spent.
  */
 export function entryStacks(

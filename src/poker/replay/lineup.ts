@@ -11,7 +11,7 @@
  * Every move here is re-derived. Not one of the recorded actions is replayed -
  * they were answers to a different table and would mostly not even be legal -
  * so the whole hand carries `simulated: true`, including the seat the player
- * occupied, which a bot now plays. What is *not* simulated is the deal, and
+ * occupied, which a bot now plays. What is not simulated is the deal, and
  * `sameCards` proves it hand by hand rather than asserting it in a comment.
  */
 

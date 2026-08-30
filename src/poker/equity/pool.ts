@@ -134,14 +134,14 @@ function multiwayTimeout(opponents: number): number {
 
 /**
  * How long a shard waits for its worker to finish booting before it gives up
- * on the worker *for this decision only*.
+ * on the worker for this decision only.
  *
  * THE BUG THIS PREVENTS. The shard deadline used to start ticking at
  * `postMessage`, and for the first job a worker ever receives that is before
  * the worker has run a line of code: the browser is still fetching and
  * compiling the module graph behind `equity.worker.ts` (a dozen separate
  * requests against the dev server, one chunk in production). On a loaded
- * machine that is routinely longer than the 400ms a *shard* is allowed, so the
+ * machine that is routinely longer than the 400ms a shard is allowed, so the
  * deadline fired on a perfectly healthy worker, `retire` terminated the whole
  * pool, and because `MAX_POOL_BUILDS` is 2 the second occurrence latched
  * `unavailable` for the life of the page. Every decision from the third on ran
@@ -174,7 +174,7 @@ const bootState = new WeakMap<
 >();
 
 /**
- * Called for *any* message, not only the `ready` announcement: a shard result
+ * Called for any message, not only the `ready` announcement: a shard result
  * proves the worker is up just as well, and that keeps the pool correct against
  * a cached worker bundle that predates the handshake.
  */

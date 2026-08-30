@@ -1,7 +1,7 @@
 /**
  * Engine adapters for the two explanatory surfaces.
  *
- * The review's Math tab and the concepts page both need to *run* the engine
+ * The review's Math tab and the concepts page both need to run the engine
  * rather than quote it, a break-even frequency worked at this hand's pot, the
  * category distribution of a real holding, the model a session's own decisions
  * would build, an equilibrium for the river that was actually dealt. Every one
@@ -69,7 +69,7 @@ import { appliedLikelihood } from "../report/derive";
 /**
  * Bet sizes as a fraction of the pot, the four the literature quotes.
  *
- * They are here as *inputs* to the formula below, not as answers: the published
+ * They are here as inputs to the formula below, not as answers: the published
  * 33.3 / 42.9 / 50 / 66.7 table is produced by evaluating `alphaOf` at these
  * fractions, and `poker/ev.test.ts` pins the same four numbers against the
  * implementation in `poker/ev.ts`. Nothing in this module stores a break-even
@@ -260,7 +260,7 @@ export interface SessionModel {
  * IMPORTANT, and stated wherever this is displayed: the live table does not
  * learn. `model/decider.ts` prices every hand against a fresh
  * `createLikelihoodModel("poker")` that is never written to, and nothing in the
- * app calls `learn.observe`. This is the model the session's own play *would*
+ * app calls `learn.observe`. This is the model the session's own play would
  * produce, computed from the archive after the fact.
  */
 export function learnSeat(

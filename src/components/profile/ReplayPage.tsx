@@ -11,10 +11,9 @@
  * The two simulated views live behind their own tabs and their own colour. See
  * `WhatIf.tsx` for why they are so insistent about it.
  *
- * The tab bar used to be a near byte-for-byte copy of the hand review's,
- * inlined here, same gradient, same sticky wrapper, same active treatment
- * written out a second time. It is now `Tabs` + `StickyTabs` from the design
- * system.
+ * The tab bar is `Tabs` + `StickyTabs` from the design system rather than an
+ * inlined copy of the hand review's, so the gradient, the sticky wrapper and the
+ * active treatment are defined once.
  *
  * Those tab blurbs ("Change one decision") started life in `title=` attributes,
  * which no phone has ever shown to anyone, and the fix was to print the active
@@ -22,7 +21,7 @@
  * italic prose describing a tab whose label is already on screen and already
  * selected, sitting in a sticky bar directly above the thing the reader came to
  * look at. It is now `hintAs="tooltip"`, which is emphatically not a return to
- * `title=`: `Tabs` renders a real element on hover *and* on focus-within, so it
+ * `title=`: `Tabs` renders a real element on hover and on focus-within, so it
  * reaches a keyboard and a tap, and every tab's own blurb is reachable rather
  * than only the selected one's.
  */
@@ -75,7 +74,7 @@ export default function ReplayPage() {
   // Hands are addressed by deal seed below, so the seat count is known before
   // the report is; `seatCount` here is the archive's widest table, which is all
   // `seatName` needs. Names go into the replay table itself so the engine's own
-  // narration ("Textbook Tara raises to $40") matches the seats on screen.
+  // narration ("Tight Aggressive raises to $40") matches the seats on screen.
   const options = useMemo(
     () => ({
       config,
@@ -121,7 +120,7 @@ export default function ReplayPage() {
                 </ButtonLink>
               }
             >
-              Play a hand out and it becomes replayable here — stepped through
+              Play a hand out and it becomes replayable here, stepped through
               action by action, with the option to change one of your decisions
               and watch the table answer it differently.
             </EmptyState>
@@ -141,7 +140,7 @@ export default function ReplayPage() {
           title="Hand replay"
           lede={
             <>
-              Hand #{report.handNumber} — {report.seatCount}-handed, dealt from
+              Hand #{report.handNumber}: {report.seatCount}-handed, dealt from
               seed {report.seed}.
               {mine
                 ? ` ${seatName(seat)} netted ${mine.net >= 0 ? `+${money(mine.net)}` : `−${money(-mine.net)}`}.`
@@ -214,7 +213,7 @@ export default function ReplayPage() {
           </div>
           <p className="mt-1.5 text-[0.78rem] leading-relaxed text-ivory/65">
             {replay.fidelity.ok
-              ? "The engine was given this hand's seed and dealt it again. Every card, every side pot and every seat's net came out identical to the record — so what you are stepping through is the hand, not a reconstruction of it."
+              ? "The engine was given this hand's seed and dealt it again. Every card, every side pot and every seat's net came out identical to the record, so what you are stepping through is the hand, not a reconstruction of it."
               : "This hand did not rebuild identically, so the steps below may not be what happened. The simulated views are disabled."}
           </p>
           {!replay.fidelity.ok && (

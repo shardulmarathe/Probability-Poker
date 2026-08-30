@@ -59,7 +59,7 @@ export function RangesConcept() {
     >
       <Lead>
         There are exactly {COMBO_COUNT.toLocaleString()} two-card combinations in
-        a deck, and a range is one weight for each of them. Not a list of hands —
+        a deck, and a range is one weight for each of them. Not a list of hands but
         a distribution, because "he has ace-king or a pair" is not a claim you can
         sample from and "these 1,326 weights" is. Every read on this table is that
         object, and the sampler draws opponents' cards straight out of it.
@@ -110,7 +110,7 @@ export function RangesConcept() {
       <Lead>
         That is card removal, and it is why a blocker is arithmetic rather than
         intuition. Holding one ace does not make it "less likely" they have aces
-        in some vague sense — it takes the number of ace pairs they can physically
+        in some vague sense. It takes the number of ace pairs they can physically
         hold from six to {aces === 6 ? 6 : aces}. The same reasoning runs the
         other way when you hold none.
       </Lead>
@@ -122,13 +122,13 @@ export function RangesConcept() {
           combination containing it to zero and renormalising. Nothing special
           happens: the likelihood factors that come afterwards can only scale a
           zero. That means a blocker moves the equity estimate, not merely the
-          picture of the range — the sampler literally cannot deal a hand that
+          picture of the range: the sampler literally cannot deal a hand that
           contains a card you can see.
         </Lead>
         <Heading>What replaced the old model</Heading>
         <Lead>
-          The sampler used to draw from a three-tier belief — 70% likely to be
-          strong, 20% medium — and a belief like that cannot say <em>which</em>{" "}
+          The sampler used to draw from a three-tier belief (70% likely to be
+          strong, 20% medium), and a belief like that cannot say <em>which</em>{" "}
           hands those are, so it had to guess. The guess was a preflop score,
           which files 7-2 under "weak" on a K-7-2 board where it is two pair. The
           range carries the board-relative answer and the card removal together,

@@ -1,7 +1,7 @@
 /**
  * One slice of a belief-weighted Monte Carlo run, off the main thread.
  *
- * The shard *logic* lives here rather than in the pool because the pool holds
+ * The shard logic lives here rather than in the pool because the pool holds
  * the `new Worker(new URL(...))` reference to this file, importing the pool
  * back would make the two modules a bundling cycle. So this module is the unit
  * of work, and `pool.ts` is only the scheduler. The pool imports `runShard`
@@ -44,7 +44,7 @@ export interface ShardResult extends MonteCarloCounts {
  * A slice of a multiway run. Same wire discipline, one hero against a field.
  *
  * `kind` is the discriminator, and only this job carries it: `ShardJob` shipped
- * first and had no tag, so its *absence* is what identifies a heads-up job.
+ * first and had no tag, so its absence is what identifies a heads-up job.
  * That keeps every existing caller and every existing message on the wire valid
  * unchanged.
  */
@@ -60,7 +60,7 @@ export interface MultiwayShardJob {
    *
    * 10.6 KB per seat on the wire against the 40 bytes a `BeliefDistribution[]`
    * cost, which is the price of the migration's whole point: a tier label
-   * cannot express "this opponent has two pair on *this* board", and a weight
+   * cannot express "this opponent has two pair on this board", and a weight
    * per combo can. Structured clone handles a `Float64Array` natively, and the
    * shard that receives it builds its own alias table.
    */

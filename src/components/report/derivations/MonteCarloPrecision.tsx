@@ -125,7 +125,7 @@ function MonteCarlo({ decision }: { decision: BotDecision }) {
           thing. They agree in the middle. They part company at the edges, and a
           poker equity spends a lot of its life at the edges: by the river the
           hand is decided, p̂ is exactly 0 or 1, and the standard error collapses
-          to zero — Wald then claims perfect certainty from a finite sample, and
+          to zero. Wald then claims perfect certainty from a finite sample, and
           can report bounds outside [0, 1] on the way there.
         </Lead>
         <Heading>What Wilson does instead</Heading>
@@ -143,8 +143,8 @@ function MonteCarlo({ decision }: { decision: BotDecision }) {
         <Lead>
           The z²/2n in the numerator pulls the centre off the observed proportion
           and toward ½, by an amount that shrinks as n grows. At k = 0 the
-          interval still has width — it says "we saw none in n tries", not "it
-          cannot happen" — and it never leaves [0, 1].
+          interval still has width. It says "we saw none in n tries", not "it
+          cannot happen", and it never leaves [0, 1].
         </Lead>
         {n > 0 && (
           <>
@@ -158,7 +158,7 @@ function MonteCarlo({ decision }: { decision: BotDecision }) {
           </>
         )}
         <Why>
-          Sample size is not a footnote on an equity estimate — it is part of the
+          Sample size is not a footnote on an equity estimate. It is part of the
           estimate. Two hands both showing 62% are different hands if one ran
           20,000 trials and the other 5,000.
         </Why>

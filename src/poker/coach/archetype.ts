@@ -42,7 +42,7 @@ export type PlayStyle = "Nit" | "TAG" | "LAG" | "Calling Station" | "Maniac";
 
 export const STYLE_BLURBS: Record<PlayStyle, string> = {
   Nit: "Tight and passive. Folds too much preflop and gets no value from the hands it does play.",
-  TAG: "Tight and aggressive. Few hands, played hard — the textbook winning style.",
+  TAG: "Tight and aggressive. Few hands, played hard: the textbook winning style.",
   LAG: "Loose and aggressive. Wide ranges backed by real pressure; hard to put on a hand.",
   "Calling Station": "Loose and passive. Sees a lot of flops and pays them off rather than betting them.",
   Maniac: "Loose past sense and relentlessly aggressive. Enormous variance in both directions.",
@@ -64,13 +64,13 @@ export const MANIAC_VPIP = 45;
 /** Postflop bets+raises per call at or above which a seat reads as aggressive. */
 export const AGGRESSIVE_AF = 1.5;
 
-/** Share of *entered* hands that were raised preflop, at or above which likewise. */
+/** Share of entered hands that were raised preflop, at or above which likewise. */
 export const AGGRESSIVE_PFR_RATIO = 0.5;
 
 /** Aggression a loose seat must clear before "maniac" beats "LAG". */
 export const MANIAC_AF = 2;
 
-/** …or this PFR, for a seat aggressive enough preflop to never reach a call. */
+/** ...or this PFR, for a seat aggressive enough preflop to never reach a call. */
 export const MANIAC_PFR = 30;
 
 /** Sample at which confidence reaches one half. */
@@ -179,7 +179,7 @@ function isAggressive(v: StyleVector): boolean {
 /**
  * The rules, in order. Each may veto the ones below it.
  *
- *   1. Maniac, loose past `MANIAC_VPIP` *and* aggressive past `MANIAC_AF` or
+ *   1. Maniac, loose past `MANIAC_VPIP` and aggressive past `MANIAC_AF` or
  *                `MANIAC_PFR`. Both halves are required: a seat playing 70% of
  *                hands passively is a station, not a maniac.
  *   2. Nit, under `NIT_VPIP` on width alone, or merely tight and passive.
@@ -214,7 +214,7 @@ export function classify(v: StyleVector): StyleVerdict {
     reasons.push(`VPIP < ${NIT_VPIP}: too tight to be anything else`);
   } else if (tight && !aggressive) {
     style = "Nit";
-    reasons.push("tight and passive — the same losing shape as a nit");
+    reasons.push("tight and passive: the same losing shape as a nit");
   } else if (aggressive) {
     style = tight ? "TAG" : "LAG";
     reasons.push(tight ? "tight and aggressive" : "loose and aggressive");

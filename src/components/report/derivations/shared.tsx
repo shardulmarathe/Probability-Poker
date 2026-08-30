@@ -19,7 +19,7 @@ export function num(v: number, digits = 3): string {
 }
 
 /**
- * "Callin' Carla's", or "your" when the seat under review is the reader's.
+ * "Calling Station's", or "your" when the seat under review is the reader's.
  *
  * `seatName` returns the table's own label for a seat, and for the human that
  * label is "You", which reads correctly as a subject and not at all as a
@@ -74,7 +74,7 @@ export function bluffing(decisions: BotDecision[], focus: number): BotDecision |
  * `profile/store.ts` strips `decisions` before writing, the Monte Carlo audit
  * trail is a build-specific object and a stored one is either absent or no
  * longer understood, so a restored hand has a full action record and no
- * pricing. Every panel below that reads `BotDecision` has to say *that* rather
+ * pricing. Every panel below that reads `BotDecision` has to say that rather
  * than "nobody was ever priced", which would be a claim about the hand instead
  * of a fact about the storage.
  */
@@ -87,7 +87,7 @@ export function NoTrail({ what }: { what: string }) {
   return (
     <EmptyPanel title="The decision trail was not stored">
       This hand came back from the archive, and the audit trail of what the
-      engine priced is not part of what gets written down — only the cards, the
+      engine priced is not part of what gets written down, only the cards, the
       chips and every action. So {what} cannot be shown for this hand. Every
       panel built from the action record works normally, here and elsewhere in
       the review.
@@ -120,12 +120,11 @@ export function mainVillain(report: TableHandReport, focus: number) {
 }
 
 /**
- * The line that used to be a `Section` subtitle.
+ * The derivation's own context line.
  *
- * Each derivation was a titled panel on the Math tab, and the subtitle carried
- * real content: the trial count, the street, which seat the worked example is
- * about. The caller now owns the label, so that line has to travel with the
- * body or it is lost, and "20,000 trials, flop, Callin' Carla" is exactly the
+ * The caller owns the disclosure's label, so the details that identify a worked
+ * example (the trial count, the street, which seat it is about) have to travel
+ * with the body or they are lost, and "20,000 trials, flop, Calling Station" is exactly the
  * sentence that tells a reader whether the arithmetic below is about the
  * decision they were looking at.
  */

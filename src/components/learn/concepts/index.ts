@@ -3,8 +3,8 @@
  *
  * One list, read by both things that need it: the selector at the top of
  * `/learn` and the panel underneath it. When the seven were stacked in a single
- * scroll there were two lists — a `CONTENTS` array of `#` anchors and the JSX
- * that rendered the sections — and nothing checked that they agreed. They
+ * scroll there were two lists - a `CONTENTS` array of `#` anchors and the JSX
+ * that rendered the sections - and nothing checked that they agreed. They
  * cannot disagree now, because the label a chip prints and the component it
  * mounts are the same row.
  *

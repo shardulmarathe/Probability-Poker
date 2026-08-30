@@ -331,7 +331,7 @@ describe("replayWithLineup", () => {
     }
   });
 
-  it("re-derives every move — none is replayed", () => {
+  it("re-derives every move: none is replayed", () => {
     const { reports } = playSession({ seatCount: 3, hands: 4, seed: 16, ...BLINDS });
     for (const report of reports) {
       const outcome = replayWithLineup(report, ARCHETYPES, {

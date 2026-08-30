@@ -2,7 +2,7 @@
  * Concept 5: board-relative hand classes.
  *
  * `boardClasses` and `makeBoardContext` are keyed on `board.id`, not on `codes`,
- * because `cardCodes` returns a fresh array every render — a `[codes]`
+ * because `cardCodes` returns a fresh array every render - a `[codes]`
  * dependency would classify all 1,326 combinations on every keystroke anywhere
  * in the tree. The id is the board's identity; the array is only its shape.
  */
@@ -51,7 +51,7 @@ export function BucketsConcept() {
     <Group
       id="classes"
       title="Hand classes are board-relative"
-      lede="The same two cards are a different hand on a different board — so the engine classifies against the board, every time."
+      lede="The same two cards are a different hand on a different board, so the engine classifies against the board, every time."
     >
       <Lead>
         Nine classes, ordered by strength, and a combination's class is recomputed
@@ -123,7 +123,7 @@ export function BucketsConcept() {
       </div>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
         Every one of the {classes.live.toLocaleString()} combinations this board
-        leaves alive, classified — the same call a decision makes, counted instead
+        leaves alive, classified: the same call a decision makes, counted instead
         of weighted. A dry board leaves most of the deck with nothing; a
         coordinated one hands a third of it a draw.
       </p>

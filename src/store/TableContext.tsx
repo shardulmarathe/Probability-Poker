@@ -5,7 +5,7 @@
  * in the choreography the heads-up store established, a chip flight, a spoken
  * action, a staggered board deal, generalised from two fixed seats to however
  * many are sitting. The engine itself is untouched by any of it: this file
- * decides *when* a move is shown, never *what* the move is.
+ * decides when a move is shown, never what the move is.
  *
  * Two invariants are worth stating because breaking either is invisible until
  * it is catastrophic:
@@ -216,7 +216,7 @@ const TableContext = createContext<TableContextValue | null>(null);
 
 /**
  * Seat names, deduplicated. The picker allows the same archetype twice, and two
- * seats both called "Wildfire Wes" is unreadable at a glance.
+ * seats both called "Hyper-Aggressive" is unreadable at a glance.
  */
 function seatNames(profiles: string[]): string[] {
   const seen = new Map<string, number>();
@@ -368,7 +368,7 @@ function liveCombos(range: Range | undefined): number {
  * The stages of one decision, in the order the decider runs them.
  *
  * `decision` is the completed `BotDecision` when the current mode is allowed to
- * print the bot's own numbers, and null otherwise. It only ever *appends* to a
+ * print the bot's own numbers, and null otherwise. It only ever appends to a
  * stage's detail, so the stage list has the same length and the same order in
  * every mode, what changes is how much of each line is filled in.
  */
@@ -397,7 +397,7 @@ function planStages(
   if (opponents.length === 0) {
     stages.push({
       title: "Taking it down",
-      detail: "pot is already this seat's — nothing to simulate",
+      detail: "pot is already this seat's, nothing to simulate",
       items: 1,
     });
     return stages;
@@ -422,7 +422,7 @@ function planStages(
     title: "Weighting their ranges",
     detail:
       factors === 0
-        ? `${opponents.length} flat ${s(opponents.length, "prior")} — none of them has acted yet`
+        ? `${opponents.length} flat ${s(opponents.length, "prior")}, none of them has acted yet`
         : `${opponents.length} ${s(opponents.length, "range")} · ${factors} P(action | bucket) ${s(factors, "factor")}, renormalised each time`,
     items: opponents.length,
   });
@@ -486,7 +486,7 @@ function planStages(
   const call = actions.find((a) => a.type === "call");
   if (call && call.cost > 0 && !closesAction(state, seat)) {
     const behind = opponents.filter((id) => toCallOf(state, id) > 0).length;
-    let detail = `${behind} ${s(behind, "seat")} behind still ${s(behind, "owes", "owe")} chips — the pot it is called into is not the final one`;
+    let detail = `${behind} ${s(behind, "seat")} behind still ${s(behind, "owes", "owe")} chips, the pot it is called into is not the final one`;
     const ev = decision?.evByAction[call.label];
     if (ev !== undefined) detail += ` · ${call.label} at ${signed(ev)}`;
     stages.push({
@@ -632,7 +632,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const heroReadRef = useRef<HeroRead | null>(null);
   heroReadRef.current = heroRead;
   // Read the same way `tableRef` is, and for the same reason: the bot loop is a
-  // long-lived async sequence that must see the mode as it is *now*, and putting
+  // long-lived async sequence that must see the mode as it is now, and putting
   // `options` in its dependency list would rebuild `drive`, and re-fire the
   // resume effect that depends on it, every time a setting changed.
   const optionsRef = useRef(options);
@@ -684,7 +684,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
   /**
-   * Set when the loop stopped *because of* the pause, as opposed to because the
+   * Set when the loop stopped because of the pause, as opposed to because the
    * hand ended or the human is on the clock. Only the first case has a turn
    * still owed, so only the first case is resumed, which is what keeps the
    * resume from re-entering a loop that already finished for a good reason.
@@ -734,7 +734,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       if (await sleep(T.dealStep)) {
         /*
          * Starvation is not a pause. A pause means stop; a starved timer means
-         * these beats are stale, and the honest answer is to stop *animating*
+         * these beats are stale, and the honest answer is to stop animating
          * and show the rest at once. Returning early here left community cards
          * hidden while the engine had already dealt them, so a player could be
          * asked to act on a flop they could not see.
@@ -785,7 +785,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
       /*
        * Past this line the move is committed, so bailing can only ever leave
-       * the *table* half-drawn: a bubble still showing and community cards the
+       * the table half-drawn: a bubble still showing and community cards the
        * engine has dealt still face down, which is how a player ended up being
        * asked to act on a flop they could not see. Finish the presentation
        * either way, immediately if the timers are starved.
@@ -816,7 +816,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
     async (seat: number): Promise<boolean> => {
       const live = tableRef.current;
       const request = equityRequest(live, seat);
-      // Kick the decision off first so the whole pipeline runs *underneath* the
+      // Kick the decision off first so the whole pipeline runs underneath the
       // narration rather than after it. It goes to the worker pool, so the main
       // thread stays free to animate while it is in flight, and by the time the
       // first stage has been read it has long since landed.
@@ -1132,7 +1132,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
   // ---- Observer mode deals itself on ---------------------------------------
   //
-  // Gated on the pause too: dealing the *next* hand behind the review screen is
+  // Gated on the pause too: dealing the next hand behind the review screen is
   // the same defect as playing the current one, and the louder half of it -
   // it is what moves the hand number.
   useEffect(() => {

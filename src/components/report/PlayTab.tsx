@@ -7,7 +7,7 @@
  * review that blurs them teaches the opposite of the lesson, that a call was
  * bad because the river bricked, or good because it hit.
  *
- *   Model EV     what the line was worth given what was *knowable* then, priced
+ *   Model EV     what the line was worth given what was knowable then, priced
  *                against the range inferred from the public action. It judges
  *                the decision, and it is the only number worth coaching from.
  *   Hindsight EV what the line turned out to be worth with every hole card face
@@ -23,14 +23,13 @@
  *
  * ## The three derivations at the foot of the two sections
  *
- * All collapsed. The EV columns raise two questions this tab used to answer on
- * a different tab fifteen screens away — how a number in a column called "Model
- * loss" was arrived at, and what a bet is worth beyond the α it has to clear —
- * so `ExpectedValue` and `FoldEquityAlphaMdf` hang off the per-move section
- * that prints them. `RiverEquilibrium` hangs off the EV Loss section, under the
- * costliest-decision callout: that callout names the line that priced better
- * against a read, and equilibrium is the other yardstick, the one that holds
- * against an opponent who knew the strategy in advance.
+ * All collapsed. The EV columns raise two questions, how a number in a column
+ * called "Model loss" was arrived at, and what a bet is worth beyond the α it
+ * has to clear, so `ExpectedValue` and `FoldEquityAlphaMdf` hang off the
+ * per-move section that prints them. `RiverEquilibrium` hangs off the EV Loss
+ * section, under the costliest-decision callout: that callout names the line
+ * that priced better against a read, and equilibrium is the other yardstick,
+ * the one that holds against an opponent who knew the strategy in advance.
  */
 
 import { useEffect, useState } from "react";
@@ -172,7 +171,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           {/* Signed, so the tone carries the sign rather than a flat gold. */}
           <Stat
             label="Net"
-            value={you ? signed(you.net) : "—"}
+            value={you ? signed(you.net) : "-"}
             tone={!you || you.net === 0 ? "neutral" : you.net > 0 ? "good" : "bad"}
           />
         </StatGrid>
@@ -187,7 +186,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
         {loss.status === "working" && (
           <div className="flex h-[7rem] flex-col items-center justify-center gap-3 text-sm text-ivory/55">
             <span className="h-2 w-2 animate-pulse rounded-full bg-gold-soft" />
-            Re-pricing every decision…
+            Re-pricing every decision...
           </div>
         )}
 
@@ -214,7 +213,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                 title="Model EV loss"
                 subtitle="Judges the decision"
                 value={loss.value.totalModelEvLoss}
-                blurb="Priced against the range the public action implied — only what was knowable at the time. This is the coaching number."
+                blurb="Priced against the range the public action implied: only what was knowable at the time. This is the coaching number."
               />
               <LensCard
                 tone="red"
@@ -240,7 +239,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                       Costliest decision
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-ivory/75">
-                      {STREET_LABEL[loss.value.worst.street]} —{" "}
+                      {STREET_LABEL[loss.value.worst.street]},{" "}
                       {who.toLowerCase() === "you" ? "you" : who} chose{" "}
                       <strong className="uppercase text-ivory">
                         {loss.value.worst.action}
@@ -334,7 +333,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                 <p className="mt-3 text-[0.7rem] leading-relaxed text-ivory/45">
                   The two loss columns are never added together. A tilde on the
                   true equity means the runout was sampled rather than
-                  enumerated — only possible when the hand ended with cards still
+                  enumerated: only possible when the hand ended with cards still
                   to come.
                 </p>
               </>
@@ -362,8 +361,8 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           <Heading>What changes between the lenses</Heading>
           <Lead>
             Only the equity. Model EV uses the pot share against the{" "}
-            <em>inferred range</em> — the same three-tier read the Ranges tab
-            draws — while hindsight EV uses the pot share against the{" "}
+            <em>inferred range</em>, the same three-tier read the Ranges tab
+            draws, while hindsight EV uses the pot share against the{" "}
             <em>actual cards</em>, with the real board enumerated where it can
             be. The pricing formula is identical either way:
           </Lead>
@@ -375,7 +374,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           </Calc>
           <Heading>What each is worth measuring for</Heading>
           <Lead>
-            Model EV loss adds up over a session into something meaningful — it
+            Model EV loss adds up over a session into something meaningful. It
             is roughly the price of the mistakes. Hindsight EV loss adds up into
             variance, and averages to zero over correct decisions. Both are worth
             seeing; neither is worth seeing in the same column.
@@ -436,13 +435,13 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                       Facing {money(m.record.toCall)} into{" "}
                       {money(m.record.potBefore)}: a call had to be good{" "}
                       <span className="font-mono text-gold-soft">{pct(need)}</span>{" "}
-                      of the time to break even —{" "}
+                      of the time to break even,{" "}
                       {(m.record.potBefore / m.record.toCall).toFixed(1)} to 1 on
                       the money.
                     </p>
                   ) : (
                     <p className="mt-2 text-xs leading-relaxed text-ivory/70">
-                      Nothing to call, so the move was free — any equity at all is
+                      Nothing to call, so the move was free: any equity at all is
                       profit.
                     </p>
                   )}
@@ -471,20 +470,20 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
 
                     <div>
                       <p className="mb-1.5 font-mono text-[0.58rem] uppercase tracking-[0.18em] text-gold-soft/70">
-                        Model EV — the lines available
+                        Model EV: the lines available
                       </p>
                       {scored ? (
                         <>
                           <Alternatives d={scored} lens="model" />
                           <p className="mb-1.5 mt-3 font-mono text-[0.58rem] uppercase tracking-[0.18em] text-[#e58a8a]/70">
-                            Hindsight EV — with the cards face up
+                            Hindsight EV: with the cards face up
                           </p>
                           <Alternatives d={scored} lens="hindsight" />
                         </>
                       ) : (
                         <p className="text-xs leading-relaxed text-ivory/45">
                           {loss.status === "working"
-                            ? "Scoring…"
+                            ? "Scoring..."
                             : "This move was not scored."}
                         </p>
                       )}
@@ -510,7 +509,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           </Calc>
           <Lead>
             That is the number printed against every call above. It is exact
-            arithmetic, not an estimate — the only open question is whether the
+            arithmetic, not an estimate: the only open question is whether the
             hand clears it, and that is what the two EV panels answer from their
             two different vantage points.
           </Lead>
@@ -536,7 +535,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           </Calc>
           <Lead>
             Both numbers are printed against every bet and raise above, worked at
-            that move's own pot. They need no simulation and no read — like pot
+            that move's own pot. They need no simulation and no read, like pot
             odds, they are the half of the decision that is pure arithmetic. What
             the bet is actually <em>worth</em> needs one more thing, the equity
             against the hands that do not fold, and that is the next panel down.
@@ -598,7 +597,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                         {money(d.potBefore)}
                       </td>
                       <td className="py-2 pr-3 text-right font-mono text-xs text-ivory/70">
-                        {d.toCall > 0 ? money(d.toCall) : "—"}
+                        {d.toCall > 0 ? money(d.toCall) : "-"}
                       </td>
                       <td
                         className={`py-2 pr-3 text-right font-mono text-xs ${
@@ -609,7 +608,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
                               : "text-ivory/40"
                         }`}
                       >
-                        {d.toCall > 0 ? pct(need) : "—"}
+                        {d.toCall > 0 ? pct(need) : "-"}
                       </td>
                       <td className="py-2 pr-3">
                         <Tag tone="gold">{d.action.label}</Tag>
@@ -623,7 +622,7 @@ export function PlayTab({ report, focus, seatName, isHero }: Props) {
           {/* Two tables on one tab print an equity column each and the two do
               not match to the last point. That is worth explaining once, to the
               reader who noticed, and it is not worth a permanent paragraph
-              under a table nobody has cross-checked yet — the mismatch is the
+              under a table nobody has cross-checked yet - the mismatch is the
               question, so the answer waits for it. */}
           <Reveal
             tone="quiet"
@@ -689,7 +688,7 @@ function BluffPrice({ move, isHero }: { move: Move; isHero: boolean }) {
           >
             {pct(breakdown.pFold)}
           </span>
-          , {breakdown.pFold >= alpha ? "above" : "below"} that line — and the
+          , {breakdown.pFold >= alpha ? "above" : "below"} that line, and the
           bet had {pct(breakdown.eContinue)} equity against the range that would
           have called.
         </>
@@ -832,7 +831,7 @@ function ReadShift({
         }}
       >
         {Math.abs(delta) < 0.005
-          ? "—"
+          ? "-"
           : `${delta > 0 ? "+" : "−"}${pct(Math.abs(delta), 0)}`}
       </span>
     </div>

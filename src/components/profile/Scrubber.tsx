@@ -20,7 +20,7 @@ import { CardRow, Tag } from "../ui";
  *
  * `frame.pot` is the live pot: right until the chips are pushed and wrong
  * afterwards. The last frame of every hand read "Pot $0" directly above a
- * narration line saying "Pot of $90 to Wildfire Wes". Once the hand is settled
+ * narration line saying "Pot of $90 to Hyper-Aggressive". Once the hand is settled
  * the total that was contested is the number being looked for, and every seat's
  * `invested` still holds its share of it.
  */
@@ -152,7 +152,7 @@ export function Scrubber({
         data-testid="scrub-narration"
       >
         {narration.length === 0 ? (
-          <p className="text-[0.78rem] text-ivory/40">—</p>
+          <p className="text-[0.78rem] text-ivory/40">-</p>
         ) : (
           narration.map((line, i) => (
             <p key={i} className="text-[0.78rem] leading-relaxed text-ivory/75">
@@ -194,7 +194,7 @@ export function Scrubber({
               </div>
 
               <div className="mt-2 flex items-end justify-between gap-2">
-                <CardRow cards={seat.hole} size="sm" empty="—" />
+                <CardRow cards={seat.hole} size="sm" empty="-" />
                 <div className="shrink-0 text-right">
                   <p className="font-mono text-[0.7rem] text-ivory">{money(seat.stack)}</p>
                   <p className="font-mono text-[0.6rem] text-ivory/45">

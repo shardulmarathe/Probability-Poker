@@ -100,7 +100,7 @@ export function BayesConcept() {
 
       <div className="mb-4">
         <Choice
-          label="They…"
+          label="They..."
           value={action}
           onChange={setAction}
           options={ACTIONS.map((a) => ({ value: a, label: a }))}
@@ -156,15 +156,15 @@ export function BayesConcept() {
       <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
         The posterior column is the product column divided by its own sum. An
         action nobody plays differently with different hands leaves the read
-        exactly where it was — which is why a check on a wet board says almost
+        exactly where it was, which is why a check on a wet board says almost
         nothing and a river raise says a great deal.
       </p>
 
       <Heading>The same action at a different node</Heading>
       <Lead>
         Three tiers and one table is a summary. The model the engine actually
-        prices with conditions on four things at once — the hand class, the
-        street, the position and what the actor is facing — because "raise"
+        prices with conditions on four things at once: the hand class, the
+        street, the position and what the actor is facing. "Raise"
         unopened is a bet, "raise" facing a bet is a raise, and "raise" facing a
         raise is a three-bet, and the three carry wildly different implications.
         Folding is only <em>legal</em> in the last two, so pooling them corrupts
@@ -208,7 +208,7 @@ export function BayesConcept() {
         ))}
       </div>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
-        P({action}) at this node, by hand class — spread from{" "}
+        P({action}) at this node, by hand class: spread from{" "}
         {pct(Math.min(...spread), 1)} to {pct(Math.max(...spread), 1)}, a factor
         of {(Math.max(...spread) / Math.max(1e-9, Math.min(...spread))).toFixed(1)}.
         Change the street or what they are facing and the whole shape moves. This
@@ -229,7 +229,7 @@ export function BayesConcept() {
         <Heading>The backoff</Heading>
         <Lead>
           So six nested estimates are kept, ordered by how fast each fills with
-          data — everything, then (street, facing), then the class, then class and
+          data: everything, then (street, facing), then the class, then class and
           street, then class, street and facing, then all four. A lookup starts at
           the prior and walks coarse to fine, each level shrinking toward the
           previous one's answer with a Dirichlet prior. A level with no evidence is
@@ -246,7 +246,7 @@ export function BayesConcept() {
         </Lead>
         <Why>
           The prior is generated from six constants rather than hand-typed,
-          because nobody can keep 540 hand-written probabilities self-consistent —
+          because nobody can keep 540 hand-written probabilities self-consistent,
           and one of those constants exists purely to stop the prior folding more
           than the minimum defence frequency allows.
         </Why>

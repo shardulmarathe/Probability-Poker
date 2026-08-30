@@ -106,8 +106,8 @@ export function Tabs<T extends string | number>({
    * The four seconds is a fallback, not the usual path. Verified on an emulated
    * iPad (`hover: none`, `pointer: coarse`): a tap leaves the control focused,
    * so `group-focus-within` holds the hint open past this timer and it clears
-   * when the reader taps away. That is the behaviour you want — a focused
-   * control should keep its own description available — and the timer only
+   * when the reader taps away. That is the behaviour you want - a focused
+   * control should keep its own description available - and the timer only
    * matters where focus is not retained.
    */
   const [justPicked, setJustPicked] = useState<T | null>(null);
@@ -139,7 +139,7 @@ export function Tabs<T extends string | number>({
   const idleBorder = layout === "fill" ? "transparent" : LINE.quiet;
 
   // A "fill" row divides a fixed width between its labels, so on a phone the
-  // type has to come down or "Step through" becomes "Step thro…". Everything
+  // type has to come down or "Step through" becomes "Step thro...". Everything
   // else keeps its size, it can wrap or scroll instead.
   const metrics =
     size === "sm"
@@ -197,7 +197,7 @@ export function Tabs<T extends string | number>({
 
           if (!tipId) return control;
 
-          // Hover *and* focus-within, so the blurb is reachable from a keyboard
+          // Hover and focus-within, so the blurb is reachable from a keyboard
           // and not only from a mouse, plus a brief forced open on commit so a
           // touch device sees it at all. The hover and focus halves stay in CSS
           // rather than state: an open/closed boolean per option would

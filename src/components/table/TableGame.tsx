@@ -7,7 +7,7 @@
  * No-Limit makes "how much" the actual decision, and a mode-gated readout of
  * what the interface is allowed to tell you.
  *
- * The modes gate *this file* and nothing else. `TableContext` never reads
+ * The modes gate this file and nothing else. `TableContext` never reads
  * `mode` before deciding anything, so switching to Study reveals cards without
  * changing a single bot's information set, which is what makes a hand studied
  * the same hand as a hand played.
@@ -98,7 +98,7 @@ export default function TableGame() {
   /*
    * What each winner actually held, by seat. A showdown that only says who was
    * paid teaches nothing, the point of the table is that a player can see
-   * *why* the chips moved. Folded seats have a null `final` and are skipped,
+   * why the chips moved. Folded seats have a null `final` and are skipped,
    * which is also why this is empty when everyone else folded.
    */
   const madeHands = useMemo(() => {
@@ -217,10 +217,10 @@ export default function TableGame() {
         {/*
          * Two elements, because a real table is two things: a padded rail you
          * rest your arms on, and a bed of cloth sunk below it. `.pp-table`
-         * carries the rail, its padding *is* the rail's width, and
+         * carries the rail, its padding is the rail's width, and
          * `.pp-table-bed` is the cloth, inset by exactly that much. Both
          * materials live in index.css; nothing here paints, and the table's
-         * minimum height lives there too, because it is the *bed* that has to
+         * minimum height lives there too, because it is the bed that has to
          * clear a seat, the board and the hero, and only the rail knows how
          * much of the outer box it is taking.
          */}
@@ -272,7 +272,7 @@ export default function TableGame() {
               </div>
 
               {/* Taken out of flow at `lg` rather than made a flex sibling of
-                  the cards: as a sibling the pair would be centred *with* the
+                  the cards: as a sibling the pair would be centred together with the
                   board, which slides the flop off the table's own axis. Pinned
                   to 14rem right of centre it clears the widest board (5 × 5rem
                   plus gaps) and the cards stay where the felt is drawn around
@@ -343,7 +343,7 @@ export default function TableGame() {
              *
              * It hung off the thinking seat until this round, which read well
              * and covered the flop: a chair on the top arc opens downward, and
-             * at four-handed the chair above the board *is* the one above the
+             * at four-handed the chair above the board is the one above the
              * board. Every other direction runs into a neighbouring seat or off
              * the cloth, so it lives here instead, in the one strip of felt that
              * is guaranteed empty at every table size, below the board and to
@@ -426,7 +426,7 @@ export default function TableGame() {
             <Thinking step={thinkingSeat.step} compact who={thinkingSeat.name} />
           ) : (
             <p className="py-2 text-center font-cormorant text-sm italic text-ivory/40 sm:py-4 sm:text-base">
-              {fx.busy ? "Watching the table…" : " "}
+              {fx.busy ? "Watching the table..." : " "}
             </p>
           )}
         </div>
@@ -564,7 +564,7 @@ function ResultStrip({
     .join(" · ");
 
   /*
-   * "Callin' Carla $3000" says who was paid. It does not say why, and the whole
+   * "Calling Station $3000" says who was paid. It does not say why, and the whole
    * table exists to answer why, so the winning hand is named right where the
    * chips are announced rather than one click away in the review.
    *

@@ -118,12 +118,12 @@ export function useProfileArchive(): ProfileView {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, version]);
 
-  // How many seats the picker may offer, and the archive is the only honest
-  // source for it. The live table used to be folded in with `Math.max`, so
-  // sitting down at a six-max table put "Seat 5" and "Seat 6" in the picker
-  // while every archived hand was four-handed: both chairs profiled zero hands
-  // and read as a player who never plays, which is a claim about a seat that
-  // has never existed. The live table is the fallback only while the archive is
+  // How many seats the picker may offer, and the archive is the only sound
+  // source for it. Folding the live table in with `Math.max` would put "Seat 5"
+  // and "Seat 6" in the picker as soon as somebody sat at a six-max table, while
+  // every archived hand was four-handed: both chairs would profile zero hands
+  // and read as a player who never plays, which is a claim about a seat that has
+  // never existed. The live table is the fallback only while the archive is
   // empty, and there the page renders its empty state with no picker at all.
   const seatCount = useMemo(() => {
     const widest = archive.hands.reduce((n, hand) => Math.max(n, hand.seatCount), 0);

@@ -22,8 +22,8 @@ import {
 //
 // Hand-built rather than played, so every count in a test can be verified by
 // reading the action list. The engine's own reports are exercised in
-// evLoss.test.ts and archetype.test.ts; here the point is that a *known* action
-// sequence produces a *known* number.
+// evLoss.test.ts and archetype.test.ts; here the point is that a known action
+// sequence produces a known number.
 // ---------------------------------------------------------------------------
 
 /** `toCall` is the only numeric field any stat reads; the rest is padding. */
@@ -377,9 +377,9 @@ describe("AF and AFq", () => {
       board: RIVER,
     });
 
-    // Seat 1: one check + one fold. AF sees nothing at all…
+    // Seat 1: one check + one fold. AF sees nothing at all...
     expect(scanHand(report, 1)!.af).toEqual({ n: 0, d: 0 });
-    // …but AFq counts the fold as a passive decision.
+    // ...but AFq counts the fold as a passive decision.
     expect(scanHand(report, 1)!.afq).toEqual({ n: 0, d: 1 });
     // Seat 2: check (ignored), call. Seat 0: bet.
     expect(scanHand(report, 2)!.afq).toEqual({ n: 0, d: 1 });

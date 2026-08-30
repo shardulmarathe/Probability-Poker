@@ -112,7 +112,7 @@ function compare(
   // eslint-disable-next-line no-console
   console.log(
     `  ${stack}bb ${label}: ${agree}/${CLASS_COUNT}` +
-      (diffs.length ? ` — differs on ${diffs.join(", ")}` : " — exact")
+      (diffs.length ? ` (differs on ${diffs.join(", ")}` : ") exact")
   );
   return { agree, diffs, worstGapBb };
 }
@@ -210,7 +210,7 @@ describe("preflop all-in equity", () => {
     const mc = m.equity[classIndex("AA") * CLASS_COUNT + classIndex("KK")];
     // eslint-disable-next-line no-console
     console.log(
-      `AA vs KK — exact ${(exact * 100).toFixed(3)}% ` +
+      `AA vs KK: exact ${(exact * 100).toFixed(3)}% ` +
         `(overlap 2/1/0 suits: ${(two * 100).toFixed(2)}/${(one * 100).toFixed(2)}/` +
         `${(zero * 100).toFixed(2)}), sampled ${(mc * 100).toFixed(3)}%, ` +
         `error ${((mc - exact) * 100).toFixed(3)}pp`

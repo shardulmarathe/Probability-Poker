@@ -9,7 +9,7 @@
  * `ThinkStep`, it cannot be rendered.
  *
  * It is drawn as a transcript rather than a spinner. A spinner says "wait"; the
- * point of this panel is that the waiting *is* the content, five or six named
+ * point of this panel is that the waiting is the content, five or six named
  * stages, each with the real count it is working on, arriving in the order the
  * decider runs them. Finished stages stay above the current one so the shape of
  * the pipeline accumulates as it runs, which is the thing being taught.
@@ -86,7 +86,7 @@ export interface ThinkingProps {
    * grow into empty felt.
    *
    * Pass `0` where the panel sits in the page flow rather than floating: there,
-   * every finished stage pushes the *running* one further down, and by stage
+   * every finished stage pushes the running one further down, and by stage
    * five it is below the fold on a phone, the one line that is actually live
    * is the one you cannot see. Zero holds the height constant instead.
    *
@@ -150,7 +150,7 @@ export function Thinking({
         borderColor: LINE.gold,
         // The panel gradient over a near-opaque base rather than straight on
         // top of it: `SURFACE.panel` is translucent by design, which is right
-        // for a panel sitting *in* a page and wrong for one floating over the
+        // for a panel sitting in a page and wrong for one floating over the
         // felt, the cards and chips underneath read straight through the text.
         backgroundColor: "rgba(8,25,18,0.96)",
         backgroundImage: SURFACE.panel,
@@ -247,7 +247,7 @@ function Done({ line, rail }: { line: ThinkLine; rail?: boolean }) {
       </p>
       {/*
        * The detail wraps rather than truncating. These lines are the counts the
-       * narration exists to show, and a clipped "1,225 of 1,326 combos surv…"
+       * narration exists to show, and a clipped "1,225 of 1,326 combos surv..."
        * is worse than one that takes a second line.
        *
        * On the rail there is no width for either, so a finished stage drops its

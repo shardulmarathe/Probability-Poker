@@ -3,7 +3,7 @@
  *
  * The old engine's fixed-limit rules had a closed action set: bet $10, raise to
  * $20, done. No-Limit replaces the size with a continuous range, which is what
- * makes the decision genuinely hard, the bot must now choose *how much*, and
+ * makes the decision genuinely hard, the bot must now choose how much, and
  * the size it picks changes how often opponents fold, so equity alone no longer
  * determines the play.
  *
@@ -57,7 +57,7 @@ function minRaiseTotal(state: TableState, config: TableConfig): number {
 /**
  * Legal actions for a seat under No-Limit.
  *
- * Note `mayRaise`: a seat that already acted and then faced an *undersized*
+ * Note `mayRaise`: a seat that already acted and then faced an undersized
  * all-in owes the difference but has lost the right to re-raise, so it gets
  * fold/call only (see `recordAction` in state.ts).
  */

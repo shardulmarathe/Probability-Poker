@@ -69,7 +69,7 @@ function EvWorked({
         EV = P(win) × gain + P(tie) × (chop − stake) + P(lose) × loss
         <div className="mt-2 text-ivory/60">
           this decision: P(win) = {num(d.equity.pWin, 3)}, P(tie) ={" "}
-          {num(d.equity.pTie, 3)}, P(lose) = {num(d.equity.pLoss, 3)} — they sum
+          {num(d.equity.pTie, 3)}, P(lose) = {num(d.equity.pLoss, 3)}, they sum
           to {num(d.equity.pWin + d.equity.pTie + d.equity.pLoss, 3)}, because
           those three outcomes are all there are.
         </div>
@@ -84,12 +84,12 @@ function EvWorked({
         Heads-up a chop returns the stake and splits the rest, so the middle term
         is worth half the pot and{" "}
         <span className="font-mono">P(win) + ½·P(tie)</span> can stand in for the
-        whole expression — which is what <span className="font-mono">poker/ev.ts</span>{" "}
+        whole expression, which is what <span className="font-mono">poker/ev.ts</span>{" "}
         means when it says ties are
         "chip-neutral". Multiway that shortcut breaks: a three-way chop is worth a
         third and a four-way chop a quarter, so the estimator tracks the size of
         every tie and reports <em>pot share</em> instead. Pot share supersedes the
-        tie term rather than dropping it — it is the tie term, already integrated.
+        tie term rather than dropping it. It is the tie term, already integrated.
       </Lead>
       <Calc>
         <div className="flex flex-wrap items-center gap-1">
@@ -98,14 +98,14 @@ function EvWorked({
           <span className="text-gold-soft">{num(share, 4)}</span>
         </div>
         <div className="mt-2 text-ivory/60">
-          against an outright win rate of {num(d.equity.pWin, 4)}. The gap —{" "}
-          {num(share - d.equity.pWin, 4)} — is what the chops were worth, and it
+          against an outright win rate of {num(d.equity.pWin, 4)}. The gap,{" "}
+          {num(share - d.equity.pWin, 4)}, is what the chops were worth, and it
           is exactly what a formula using P(win) alone would throw away.
         </div>
       </Calc>
 
       <Heading>
-        This hand — {seatName(d.seat)}
+        This hand: {seatName(d.seat)}
         {d.seat === focus ? "" : " (the seat the engine priced)"}, {STREET_LABEL[d.street].toLowerCase()}
       </Heading>
       <Calc>
@@ -155,7 +155,7 @@ function EvWorked({
         <Heading>EV ranks the actions; the profile picks one</Heading>
         <Lead>
           The engine prices every legal action and hands that table to the seat's
-          personality. A pure maximiser takes the top row every time — that is
+          personality. A pure maximiser takes the top row every time. That is
           the "professor" seat. Every other archetype bends it: an aggressive
           profile multiplies the EV of betting and raising, a nit needs a better
           hand before it will enter a pot at all, and a bluffing profile will
@@ -163,7 +163,7 @@ function EvWorked({
         </Lead>
         <Lead>
           So the chosen row above may not be the largest, and that is not a bug
-          in the arithmetic — it is the difference between knowing what a spot is
+          in the arithmetic. It is the difference between knowing what a spot is
           worth and being the kind of player who takes it.
         </Lead>
         <Why>

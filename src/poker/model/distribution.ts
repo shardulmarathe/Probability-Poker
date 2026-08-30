@@ -1,5 +1,5 @@
 /**
- * Hand-strength *distributions*, what a combo's final equity looks like across
+ * Hand-strength distributions, what a combo's final equity looks like across
  * every way the board can still run out, not just its average.
  *
  * `buckets.ts` orders its classes by equity against a random hand: expected
@@ -24,9 +24,9 @@
  * note on `allDistributions`).
  *
  * What this is NOT: potential-aware abstraction. Ganzfried & Sandholm draw the
- * line between "distribution aware", histograms over strength at the *final*
+ * line between "distribution aware", histograms over strength at the final
  * round, which is what is built here, and "potential aware", which recurses
- * over histograms of next-round *clusters* so that two hands realizing the same
+ * over histograms of next-round clusters so that two hands realizing the same
  * river distribution at different rates come apart. Doing that needs a cluster
  * assignment per round, which needs k-means with a free cluster count, which is
  * exactly what BUCKET_COUNT being frozen forbids. distribution.test.ts measures

@@ -1,7 +1,7 @@
 /**
  * The bot roster.
  *
- * A seat's playing style lives here as *data*, four numbers per archetype -
+ * A seat's playing style lives here as data, four numbers per archetype -
  * rather than as a subclass with an overridden `decide()`. That is a deliberate
  * choice: the whole point of this project is to report honestly on what the
  * opponents are doing ("this seat enters 11% of pots and bluffs 3% of the time
@@ -9,7 +9,7 @@
  * you can print, not behaviour spread across a class hierarchy.
  *
  * Nothing in here estimates equity or computes EV. This module answers a
- * narrower question: *given* the EV of each legal action, which one does a
+ * narrower question: given the EV of each legal action, which one does a
  * player with this personality actually take? The deviation from the pure
  * maximiser is the personality.
  */
@@ -27,7 +27,7 @@ import type { SizingOption, TableAction } from "../table/rules";
 /**
  * Archetypes that exist as static parameters.
  *
- * `mirror` is excluded on purpose: it copies a *learned* profile of the human
+ * `mirror` is excluded on purpose: it copies a learned profile of the human
  * player, so it has no parameters until a session has been observed and cannot
  * be written down here. Deleting it from this `Exclude` is all Phase 2 needs -
  * the compiler will then demand the missing `BOT_PROFILES` entry rather than
@@ -65,13 +65,14 @@ export const MIN_HOLE_SCORE = -1;
  */
 export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // Tight-passive, taken to its extreme: folds so much that the blinds alone
-  // grind it down. Low aggression *and* a tiny bluff rate, because the whole
+  // grind it down. Low aggression and a tiny bluff rate, because the whole
   // failure mode of a nit is that it only ever puts chips in with the nuts.
   nit: {
     id: "nit",
-    name: "Nickel Nate",
-    avatar: "🔒",
-    blurb: "Folds all but the top 4% of hands, then asks if he's still beat.",
+    name: "Ultra-Tight",
+    short: "Ultra-Tight",
+    monogram: "UT",
+    blurb: "Enters the top 4% of hands and rarely raises them.",
     entryThreshold: 10,
     aggression: 0.8,
     bluffRate: 0.01,
@@ -85,9 +86,10 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // barely does. The two parameters are not the same axis.
   rock: {
     id: "rock",
-    name: "Granite Greta",
-    avatar: "🪨",
-    blurb: "Plays 11% of hands and bets them like she'd rather not.",
+    name: "Tight Passive",
+    short: "Tight Passive",
+    monogram: "TP",
+    blurb: "Plays 11% of hands and shows little appetite for building pots.",
     entryThreshold: 8,
     aggression: 0.7,
     bluffRate: 0.02,
@@ -99,9 +101,10 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // difference, same cards, opposite chips.
   tag: {
     id: "tag",
-    name: "Textbook Tara",
-    avatar: "🎯",
-    blurb: "Enters 18% of pots and applies pressure with every one of them.",
+    name: "Tight Aggressive",
+    short: "TAG",
+    monogram: "TAG",
+    blurb: "Enters 18% of pots and applies pressure in all of them.",
     entryThreshold: 7,
     aggression: 1.35,
     bluffRate: 0.14,
@@ -111,15 +114,16 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // The neutral baseline: aggression 1 and bluffRate 0 make `chooseAction`
   // collapse to a plain argmax over unmodified EV, exactly the old heads-up
   // bot. The threshold sits at the minimum possible holeScore, which is a
-  // *disabled gate* rather than a claim about looseness: this seat folds when
+  // disabled gate rather than a claim about looseness: this seat folds when
   // the EV says fold and for no other reason, so it can be tighter than a nit
   // or looser than a maniac depending only on the price it is being offered.
   // Every other profile is defined as a deviation from this row.
   professor: {
     id: "professor",
-    name: "The Professor",
-    avatar: "🎓",
-    blurb: "Pure expected value, no personality. The baseline everyone deviates from.",
+    name: "Expected Value Baseline",
+    short: "EV Baseline",
+    monogram: "EV",
+    blurb: "Pure expected value, no personality. The row every other profile deviates from.",
     entryThreshold: MIN_HOLE_SCORE,
     aggression: 1,
     bluffRate: 0,
@@ -127,13 +131,14 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   },
 
   // Loose-aggressive: a much wider range than the TAG plus more of everything
-  // after the flop. Wide *and* aggressive is what makes it hard to read, the
+  // after the flop. Wide and aggressive is what makes it hard to read, the
   // same bet covers far more hands.
   lag: {
     id: "lag",
-    name: "Riverboat Rey",
-    avatar: "🃏",
-    blurb: "Plays 43% of hands and barrels most of them. Good luck ranging him.",
+    name: "Loose Aggressive",
+    short: "LAG",
+    monogram: "LAG",
+    blurb: "Plays 43% of hands and barrels most of them, which makes it hard to range.",
     entryThreshold: 5,
     aggression: 1.6,
     bluffRate: 0.26,
@@ -146,9 +151,10 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // rate near zero, a station's chips go in by calling, never by representing.
   station: {
     id: "station",
-    name: "Callin' Carla",
-    avatar: "☎️",
-    blurb: "Sees 67% of flops and folds on approximately none of them.",
+    name: "Calling Station",
+    short: "Station",
+    monogram: "CS",
+    blurb: "Sees 67% of flops and folds almost none of them.",
     entryThreshold: 3,
     aggression: 0.55,
     bluffRate: 0.01,
@@ -161,9 +167,10 @@ export const BOT_PROFILES: Record<BuiltArchetype, BotProfile> = {
   // strictly looser, strictly more aggressive, and strictly bluffier.
   maniac: {
     id: "maniac",
-    name: "Wildfire Wes",
-    avatar: "🔥",
-    blurb: "Plays 96% of hands, raises most of them, and pots it with nothing.",
+    name: "Hyper-Aggressive",
+    short: "Maniac",
+    monogram: "HA",
+    blurb: "Plays 96% of hands, raises most of them, and bets pot with nothing.",
     entryThreshold: 0,
     aggression: 2.2,
     bluffRate: 0.42,
@@ -209,7 +216,7 @@ export function randomLineup(count: number, seed: number): BotProfile[] {
 /**
  * Equity below which there is no hand to value bet, so any bet is a bluff.
  *
- * Strictly this should be equity against the *calling* range rather than raw
+ * Strictly this should be equity against the calling range rather than raw
  * equity against the field, but that needs the opponent model this module
  * deliberately does not depend on. Half the pot share is the honest coarse cut.
  */
@@ -274,7 +281,7 @@ const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
  * Bend an aggressive action's EV by the profile's aggression.
  *
  * The obvious `ev * aggression` is wrong the moment EV goes negative: it would
- * make a maniac *less* willing to fire a -$3 bluff than a rock, inverting the
+ * make a maniac less willing to fire a -$3 bluff than a rock, inverting the
  * whole parameter. Dividing on the negative side keeps the multiplier monotone
  * across zero, above 1 always makes betting look better, below 1 always worse
  *, while staying continuous at 0 and exactly the identity at 1, which is what
@@ -300,7 +307,7 @@ export function meetsEntry(profile: BotProfile, hole: Card[]): boolean {
  * moment they are not, and preflop multiway they never are.
  *
  * The reason is in how the two prices are formed. A call is priced by
- * `ev.actionEv` against the pot *as it stands*, because a call is assumed to
+ * `ev.actionEv` against the pot as it stands, because a call is assumed to
  * close the action; a bet or raise is priced by `ev.foldEquityEv` against the
  * pot every caller will have built by the time the hand is decided. Six-handed
  * with an even share of the equity those come out at roughly
@@ -311,14 +318,14 @@ export function meetsEntry(profile: BotProfile, hole: Card[]): boolean {
  * for the same holding, so raising is priced positive and calling negative for
  * essentially every hand. No `aggression` in (0, ∞) reorders a positive number
  * below a negative one, and measurement agrees: over 220 six-handed hands only
- * 4.3% of the spots where the aggressive line led could be flipped by *any*
+ * 4.3% of the spots where the aggressive line led could be flipped by any
  * multiplier below 1. That is why every profile's PFR tracked its VPIP, and it
  * is not something a different constant in `BOT_PROFILES` can fix.
  *
  * What can, without a new parameter: this module already names the equity below
  * which a bet cannot be for value (`VALUE_BET_FLOOR`), and already carries the
  * rate at which each profile fires there (`bluffRate`). Below the floor every
- * aggressive action is a bluff *by this module's own definition*, so letting the
+ * aggressive action is a bluff by this module's own definition, so letting the
  * argmax take one whenever a one-street EV model likes the price made the
  * declared `bluffRate` a fiction, a station with `bluffRate: 0.01` was firing
  * at air in roughly half its spots. Rule 2 below therefore decides both ways for
@@ -386,7 +393,7 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
     if (profile.bluffRate > 0 && rng.next() < profile.bluffRate) {
       return { action: sizedBluff(aggressive, input), reason: "bluff", tiltedEv };
     }
-    // …and the other side of that same coin: a profile that is passive by
+    // ...and the other side of that same coin: a profile that is passive by
     // parameter does not fire at a hand it cannot value bet, so it takes its
     // passive continuation instead of letting rule 3 raise for it.
     if (isPassive(profile)) {
@@ -412,7 +419,7 @@ export function chooseAction(input: ActionChoiceInput): ActionChoice {
 /**
  * The best way to keep playing without building the pot: a check or a call.
  *
- * Folding is deliberately not a candidate. Declining to *raise* is a statement
+ * Folding is deliberately not a candidate. Declining to raise is a statement
  * about aggression; whether the hand is worth playing at all was already settled
  * by rule 1, and re-deciding it here would turn `aggression` into a second,
  * hidden entry gate. Measured, that is not a nicety: falling back to the plain
@@ -440,7 +447,7 @@ function bestPassive(
 /**
  * Is calling so obviously profitable that the style's entry gate should yield?
  *
- * Only *passive* actions can waive the gate, and deliberately so. The override
+ * Only passive actions can waive the gate, and deliberately so. The override
  * exists for the case its constant documents, a nit in the big blind getting
  * 6-to-1, which is a call: cheap, priced entirely by this street, and wrong to
  * fold. A raise is different in kind. Its EV here is a single-street number, and

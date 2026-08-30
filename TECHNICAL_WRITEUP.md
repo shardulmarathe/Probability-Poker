@@ -18,12 +18,12 @@ A card is a `{rank, suit, id}` triple, with rank $\in\{2,\dots,14\}$ (14 = Ace) 
 
 Everything on a hot path speaks a compact integer instead. `src/poker/core/card.ts` encodes a card as $4(\text{rank}-2) + \text{suit} \in \{0,\dots,51\}$, which makes rank and suit a shift and a mask (`c >> 2`, `c & 3`) and lets the evaluator, the sampler and the range model share one representation with no conversion.
 
-Shuffling uses **Fisher–Yates**, which produces a uniform random permutation: iterating $i$ from $n-1$ down to 1 and swapping element $i$ with a uniformly chosen $j\in\{0,\dots,i\}$ yields each of the $n!$ orderings with probability $1/n!$ (`src/poker/core/rng.ts`, `Rng.shuffle`). The uniformity of this shuffle is the foundation of every probability estimate downstream: it is the assumption that the unseen cards are exchangeable and equally likely in every unseen slot.
+Shuffling uses **Fisher-Yates**, which produces a uniform random permutation: iterating $i$ from $n-1$ down to 1 and swapping element $i$ with a uniformly chosen $j\in\{0,\dots,i\}$ yields each of the $n!$ orderings with probability $1/n!$ (`src/poker/core/rng.ts`, `Rng.shuffle`). The uniformity of this shuffle is the foundation of every probability estimate downstream: it is the assumption that the unseen cards are exchangeable and equally likely in every unseen slot.
 
 The randomness itself is **seeded and deterministic** (§10). Cards are dealt one at a time starting left of the button, which is the real dealing order and no more expensive than slicing the deck in seat order (`src/poker/table/engine.ts`, `deal`).
 
 ### The N-handed state
-Heads-up, every quantity could be a `Record<"player" | "bot", …>` and "the other player" was a function call. With three or more seats those assumptions all break, so state is seat-indexed (`src/poker/table/state.ts`):
+Heads-up, every quantity could be a `Record<"player" | "bot", ...>` and "the other player" was a function call. With three or more seats those assumptions all break, so state is seat-indexed (`src/poker/table/state.ts`):
 
 ```ts
 export interface TableSeat {
@@ -126,7 +126,7 @@ This replaces the old triple $\beta = (\beta_w,\beta_m,\beta_s)$, a single distr
 Every probability downstream is an average over showdowns, so the evaluator that decides a showdown is the primitive the whole engine rests on. It must impose a **total order** on hands so ties and wins are decided by a single comparison.
 
 ### The score encoding
-`evaluate` classifies any 5–7 card set into one of nine categories and assigns an integer `score` (`src/poker/handEvaluator.ts`):
+`evaluate` classifies any 5-7 card set into one of nine categories and assigns an integer `score` (`src/poker/handEvaluator.ts`):
 
 ```ts
 const BASE = 15;
@@ -236,7 +236,7 @@ export function drawCombo(sampler: ComboSampler, rng: Rng): number {
 The coin keeps ~22 bits after the bucket takes its share, far finer than any Monte Carlo here can resolve. The construction is careful about one probabilistic detail: a zero-weight combo left over as float dust is given `prob = 0` and aliased away, so an impossible hand can never be drawn.
 
 ### The 13×13 projection
-For display, combos aggregate into the 169 canonical hand classes of a standard range chart, rows and columns A, K, Q, …, 2; pairs on the diagonal, suited above it, offsuit below. `toGrid` is deliberately **not** normalized, so the projection conserves weight and "the grid sums to the range" stays testable.
+For display, combos aggregate into the 169 canonical hand classes of a standard range chart, rows and columns A, K, Q, ..., 2; pairs on the diagonal, suited above it, offsuit below. `toGrid` is deliberately **not** normalized, so the projection conserves weight and "the grid sums to the range" stays testable.
 
 ---
 
@@ -539,7 +539,7 @@ The generated prior's uncapped rows folded **46.4%** of a range to a half-pot be
 
 Three details make the cap principled rather than a fudge.
 
-**What is anchored is the range-weighted fold frequency**, the share of the hands an opponent actually holds that go in the muck, which is what the EV integral sees. Not the flat mean over the nine buckets: a random range is air-heavy and air is what folds, so the range-weighted rate runs 6–12 points above the per-bucket mean, and pinning the smaller number would leave the one that prices a bet still over the line.
+**What is anchored is the range-weighted fold frequency**, the share of the hands an opponent actually holds that go in the muck, which is what the EV integral sees. Not the flat mean over the nine buckets: a random range is air-heavy and air is what folds, so the range-weighted rate runs 6-12 points above the per-bucket mean, and pinning the smaller number would leave the one that prices a bet still over the line.
 
 **One size is enough**, because the sizing law has the MDF frontier as a **fixed point**. Measure the bet $s$ as a fraction of the pot, so $P = 1$. Then $\alpha = s/(1+s)$, which in odds form is exactly
 
@@ -720,10 +720,10 @@ Finally 8% of each row is replaced by a uniform mix (`PRIOR_MIX = 0.08`), cappin
 
 A lookup starts at the data-free prior row and walks the list coarse to fine, applying the smoothing below at each level **with the previous level's answer as the prior mean**. Because $\text{betaMean}(0,0,m) = m$ exactly, a level with no evidence is the identity: an empty cell inherits its parent's estimate rather than snapping back to the prior. That property is what decides whether the model is useful after 50 hands or only after 5,000.
 
-Position is dropped first because it is the weakest signal per unit of sparsity, six values, and most of what position does is already visible through `facing`. Bucket is introduced late but never dropped from levels 2–5, because it is the axis being estimated; levels 0 and 1 carry no bucket at all, which is exactly what makes them writable from folded hands (§8).
+Position is dropped first because it is the weakest signal per unit of sparsity, six values, and most of what position does is already visible through `facing`. Bucket is introduced late but never dropped from levels 2-5, because it is the axis being estimated; levels 0 and 1 carry no bucket at all, which is exactly what makes them writable from folded hands (§8).
 
 ### No double counting: inclusion and exclusion
-The naive version of this chain feeds the same observation into all six levels, so 30 hands at one context would move the estimate as if there had been 180. Instead each level uses its **exclusive** evidence, the observations it saw that the finer levels did not, via inclusion–exclusion over the six cells:
+The naive version of this chain feeds the same observation into all six levels, so 30 hands at one context would move the estimate as if there had been 180. Instead each level uses its **exclusive** evidence, the observations it saw that the finer levels did not, via inclusion-exclusion over the six cells:
 
 Writing $n_\ell$ for a cell's raw total and $\tilde n_\ell$ for the exclusive evidence level $\ell$ actually uses:
 
@@ -935,7 +935,7 @@ The paper's claim is that the discount schedule matters in practice even though 
 |---|---|---|---|---|
 | exploitability (mbb/h) | **31.9** | 60.8 | 153.5 | 856.1 |
 
-DCFR is roughly twice CFR+ and 27 times vanilla, consistent with the paper's own "matches or outperforms CFR+ across the board… usually a factor of 2 or 3". In a browser that is the difference between a solve and a hang, which is why DCFR is the default and vanilla exists only as a convergence-rate control.
+DCFR is roughly twice CFR+ and 27 times vanilla, consistent with the paper's own "matches or outperforms CFR+ across the board... usually a factor of 2 or 3". In a browser that is the difference between a solve and a hang, which is why DCFR is the default and vanilla exists only as a convergence-rate control.
 
 ---
 
@@ -1033,9 +1033,9 @@ A four-handed flop, hero on the button with a bare flush draw, pot \$60, one opp
 
 **Conditional probability.** $\Pr(A\mid B)=\Pr(A\cap B)/\Pr(B)$. The likelihood model is a table of conditionals $\Pr(\text{action}\mid\text{bucket},\text{street},\text{position},\text{facing})$ (§7); the continuing range is the conditional $R(h\mid \text{did not fold})$ (§6); card removal is conditioning on the visible cards, implemented as an assignment (§3).
 
-**Bayesian inference.** Posterior $\propto$ likelihood $\times$ prior. `updateBelief` is a literal implementation over three tiers (§7); `opponentRanges` is the same rule over 1326 hypotheses, applied once per observed action; the cross-hand learning is a conjugate Beta–Bernoulli (Dirichlet–categorical) update whose posterior mean supplies the likelihoods (§8).
+**Bayesian inference.** Posterior $\propto$ likelihood $\times$ prior. `updateBelief` is a literal implementation over three tiers (§7); `opponentRanges` is the same rule over 1326 hypotheses, applied once per observed action; the cross-hand learning is a conjugate Beta-Bernoulli (Dirichlet-categorical) update whose posterior mean supplies the likelihoods (§8).
 
-**Hierarchical / shrinkage estimation.** Six nested estimates with each level's answer as the next level's prior mean, exclusive evidence apportioned by inclusion–exclusion, and pooled evidence discounted by $1/\text{BUCKET\_COUNT}$ (§7). The Beta posterior mean is the single-level case.
+**Hierarchical / shrinkage estimation.** Six nested estimates with each level's answer as the next level's prior mean, exclusive evidence apportioned by inclusion-exclusion, and pooled evidence discounted by $1/\text{BUCKET\_COUNT}$ (§7). The Beta posterior mean is the single-level case.
 
 **Monte Carlo methods.** Estimate $\mathbb{E}[f(X)] \approx \frac1N\sum f(X_s)$ with error $O(1/\sqrt N)$ (§5). Unbiasedness, $\operatorname{Var} = p(1-p)/N$, and the choice of $N$ by whether the error can reorder an $\arg\max$ rather than by the error itself.
 
@@ -1051,7 +1051,7 @@ A four-handed flop, hero on the button with a bare flush draw, pot \$60, one opp
 
 **Optimal transport.** Earth Mover's Distance between hand-strength distributions, in closed form on a line as the $L_1$ distance between CDFs, used to audit a taxonomy against published values (§4).
 
-**Inclusion–exclusion.** Three separate uses: apportioning backoff evidence (§7), counting disjoint combo pairs between chart classes in closed form (§9), and correcting the card-blocked reach in the river showdown sweep (§9).
+**Inclusion-exclusion.** Three separate uses: apportioning backoff evidence (§7), counting disjoint combo pairs between chart classes in closed form (§9), and correcting the card-blocked reach in the river showdown sweep (§9).
 
 **Game theory and regret minimisation.** Counterfactual regret with a discount schedule; the average strategy converges, not the current one; exploitability as an exact best-response value and the only honest test of a solver (§9).
 
@@ -1069,7 +1069,7 @@ A four-handed flop, hero on the button with a bare flush draw, pot \$60, one opp
 | Hole-card combinations | $\binom{52}{2}$ | 1326 | `COMBO_COUNT`, `model/range.ts` |
 | Chart classes | - | 169 | `GRID_CELLS`, `model/range.ts` |
 | Hand classes | `BUCKET_COUNT` | 9 | `model/buckets.ts` |
-| Table sizes | - | 2–6 seats | `MIN_SEATS`/`MAX_SEATS`, `table/position.ts` |
+| Table sizes | - | 2-6 seats | `MIN_SEATS`/`MAX_SEATS`, `table/position.ts` |
 | Default table | - | 4 seats, 100bb, \$5/\$10 | `DEFAULT_SETUP`, `lib/tableOptions.ts` |
 | Sizing ladder | - | ⅓, ½, ¾, pot, all-in | `LADDER`, `table/rules.ts` |
 | Table decision sims | - | 20000 / 20000 / 15000 / 10000, ÷ opponents | `TABLE_DECISION_SIMS`, `model/decider.ts` |

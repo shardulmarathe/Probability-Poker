@@ -166,7 +166,7 @@ function choose(n: number, k: number): number {
  * The exact answer, by walking every branch the sampler could draw.
  *
  * This is the reference the Monte Carlo is checked against, so it reproduces
- * the sampler's *law* rather than an idealised one: each seat proposes a combo
+ * the sampler's law rather than an idealised one: each seat proposes a combo
  * with probability proportional to its weight in that seat's range, restricted
  * to combos the pool can actually deal; the field's joint proposal is the
  * product of those; and the whole tuple is kept only if the hands are disjoint.
@@ -336,7 +336,7 @@ function fallbackRate(exact: Exact): number {
 
 // ---- Deterministic showdowns ----------------------------------------------
 
-describe("multiway — a settled board is arithmetic, not sampling", () => {
+describe("multiway: a settled board is arithmetic, not sampling", () => {
   it("agrees exactly with a direct showdown when the pool forces both hands", () => {
     // A two-card pool leaves the lone opponent no choice, so with the board
     // already out every simulation replays the same showdown.
@@ -414,7 +414,7 @@ describe("multiway — a settled board is arithmetic, not sampling", () => {
 
 // ---- Monte Carlo against exhaustive enumeration ----------------------------
 
-describe("multiway — matches exhaustive enumeration", () => {
+describe("multiway: matches exhaustive enumeration", () => {
   it("one opponent on the turn, over the whole remaining deck", () => {
     const hero = codes("Ah", "Kd");
     const board = codes("Qs", "Jc", "7h", "3d");
@@ -496,7 +496,7 @@ describe("multiway — matches exhaustive enumeration", () => {
 
 // ---- Invariants -----------------------------------------------------------
 
-describe("multiway — invariants", () => {
+describe("multiway: invariants", () => {
   const req = (n: number, sims = 20_000): EquityRequest => ({
     heroHole: codes("Qs", "Qd"),
     board: codes("Jh", "7c", "2d"),
@@ -671,7 +671,7 @@ describe("multiway — invariants", () => {
 
 // ---- Equivalence with the heads-up sampler ---------------------------------
 
-describe("multiway — one opponent is the heads-up sampler", () => {
+describe("multiway: one opponent is the heads-up sampler", () => {
   /**
    * WHAT CHANGED HERE, AND WHY.
    *
@@ -684,7 +684,7 @@ describe("multiway — one opponent is the heads-up sampler", () => {
    * mean keeping the preflop tier bucketing this migration exists to remove.
    *
    * What survives is the claim the identity was standing in for: hand the new
-   * sampler the *distribution* the old one drew from, `tierProxyRange`, the
+   * sampler the distribution the old one drew from, `tierProxyRange`, the
    * old law written out, and it estimates the same quantity. Measured over the
    * four streets below at 200k sims, |pWin_multi − pWin_headsup| came out
    * 0.0013 / 0.0004 / 0.0014 / 0.0000, against an SE-of-difference of ~0.0014.
@@ -749,7 +749,7 @@ describe("multiway — one opponent is the heads-up sampler", () => {
 
 // ---- The field effect ------------------------------------------------------
 
-describe("multiway — the field effect", () => {
+describe("multiway: the field effect", () => {
   /**
    * The property the module exists for. `perOpponent` says the hero is a heavy
    * favourite over every single opponent; `equity` says the hero is an underdog
@@ -813,7 +813,7 @@ describe("multiway — the field effect", () => {
 
 // ---- Exchangeability -------------------------------------------------------
 
-describe("multiway — dealing is symmetric in seat order", () => {
+describe("multiway: dealing is symmetric in seat order", () => {
   /**
    * Identical reads must produce identical seats, to within sampling noise.
    *
@@ -904,7 +904,7 @@ describe("multiway — dealing is symmetric in seat order", () => {
 
 // ---- The defect the migration removed ---------------------------------------
 
-describe("multiway — the sampler classifies against the board, not the deal", () => {
+describe("multiway: the sampler classifies against the board, not the deal", () => {
   /**
    * WHAT THIS SECTION IS FOR.
    *

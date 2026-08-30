@@ -79,11 +79,11 @@ describe("classify", () => {
   });
 
   it("requires both width and aggression before saying maniac", () => {
-    // Wide but passive is a station, not a maniac…
+    // Wide but passive is a station, not a maniac...
     expect(
       classify(vector({ vpip: 70, pfr: 8, af: 0.5, pfrRatio: 0.11 })).style
     ).toBe("Calling Station");
-    // …and aggressive but not wide enough is still a LAG.
+    // ...and aggressive but not wide enough is still a LAG.
     expect(
       classify(vector({ vpip: 40, pfr: 34, af: 3.5, pfrRatio: 0.85 })).style
     ).toBe("LAG");
@@ -164,7 +164,7 @@ describe("confidence", () => {
     const clear = classify(vector({ hands: 500, vpip: 34 }));
     const borderline = classify(vector({ hands: 500, vpip: TIGHT_VPIP + 0.2 }));
     expect(borderline.confidence).toBeLessThan(clear.confidence);
-    // …but the sample term still dominates: a clear read on 20 hands is worth
+    // ...but the sample term still dominates: a clear read on 20 hands is worth
     // less than a borderline one on 500.
     expect(classify(vector({ hands: 20, vpip: 34 })).confidence).toBeLessThan(
       borderline.confidence
@@ -225,7 +225,7 @@ const PREFLOP_STRENGTHS = [0.3, 0.8];
  * and spanning zero so that folding is a live option. Symmetric for the same
  * reason: a seat that treats a bet and a call alike measures AF exactly 1.
  *
- * Spaced finely (-25, -23, … -1, 1, … 25, odd, so no price is ever exactly
+ * Spaced finely (-25, -23, ... -1, 1, ... 25, odd, so no price is ever exactly
  * zero), because the tilt is a multiplier: a coarse grid would leave every
  * decision on the same side of the comparison and report every profile neutral.
  */

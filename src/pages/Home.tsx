@@ -48,7 +48,7 @@ const CONCEPTS: Concept[] = [
  * third scrolled 800px down the same page, so the first thing the product asked
  * a new arrival was which of three buttons meant "start". There is one now. The
  * table it will deal is summarised directly underneath it, with a `Change` that
- * opens the full editor — a caption on the decision rather than a second one.
+ * opens the full editor - a caption on the decision rather than a second one.
  */
 export default function Home() {
   // Shared with the panel below rather than owned by it, so the hero's label
@@ -191,7 +191,7 @@ function Matchup() {
 
       <div className="relative flex items-center justify-between gap-2">
         <Seat
-          avatar={"\u{1F916}"}
+          monogram="BOT"
           label="The Bot"
           tag="Bayesian"
           cards={
@@ -214,7 +214,7 @@ function Matchup() {
         </div>
 
         <Seat
-          avatar={"\u{1F9D1}"}
+          monogram="YOU"
           label="You"
           tag="Intuition"
           cards={
@@ -234,20 +234,20 @@ function Matchup() {
 }
 
 function Seat({
-  avatar,
+  monogram,
   label,
   tag,
   cards,
 }: {
-  avatar: string;
+  monogram: string;
   label: string;
   tag: string;
   cards: ReactNode;
 }) {
   return (
     <div className="flex flex-1 flex-col items-center gap-2.5 sm:gap-3.5">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40 bg-felt-deep text-3xl shadow-inner sm:h-16 sm:w-16 sm:text-4xl">
-        {avatar}
+      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gold/40 bg-felt-deep font-display text-xs font-semibold tracking-widest text-gold-soft shadow-inner sm:h-16 sm:w-16 sm:text-sm">
+        {monogram}
       </div>
       <div className="text-center leading-tight">
         <div className="font-display text-base tracking-wide text-ivory">{label}</div>

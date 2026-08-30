@@ -1,17 +1,16 @@
 /**
  * "Watch the table learn a bluffer", and the banner that follows it.
  *
- * The profile's empty state used to be a dead end. It said, honestly, that it
- * would fill itself in once you had played, and a first-time reader has played
- * nothing, so the most interesting page in the product opened by asking them to
- * go away and come back in eight minutes. The style verdict needs thirty hands
- * before it will commit to a label and the likelihood model needs about sixty
- * before it will move at all.
+ * The profile cannot say anything until it has hands to say it about: the style
+ * verdict needs thirty before it will commit to a label, and the likelihood
+ * model needs about sixty before it moves at all. That is roughly eight minutes
+ * of play, which is a long time to ask of a first-time reader before the page
+ * shows them anything.
  *
- * So the empty state now offers to play those sixty hands for you, in under
- * three seconds, against the scripted bluffer the README's headline claim is
- * measured on. What lands is not a mock-up: the production engine plays the
- * hands, `recordReport` folds them in exactly as the live table would, and the
+ * So the empty state offers to play those sixty hands for them, in under three
+ * seconds, against the scripted bluffer the README's headline claim is measured
+ * on. What lands is not a mock-up: the production engine plays the hands,
+ * `recordReport` folds them in exactly as the live table would, and the
  * before-and-after printed here is read out of the real likelihood model.
  *
  * It writes to its own archive (`setArchiveScope`), never the reader's. Sixty
@@ -84,7 +83,7 @@ export function DemoSessionButton({ onLoaded, thin = false }: DemoSessionProps) 
         onClick={run}
       >
         {running
-          ? `Dealing ${Math.round(progress * DEMO_HANDS)} of ${DEMO_HANDS}…`
+          ? `Dealing ${Math.round(progress * DEMO_HANDS)} of ${DEMO_HANDS}...`
           : thin
             ? `Watch the table learn a bluffer (${DEMO_HANDS} hands)`
             : `Or watch the table learn a bluffer (${DEMO_HANDS} hands)`}
@@ -99,7 +98,7 @@ export function DemoSessionButton({ onLoaded, thin = false }: DemoSessionProps) 
         }`}
       >
         {running
-          ? "Real hands, real engine — the same code the table runs."
+          ? "Real hands, real engine: the same code the table runs."
           : thin
             ? `Below ${DEMO_HANDS} hands the read on you is still mostly the shared prior. This shows what it looks like once it is not.`
             : "Played for you, into a sandbox that never touches your own archive."}
@@ -112,7 +111,7 @@ export function DemoSessionButton({ onLoaded, thin = false }: DemoSessionProps) 
  * What the demo was for, printed once it has run.
  *
  * The number is the point. Everything else on this page describes a player;
- * this line describes the *table's belief about* a player, and watching it move
+ * this line describes the table's belief about a player, and watching it move
  * is the only direct evidence a reader gets that the learning model does
  * anything at all.
  */

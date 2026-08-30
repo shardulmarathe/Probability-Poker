@@ -163,7 +163,7 @@ function Ladder({
       <Lead>
         Every point is {possessive(seatName(focus))} <em>full-knowledge equity</em>:
         both hole hands face up, the board run out from that street. Nobody had
-        this number at the table — it needs cards that were face down — but the
+        this number at the table (it needs cards that were face down) but the
         record has them now, so the review can show what the odds actually were
         rather than what anyone believed.
       </Lead>
@@ -211,7 +211,7 @@ function Ladder({
       </Well>
       <p className="mt-2 text-[0.7rem] leading-relaxed text-ivory/45">
         Solid lines are head-to-head against one opponent, both hands known, run
-        out over the board as it stood — enumerated exactly wherever two or fewer
+        out over the board as it stood, enumerated exactly wherever two or fewer
         cards were still to come. The dashed line, when the hand was played this
         session, is the seat's own recorded equity against the whole field:
         sampled from a read rather than from the cards, which is why it can sit
@@ -258,7 +258,7 @@ function Ladder({
                   <td className="py-2 pr-3 text-right font-mono text-xs text-gold-soft">
                     {threat
                       ? `${pct(threat.equity)} vs ${seatName(threat.seat)}`
-                      : "—"}
+                      : "-"}
                   </td>
                 </tr>
               );
@@ -279,7 +279,7 @@ function Ladder({
         <Heading>The last rung is not an estimate</Heading>
         <Lead>
           With the board complete there is nothing left to sample: the hand is
-          decided and the equity is exactly 100% or exactly 0% — or exactly 50%
+          decided and the equity is exactly 100% or exactly 0%, or exactly 50%
           when the two hands tie. Every number on the right of this chart is a
           fact, and the ones on the left are probabilities. They are drawn on the
           same axis because they are the same quantity, seen with different
@@ -287,7 +287,7 @@ function Ladder({
         </Lead>
         <Why>
           Watching this line is the clearest picture of what a community card is:
-          not luck arriving, but information arriving — and value moving with it
+          not luck arriving, but information arriving, and value moving with it
           from whoever was ahead in the dark to whoever the board just chose.
         </Why>
       </HowCalculated>

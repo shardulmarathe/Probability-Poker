@@ -57,7 +57,7 @@ export interface EquityRequest {
    * per hole-card combination, keyed by seat id.
    *
    * This is the whole read, not a summary of one. A three-tier belief can say
-   * an opponent is 70% likely to be strong; it cannot say *which* hands those
+   * an opponent is 70% likely to be strong; it cannot say which hands those
    * are, so a sampler fed one has to guess, and the guess it used to make was
    * a preflop Chen score, which files 7-2 under "weak" on K-7-2-9-4 and aces
    * under "strong" on 5-6-7-8-9. A `Range` carries the board-relative answer
@@ -70,7 +70,7 @@ export interface EquityRequest {
    * (`coach/evLoss.ts` scores a finished hand from action records alone).
    *
    * Consulted only for a seat `ranges` has no entry for, and then it is spread
-   * over combos by *board-relative* bucket (`beliefRange`) rather than by the
+   * over combos by board-relative bucket (`beliefRange`) rather than by the
    * preflop score, so even this path no longer inherits the defect. Supplying
    * neither is legal and means no read at all: a flat prior over every combo
    * the deck still allows.
@@ -101,8 +101,16 @@ export type BotArchetype =
  */
 export interface BotProfile {
   id: BotArchetype;
+  /** Full descriptor, e.g. "Tight Aggressive". Shown wherever there is room. */
   name: string;
-  avatar: string;
+  /**
+   * Compact form for places that cannot fit `name`, chiefly the setup panel's
+   * one-line lineup summary at 390px. Distinct across the roster, so it can be
+   * used as a label on its own rather than only as an abbreviation of one.
+   */
+  short: string;
+  /** Two- or three-letter monogram for the seat chip. */
+  monogram: string;
   blurb: string;
   /** Minimum Chen-style hole score to enter a pot unraised. Lower = looser. */
   entryThreshold: number;

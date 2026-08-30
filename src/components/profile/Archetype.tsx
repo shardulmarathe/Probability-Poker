@@ -15,7 +15,7 @@
  * a verdict the reader has not questioned yet, three lines of monospace under
  * the label they actually came for, and printing it always was a third of this
  * card's height spent answering an unasked question. It stays open while the
- * read is provisional, because then the audit trail *is* the warning: a guess
+ * read is provisional, because then the audit trail is the warning: a guess
  * that hides its reasoning reads as a fact.
  */
 
@@ -92,7 +92,7 @@ export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
           <>
             This is a guess. {verdict.hands} hand{verdict.hands === 1 ? "" : "s"} is
             well under the {MIN_CLASSIFY_HANDS} a label needs to mean anything
-            {shortOf > 0 ? ` — ${shortOf} to go` : ""}. Expect it to change.
+            {shortOf > 0 ? `, ${shortOf} to go` : ""}. Expect it to change.
           </>
         ) : verdict.confidence < USABLE_CONFIDENCE ? (
           <>
@@ -103,7 +103,7 @@ export function ArchetypeCard({ verdict }: { verdict: StyleVerdict }) {
         ) : (
           <>
             Measured over {verdict.hands} hands. Confidence still rises with the
-            sample — it passes 50% at {CONFIDENCE_HALF_HANDS} hands — and drops
+            sample (it passes 50% at {CONFIDENCE_HALF_HANDS} hands) and drops
             when VPIP sits on a cut point.
           </>
         )}

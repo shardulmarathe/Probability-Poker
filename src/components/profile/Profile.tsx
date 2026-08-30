@@ -245,6 +245,17 @@ export default function Profile() {
 
         {thin && <DemoSessionButton onLoaded={loadDemo} thin />}
 
+        {/*
+         * Outside the empty/non-empty split on purpose. Calibration is measured
+         * from guesses committed on the concepts page, not from hands played,
+         * so a reader who has used the guess gates and never sat down has a
+         * result here and an empty archive. Gating it on the archive would hide
+         * the one number on this page that does not come from the archive.
+         *
+         * It renders nothing until a quantity has three estimates behind it.
+         */}
+        <CalibrationCard />
+
         {empty ? (
           <div className="mt-10">
             <EmptyState
@@ -380,13 +391,6 @@ export default function Profile() {
              * which is, and it carries a link to the concept that derives the
              * number it broke.
              */}
-            {/*
-             * Renders nothing until a quantity has three estimates behind it,
-             * so the section is absent rather than empty for a reader who has
-             * not used the guess gates on the concepts page.
-             */}
-            <CalibrationCard />
-
             <Group
               title="What you keep doing"
               lede="Named patterns, ranked by what the habit costs rather than by the worst single hand."

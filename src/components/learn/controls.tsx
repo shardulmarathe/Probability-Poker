@@ -42,6 +42,14 @@ export function Choice<T extends string | number>({
             <button
               key={String(o.value)}
               type="button"
+              /*
+               * Each option is addressable, not just the row. A test id on the
+               * wrapper alone says a control exists and nothing about which of
+               * its values is selected or reachable, which is how this page came
+               * to be auditable only by clicking blindly.
+               */
+              data-testid={testId ? `${testId}-${o.value}` : undefined}
+              aria-pressed={active}
               onClick={() => onChange(o.value)}
               className={`min-h-[32px] border px-2.5 py-1 font-display text-[0.65rem] tracking-wide transition ${RADIUS.control}`}
               style={{

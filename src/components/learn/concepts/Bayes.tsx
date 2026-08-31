@@ -173,18 +173,21 @@ export function BayesConcept() {
 
       <div className="mb-3 flex flex-wrap gap-4">
         <Choice
+          testId="street-choice"
           label="Street"
           value={street}
           onChange={setStreet}
           options={STREETS.map((s) => ({ value: s, label: s }))}
         />
         <Choice
+          testId="facing-choice"
           label="Facing"
           value={facing}
           onChange={setFacing}
           options={FACINGS.map((f) => ({ value: f, label: f.replace("-", " ") }))}
         />
         <Choice
+          testId="position-choice"
           label="Position"
           value={position}
           onChange={setPosition}

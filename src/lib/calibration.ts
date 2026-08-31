@@ -42,11 +42,22 @@ export const CALIBRATION_VERSION = 1;
  *
  * A closed set, because it is what makes a stored row checkable: an unknown key
  * is dropped rather than accumulated, so a typo in a call site cannot quietly
- * open a third bucket that no surface ever reads. One kind per unit the reader
- * is asked to produce: a probability, and a break-even price. A kind is added
- * when something gates a guess of that quantity, not in anticipation of one.
+ * open a fourth bucket that no surface ever reads. A kind is added when
+ * something gates a guess of that quantity, not in anticipation of one.
+ *
+ * `equity` and `table-equity` are the same physical quantity and deliberately
+ * separate buckets. On the concepts page a reader estimates on a slider, in half
+ * points, with no clock; at the table they pick a band while a hand waits, and
+ * the band's width puts a floor under the absolute error that has nothing to do
+ * with how well they read the spot. Pooling them would corrupt the precision
+ * figure for both. The bias figure survives either way, which is why both are
+ * worth keeping rather than dropping the coarser one.
  */
-export const CALIBRATION_KINDS = ["equity", "required-equity"] as const;
+export const CALIBRATION_KINDS = [
+  "equity",
+  "table-equity",
+  "required-equity",
+] as const;
 
 export type CalibrationKind = (typeof CALIBRATION_KINDS)[number];
 

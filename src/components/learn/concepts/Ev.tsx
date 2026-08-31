@@ -77,12 +77,14 @@ export function EvConcept() {
       <Heading>Pot odds: the half that is pure arithmetic</Heading>
       <div className="mb-3 flex flex-wrap gap-4">
         <Choice
+          testId="pot-choice"
           label="Pot"
           value={pot}
           onChange={setPot}
           options={POTS.map((p) => ({ value: p, label: `$${p}` }))}
         />
         <Choice
+          testId="bet-choice"
           label="They bet"
           value={callSize}
           onChange={setCallSize}

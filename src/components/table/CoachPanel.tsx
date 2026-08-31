@@ -31,6 +31,7 @@ import {
 import type { TableMode } from "../../lib/tableOptions";
 import type { TableSeat } from "../../poker/table/state";
 import { LINE, RADIUS, SURFACE, Stat, TONE } from "../ui";
+import { EquityGuess } from "./EquityGuess";
 
 export interface CoachPanelProps {
   mode: TableMode;
@@ -53,6 +54,16 @@ export interface CoachPanelProps {
   handOver?: boolean;
 }
 
+/**
+ * Coach mode gates its own headline number behind a guess.
+ *
+ * Only Coach. Fair Play shows nothing to gate, Drill is silent until after the
+ * move, and Study is the mode whose whole promise is that everything is on
+ * screen, so asking a question there would contradict it. In Coach the number is
+ * the point, which is exactly why producing it first is worth something.
+ */
+const GATES_EQUITY: TableMode[] = ["coach"];
+
 export function CoachPanel({
   mode,
   read,
@@ -63,6 +74,14 @@ export function CoachPanel({
   handOver = false,
 }: CoachPanelProps) {
   const [open, setOpen] = useState(false);
+  /**
+   * The decision whose guess has been answered or skipped, so a new one re-arms.
+   * Keyed by `read.key` rather than a boolean because a hand has several
+   * decisions and each is its own question.
+   */
+  const [resolvedFor, setResolvedFor] = useState<string | null>(null);
+  /** The estimate given for the resolved decision, or null if it was skipped. */
+  const [guessed, setGuessed] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   /*
    * Drill's verdict is read from the store rather than taken as a prop, and it
@@ -126,6 +145,7 @@ export function CoachPanel({
 
   const share = read.equity.equity;
   const ahead = read.toCall === 0 || share >= read.required;
+  const gated = GATES_EQUITY.includes(mode) && resolvedFor !== read.key;
 
   /*
    * The closed line, and the one editorial decision in this file: it states a
@@ -139,7 +159,16 @@ export function CoachPanel({
    * were two things to reconcile. The ratio is in the expansion, next to the
    * percentage it converts to.
    */
-  const summary = (
+  const summary = gated ? (
+    <EquityGuess
+      actual={share}
+      decisionKey={read.key}
+      onResolved={(guess) => {
+        setResolvedFor(read.key);
+        setGuessed(guess);
+      }}
+    />
+  ) : (
     <span className="flex min-w-0 items-baseline gap-x-2 overflow-hidden whitespace-nowrap">
       <span className="font-display text-lg font-bold leading-none text-gold-soft">
         {pct(share, 1)}
@@ -170,6 +199,22 @@ export function CoachPanel({
           no bet to you
         </span>
       )}
+      {/*
+       * How close the estimate came, alongside the answer rather than instead of
+       * it. Only for the decision it was made about: `resolvedFor` moves with
+       * `read.key`, so the delta cannot outlive the spot it describes.
+       */}
+      {guessed !== null && resolvedFor === read.key && (
+        <>
+          <Dot />
+          <span
+            data-testid="coach-guess-delta"
+            className="shrink-0 font-mono text-[0.68rem] leading-none text-ivory/40"
+          >
+            you said {pct(guessed, 0)}
+          </span>
+        </>
+      )}
     </span>
   );
 
@@ -180,19 +225,29 @@ export function CoachPanel({
   return (
     <Shell tight ref={rootRef}>
       <div className="relative flex w-full min-w-0 flex-col gap-1.5">
-        <button
-          data-testid="coach-toggle"
-          aria-expanded={open}
-          onClick={() => setOpen((was) => !was)}
-          className="flex w-full min-w-0 items-center justify-between gap-2"
-        >
-          {summary}
-          <span className="shrink-0 font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
-            {open ? "less ▴" : "more ▾"}
-          </span>
-        </button>
+        {gated ? (
+          /*
+           * No toggle while the question is open. "more" would reveal the figure
+           * the reader has just been asked to produce, which would make the gate
+           * decorative rather than a gate.
+           */
+          <div className="flex w-full min-w-0 items-center">{summary}</div>
+        ) : (
+          <button
+            data-testid="coach-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((was) => !was)}
+            className="flex w-full min-w-0 items-center justify-between gap-2"
+          >
+            {summary}
+            <span className="shrink-0 font-mono text-[0.6rem] uppercase tracking-widest text-ivory/40">
+              {open ? "less ▴" : "more ▾"}
+            </span>
+          </button>
+        )}
 
-        {open &&
+        {!gated &&
+          open &&
           (narrow ? (
             /*
              * A phone has nowhere to float a panel to, so the expansion stays

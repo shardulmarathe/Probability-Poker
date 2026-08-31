@@ -34,7 +34,8 @@ import { Group, RADIUS } from "../ui";
 export const MIN_CALIBRATION_GUESSES = 3;
 
 const LABELS: Record<CalibrationKind, { name: string; concept: string }> = {
-  equity: { name: "Equity", concept: "monte-carlo" },
+  equity: { name: "Equity, on the concepts page", concept: "monte-carlo" },
+  "table-equity": { name: "Equity, at the table", concept: "monte-carlo" },
   "required-equity": { name: "The price a call needs", concept: "ev" },
 };
 

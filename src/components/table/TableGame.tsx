@@ -485,9 +485,15 @@ function TopBar({
       showHint={false}
       value={mode}
       onChange={onMode}
+      /* First word only, at every width this row renders at. A "fill" row
+         divides a fixed width between its labels, and "Fair Play" does not fit
+         the quarter it gets: it rendered as "Fair Pl..." from the narrow
+         breakpoint up to `lg`, which is the whole range this row exists in.
+         `TableChrome` reached the same conclusion for the app bar. The full
+         meaning is in `hint`, printed under the control that sets it. */
       options={TABLE_MODES.map((m) => ({
         value: m.id,
-        label: narrow ? m.name.split(" ")[0] : m.name,
+        label: m.name.split(" ")[0],
         hint: m.blurb,
       }))}
     />

@@ -45,7 +45,7 @@ import { ArchetypeCard } from "./Archetype";
 import { CalibrationCard } from "./Calibration";
 import { DemoBanner, DemoSessionButton } from "./DemoSession";
 import { getArchiveScope, setArchiveScope } from "./store";
-import { enqueueLeaks, saveQueue } from "../../lib/drillQueue";
+import { enqueueLeaks, queueSummary, saveQueue } from "../../lib/drillQueue";
 import type { DemoResult } from "../../poker/replay/demoSession";
 import {
   LeakByStreet,
@@ -111,6 +111,7 @@ export default function Profile() {
   const priced = useMemo(() => hands.slice(-EV_WINDOW), [hands]);
   const [session, setSession] = useState<SessionEvLoss | null>(null);
   const [pricing, setPricing] = useState(false);
+  const [drills, setDrills] = useState<{ total: number; due: number } | null>(null);
 
   // Off the first paint: the page is readable while this runs, and a stale
   // result can never be shown next to a newer archive because the key changes.
@@ -144,12 +145,17 @@ export default function Profile() {
          * and could not find the hand a demo seed points at.
          */
         if (!cancelled && getArchiveScope() === "player") {
-          saveQueue(
+          const queue = saveQueue(
             enqueueLeaks(
               result.hands.flatMap((h) => h.decisions),
               (handNumber) => seedOf.get(handNumber)
             )
           );
+          // Reported back on the page that filled it. The queue was being
+          // written silently, so a reader who had just been shown their named
+          // patterns had no way to know a drill existed, let alone that these
+          // were in it.
+          setDrills(queueSummary(queue));
         }
       } catch {
         // A single unpriceable hand must not take the page down with it.
@@ -420,6 +426,15 @@ export default function Profile() {
             <Group
               title="What you keep doing"
               lede="Named patterns, ranked by what the habit costs rather than by the worst single hand."
+              actions={
+                drills && drills.total > 0 ? (
+                  <ButtonLink to="/drill" size="sm" testId="to-drill">
+                    {drills.due > 0
+                      ? `Drill ${drills.due} of these`
+                      : `${drills.total} queued`}
+                  </ButtonLink>
+                ) : undefined
+              }
             >
               {session ? (
                 <LeakPatterns session={session} />

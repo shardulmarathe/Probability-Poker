@@ -82,8 +82,16 @@ export default function LearnPage() {
         />
 
         {/*
-         * `layout="scroll"`, because seven labels never fit a 390px row and a
-         * "fill" row would compress "EV, pot odds, fold equity" to an ellipsis.
+         * `layout="wrap"`. Seven labels never fit one row, and the two obvious
+         * answers both fail: "fill" divides a fixed width and compresses
+         * "EV, pot odds, fold equity" to an ellipsis, and "scroll" put three of
+         * the seven off the right edge with no affordance a reader would find.
+         * Measured at 833px, "Hand classes", "Multiway" and "Equilibrium" were
+         * 298px past the edge, so a third of the teaching content was
+         * unreachable unless somebody guessed to drag the row sideways.
+         * Wrapping costs a second row and reaches everything at every width,
+         * which on a page with no height lock is the cheap side of the trade.
+         *
          * No `showHint`: each concept prints its own one-line lede as the first
          * thing in its panel, which is where the review puts its tab blurbs too,
          * and a second copy pinned above the row would be prose the reader has
@@ -92,7 +100,7 @@ export default function LearnPage() {
         <div className="mt-5" data-testid="concept-selector">
           <Tabs
             label="Concepts"
-            layout="scroll"
+            layout="wrap"
             as="tabs"
             testIdPrefix="concept"
             value={active.id}

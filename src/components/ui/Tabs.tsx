@@ -133,7 +133,13 @@ export function Tabs<T extends string | number>({
       ? "min-w-0 flex-1 truncate"
       : layout === "scroll"
         ? "shrink-0"
-        : "min-w-[3rem] flex-1";
+        // A wrapping cell keeps its own width. `flex-1` divided the row between
+        // however many options there were, which is fine for the four or five
+        // short ones a setup field has and wrong for seven descriptive labels:
+        // each got a seventh of the row, every label broke over three or four
+        // lines, and the control became a 130px block. Natural widths wrap onto
+        // a second row instead and every label stays on one line.
+        : "min-w-[3rem] shrink-0";
 
   // Off the tray, an inactive control needs its own hairline to read as one.
   const idleBorder = layout === "fill" ? "transparent" : LINE.quiet;

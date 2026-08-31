@@ -37,11 +37,15 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: OG_OUT=public/og.png node scripts/capture-og.mjs
+      # The guard is a byte comparison and that is now sufficient: the capture
+      # runs with reduced motion, so an unchanged homepage produces an identical
+      # file. Before that it committed on every push, because the hero's cards
+      # are on a five second float and a fixed sleep caught them mid-flight.
       - name: Commit the screenshot if it changed
         run: |
           git add public/og.png
           if git diff --cached --quiet; then
-            echo "Screenshot unchanged — nothing to commit."
+            echo "Screenshot unchanged, nothing to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"

@@ -11,6 +11,19 @@ import {
   type TableSetup,
 } from "./tableOptions";
 import { BOT_PROFILES, type BuiltArchetype } from "../poker/model/profiles";
+import type { BotArchetype, BotProfile } from "../poker/table/contract";
+import { MIRROR_ID } from "../poker/model/mirror";
+
+/**
+ * The static roster read with a lineup's wider id type.
+ *
+ * `lineup` admits `mirror`, which has no row on purpose, so indexing needs to
+ * be able to come back undefined. The assertions below still demand a row: no
+ * path in this file seats a mirror, and that is the property being checked.
+ */
+const rosterRow = (id: BotArchetype) =>
+  (BOT_PROFILES as Record<string, BotProfile | undefined>)[id];
+
 
 describe("botsNeeded", () => {
   it("leaves a seat for the human", () => {
@@ -59,7 +72,7 @@ describe("fitLineup", () => {
     for (let n = 1; n <= MAX_SEATS; n++) {
       const filled = fitLineup([], n, 7);
       expect(filled).toHaveLength(n);
-      for (const id of filled) expect(BOT_PROFILES[id]).toBeDefined();
+      for (const id of filled) expect(rosterRow(id)).toBeDefined();
     }
   });
 
@@ -92,7 +105,7 @@ describe("normalizeSetup", () => {
       base({ lineup: ["rock", "ghost" as never, "maniac"], seatCount: 4 })
     );
     expect(setup.lineup).toHaveLength(3);
-    for (const id of setup.lineup) expect(BOT_PROFILES[id]).toBeDefined();
+    for (const id of setup.lineup) expect(rosterRow(id)).toBeDefined();
   });
 
   it("always produces exactly enough bots for the seats", () => {
@@ -154,7 +167,7 @@ describe("normalizeSetup", () => {
     );
     for (const id of s.lineup) {
       expect(Object.hasOwn(BOT_PROFILES, id)).toBe(true);
-      expect(typeof BOT_PROFILES[id].aggression).toBe("number");
+      expect(typeof rosterRow(id)!.aggression).toBe("number");
     }
   });
 
@@ -190,5 +203,36 @@ describe("startingStack", () => {
 describe("DEFAULT_SETUP", () => {
   it("is already normalized", () => {
     expect(normalizeSetup(DEFAULT_SETUP)).toEqual(DEFAULT_SETUP);
+  });
+});
+
+describe("the mirror is a legal lineup entry without a roster row", () => {
+  const base = (over: Partial<TableSetup>): TableSetup =>
+    ({ ...DEFAULT_SETUP, ...over }) as TableSetup;
+
+  it("survives normalisation even though BOT_PROFILES has no entry for it", () => {
+    // Its four numbers are measured per session, so a stored setup naming it is
+    // valid on a machine whose archive has since been cleared. `profileFor`
+    // then resolves it to the pure-EV baseline rather than throwing.
+    const setup = normalizeSetup(
+      base({ lineup: [MIRROR_ID, "tag"], seatCount: 3 })
+    );
+    expect(setup.lineup).toContain(MIRROR_ID);
+    expect(rosterRow(MIRROR_ID)).toBeUndefined();
+  });
+
+  it("still rejects a label that is neither the mirror nor a roster row", () => {
+    const setup = normalizeSetup(
+      base({ lineup: ["tag", "ghost" as never], seatCount: 3 })
+    );
+    expect(setup.lineup).not.toContain("ghost");
+  });
+
+  it("never invents a second mirror when filling a short lineup", () => {
+    // `fitLineup` fills from the static roster, so a table that asked for one
+    // mirrored seat gets exactly one.
+    const filled = fitLineup([MIRROR_ID], 5, 11);
+    expect(filled).toHaveLength(5);
+    expect(filled.filter((id) => id === MIRROR_ID)).toHaveLength(1);
   });
 });

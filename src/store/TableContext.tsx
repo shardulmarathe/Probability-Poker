@@ -47,6 +47,8 @@ import {
   type TableMode,
   type TableSetup as TableOptions,
 } from "../lib/tableOptions";
+import { MIRROR_ID, loadMirrorProfile } from "../lib/mirrorSeat";
+import type { BotProfile } from "../poker/table/contract";
 import {
   asyncTableDecider,
   closesAction,
@@ -862,10 +864,25 @@ export function TableProvider({ children }: { children: ReactNode }) {
    * through the refs and the decider never needs rebuilding when the memory
    * grows, which would otherwise throw away the worker pool mid-session.
    */
+  /*
+   * The mirrored seat's profile, read through a ref for the same reason `models`
+   * is: the decider is built once, and rebuilding it mid-session would throw
+   * away the worker pool. Read once rather than per decision, because a style
+   * measured from the archive cannot change while a hand is in progress, and a
+   * seat whose aggression shifted between two streets would not be a mirror of
+   * anything.
+   */
+  const mirrorRef = useRef<BotProfile | null>(loadMirrorProfile());
+
   const decide = useMemo(
     () =>
       asyncTableDecider({
         models: (seat) => seatModelsFor(heroRef.current, memoryRef.current)(seat),
+        // An unresolved label falls through to the static roster and then to the
+        // pure-EV baseline, so a `mirror` seat at a table with no measured style
+        // plays baseline poker rather than failing to deal.
+        profiles: (id) =>
+          id === MIRROR_ID ? (mirrorRef.current ?? undefined) : undefined,
       }),
     []
   );

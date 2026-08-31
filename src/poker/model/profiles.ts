@@ -25,16 +25,16 @@ import type { SizingOption, TableAction } from "../table/rules";
 // ---------------------------------------------------------------------------
 
 /**
- * Archetypes that exist as static parameters, which is currently all of them.
+ * Archetypes that exist as static parameters in this file.
  *
- * Kept as a distinct name from `BotArchetype` rather than collapsed into it: an
- * archetype whose parameters are derived from a played session rather than
- * written down here (a seat that mirrors the human's own learned profile, say)
- * would belong in `BotArchetype` and not in this set, and the roster below
- * would then fail to compile until it was handled rather than shipping half
- * built.
+ * `mirror` is excluded because it has none: its four numbers are measured from
+ * the player's own finished hands (`./mirror.ts`), so they do not exist until a
+ * session does. Everything that seats a roster, the setup panel's picker, the
+ * lineup shuffler, the what-if replay, is typed on this set rather than on
+ * `BotArchetype`, so none of them can offer a seat the roster cannot build. The
+ * mirror reaches the engine through `DeciderOptions.profiles` instead.
  */
-export type BuiltArchetype = BotArchetype;
+export type BuiltArchetype = Exclude<BotArchetype, "mirror">;
 
 /** Tightest to loosest. Order is the roster's display order. */
 export const BOT_ARCHETYPES: readonly BuiltArchetype[] = [

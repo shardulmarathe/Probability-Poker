@@ -26,7 +26,7 @@
  * controls off the screen; a hint attached to its own control is neither.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   MAX_SEATS,
@@ -39,11 +39,9 @@ import {
   type StackDepth,
   type TableSetup,
 } from "../lib/tableOptions";
-import {
-  BOT_ARCHETYPES,
-  BOT_PROFILES,
-  type BuiltArchetype,
-} from "../poker/model/profiles";
+import { BOT_ARCHETYPES, BOT_PROFILES } from "../poker/model/profiles";
+import type { BotArchetype, BotProfile } from "../poker/table/contract";
+import { MIRROR_ID, loadMirrorProfile } from "../lib/mirrorSeat";
 import { money } from "../lib/format";
 import type { TableSetupHandle } from "./setup/useTableSetup";
 import { Button, LINE, Panel, RADIUS, Rail, Reveal, Tabs } from "./ui";
@@ -91,8 +89,24 @@ const DEPTH_HINTS: Record<number, string> = {
  * derivation (take the last word) maps both "Tight Passive" and "Loose
  * Aggressive" onto their second word and loses the distinction that matters.
  */
-function shortName(id: BuiltArchetype): string {
-  return BOT_PROFILES[id].short;
+function shortName(id: BotArchetype, mirror: BotProfile | null): string {
+  return resolveProfile(id, mirror)?.short ?? "Baseline";
+}
+
+/**
+ * The roster plus the mirror, which has no roster row.
+ *
+ * Null for `mirror` when the archive cannot support one, and every caller here
+ * treats that as "not offerable" rather than substituting something: a seat
+ * labelled as the player's own style that is actually the pure-EV baseline is
+ * the one thing this option must never quietly become.
+ */
+function resolveProfile(
+  id: BotArchetype,
+  mirror: BotProfile | null
+): BotProfile | null {
+  if (id === MIRROR_ID) return mirror;
+  return (BOT_PROFILES as Record<string, BotProfile>)[id] ?? null;
 }
 
 /**
@@ -102,7 +116,7 @@ function shortName(id: BuiltArchetype): string {
  * ask about them: how many of us, how deep, how much is the interface telling
  * me, and who am I up against.
  */
-function describeSetup(setup: TableSetup): string {
+function describeSetup(setup: TableSetup, mirror: BotProfile | null): string {
   const mode = TABLE_MODES.find((m) => m.id === setup.mode);
   return [
     `${setup.seatCount} seats`,
@@ -111,12 +125,18 @@ function describeSetup(setup: TableSetup): string {
     // Only when true: an observer table has no seat for you, and that is not
     // something to discover after pressing the button that says "deal".
     ...(setup.observer ? ["you sit out"] : []),
-    setup.lineup.map(shortName).join(", "),
+    setup.lineup.map((id) => shortName(id, mirror)).join(", "),
   ].join(" · ");
 }
 
 export default function TableSetupPanel({ table }: { table: TableSetupHandle }) {
   const navigate = useNavigate();
+  /*
+   * Read once per mount. The archive only changes by playing hands, which this
+   * page cannot do, so re-reading on every render would be work for a value
+   * that cannot have moved.
+   */
+  const mirror = useMemo(() => loadMirrorProfile(), []);
   const { setup, update, setBot, randomise } = table;
   const [editing, setEditing] = useState(false);
 
@@ -140,7 +160,7 @@ export default function TableSetupPanel({ table }: { table: TableSetupHandle }) 
               data-testid="setup-summary"
               className="mt-1 font-mono text-[0.72rem] leading-relaxed text-ivory/65 sm:text-[0.78rem]"
             >
-              {describeSetup(setup)}
+              {describeSetup(setup, mirror)}
             </p>
           )}
         </div>
@@ -277,6 +297,7 @@ export default function TableSetupPanel({ table }: { table: TableSetupHandle }) 
                     key={i}
                     index={i}
                     value={id}
+                    mirror={mirror}
                     onChange={(next) => setBot(i, next)}
                   />
                 ))}
@@ -349,13 +370,15 @@ function Field({
 function BotPicker({
   index,
   value,
+  mirror,
   onChange,
 }: {
   index: number;
-  value: BuiltArchetype;
-  onChange: (id: BuiltArchetype) => void;
+  value: BotArchetype;
+  mirror: BotProfile | null;
+  onChange: (id: BotArchetype) => void;
 }) {
-  const profile = BOT_PROFILES[value];
+  const profile = resolveProfile(value, mirror);
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-2">
@@ -363,13 +386,13 @@ function BotPicker({
           className={`flex h-9 w-9 shrink-0 items-center justify-center border font-display text-[0.7rem] font-semibold tracking-tight ${RADIUS.control}`}
           style={{ borderColor: LINE.gold, background: "rgba(0,0,0,0.4)" }}
         >
-          {profile.monogram}
+          {profile?.monogram ?? "EV"}
         </span>
         <select
           data-testid={`bot-${index}`}
           aria-label={`Opponent ${index + 1}`}
           value={value}
-          onChange={(e) => onChange(e.target.value as BuiltArchetype)}
+          onChange={(e) => onChange(e.target.value as BotArchetype)}
           className={`min-h-[36px] w-full border px-2 py-1.5 font-display text-sm text-ivory outline-none transition focus:border-gold/60 ${RADIUS.control}`}
           style={{ borderColor: LINE.quiet, background: "rgba(0,0,0,0.5)" }}
         >
@@ -378,10 +401,22 @@ function BotPicker({
               {BOT_PROFILES[id].name}
             </option>
           ))}
+          {/*
+           * The mirror is offered only when the archive can actually build it.
+           * Listing it greyed out would invite the click that cannot be
+           * honoured, and listing it live would seat a bot claiming to be the
+           * player's style while playing the baseline.
+           */}
+          {mirror && (
+            <option value={MIRROR_ID} style={{ background: "#0b2218" }}>
+              {mirror.name} (you)
+            </option>
+          )}
         </select>
       </div>
       <p className="mt-1.5 font-cormorant text-[0.9rem] italic leading-snug text-ivory/55">
-        {profile.blurb}
+        {profile?.blurb ??
+          "Pure expected value: the style this seat falls back to when there is no measured one to copy."}
       </p>
     </div>
   );

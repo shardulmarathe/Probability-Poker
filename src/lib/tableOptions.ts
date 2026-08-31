@@ -14,6 +14,8 @@ import {
   type BuiltArchetype,
 } from "../poker/model/profiles";
 import { MAX_SEATS, MIN_SEATS } from "../poker/table/position";
+import type { BotArchetype } from "../poker/table/contract";
+import { MIRROR_ID } from "../poker/model/mirror";
 
 /**
  * How much the interface reveals while a hand is live.
@@ -95,8 +97,16 @@ export interface TableSetup {
   stackBb: StackDepth;
   smallBlind: number;
   bigBlind: number;
-  /** Bot archetypes filling every seat except the human's. */
-  lineup: BuiltArchetype[];
+  /**
+   * Archetypes filling every seat except the human's.
+   *
+   * Typed on `BotArchetype` rather than `BuiltArchetype` so `mirror` is a legal
+   * choice: it has no static row (see `poker/model/mirror.ts`) and is resolved
+   * per decision from the player's measured style. Everything that has to
+   * BUILD a roster still works from `BuiltArchetype`, which is why `fitLineup`
+   * fills gaps from the static set and never invents a second mirror.
+   */
+  lineup: BotArchetype[];
   mode: TableMode;
   /** No human seat, watch the bots play each other with cards face up. */
   observer: boolean;
@@ -125,10 +135,10 @@ export function botsNeeded(setup: {
  * so changing seat count does not silently discard a chosen table.
  */
 export function fitLineup(
-  lineup: BuiltArchetype[],
+  lineup: BotArchetype[],
   needed: number,
   seed: number
-): BuiltArchetype[] {
+): BotArchetype[] {
   if (lineup.length === needed) return lineup;
   if (lineup.length > needed) return lineup.slice(0, needed);
 
@@ -195,8 +205,12 @@ export function normalizeSetup(setup: TableSetup): TableSetup {
   // `hasOwn`, not `in`: `in` walks the prototype chain, so storage could name
   // "toString" and seat a bot whose parameters are all undefined.
   const lineup = Array.isArray(setup.lineup) ? setup.lineup : [];
-  const known = lineup.filter((id): id is BuiltArchetype =>
-    Object.hasOwn(BOT_PROFILES, id)
+  // `mirror` passes without a roster row on purpose: it is resolved per
+  // decision from measured stats, and a stored setup naming it is valid even on
+  // a machine whose archive has since been cleared. It then plays pure EV,
+  // which is what `profileFor` does with any label it cannot resolve.
+  const known = lineup.filter((id): id is BotArchetype =>
+    id === MIRROR_ID || Object.hasOwn(BOT_PROFILES, id)
   );
 
   return {

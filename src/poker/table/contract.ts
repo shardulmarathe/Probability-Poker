@@ -91,7 +91,17 @@ export type BotArchetype =
   | "maniac"
   | "tag"
   | "lag"
-  | "professor";
+  | "professor"
+  /**
+   * A seat playing the style measured from the player's own finished hands.
+   *
+   * Listed here and excluded from `BuiltArchetype`, because its four parameters
+   * are derived from a session rather than written down: see
+   * `../model/mirror.ts`. A decider resolves it through the `profiles` lookup in
+   * `DeciderOptions`; unresolved, it falls back to the pure-EV baseline like any
+   * other unknown label.
+   */
+  | "mirror";
 
 /**
  * A bot's playing style, expressed as parameters rather than code so each seat

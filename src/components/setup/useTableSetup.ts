@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useState } from "react";
+import type { BotArchetype } from "../../poker/table/contract";
 import {
   botsNeeded,
   fitLineup,
@@ -29,7 +30,7 @@ export interface TableSetupHandle {
   setup: TableSetup;
   /** Merge a patch, re-fit the lineup to the seat count, persist. */
   update: (patch: Partial<TableSetup>) => void;
-  setBot: (index: number, id: BuiltArchetype) => void;
+  setBot: (index: number, id: BotArchetype) => void;
   randomise: () => void;
 }
 
@@ -53,7 +54,7 @@ export function useTableSetup(): TableSetupHandle {
     });
   }, []);
 
-  const setBot = useCallback((index: number, id: BuiltArchetype) => {
+  const setBot = useCallback((index: number, id: BotArchetype) => {
     setSetupState((cur) => {
       const lineup = [...cur.lineup];
       lineup[index] = id;

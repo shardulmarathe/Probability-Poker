@@ -932,9 +932,32 @@ export function priceCall(
 // The decision
 // ---------------------------------------------------------------------------
 
-/** A seat's profile, defaulting to the pure-EV baseline for an unlabelled seat. */
-export function profileFor(id: string | undefined): BotProfile {
-  return (id ? findProfile(id) : undefined) ?? BOT_PROFILES.professor;
+/**
+ * Resolves a seat's profile label, for labels the static roster does not carry.
+ *
+ * Injected rather than imported for the same reason `SeatModels` is: the engine
+ * must not reach into session state, and a derived profile (the mirror, built
+ * from the player's own stats) only exists once there is a session to derive it
+ * from. Returning undefined for a label means "no opinion", and the static
+ * roster is consulted next.
+ */
+export type ProfileLookup = (id: string) => BotProfile | undefined;
+
+/**
+ * A seat's profile, defaulting to the pure-EV baseline for an unlabelled seat.
+ *
+ * Order matters: the injected lookup wins, so a caller can override a static
+ * row as well as supply a missing one, and an unresolved label still lands on
+ * the baseline rather than throwing. A seat labelled `mirror` at a table with no
+ * measured style therefore plays pure EV, which is the honest reading of "we do
+ * not know how you play yet".
+ */
+export function profileFor(
+  id: string | undefined,
+  lookup?: ProfileLookup
+): BotProfile {
+  if (!id) return BOT_PROFILES.professor;
+  return lookup?.(id) ?? findProfile(id) ?? BOT_PROFILES.professor;
 }
 
 const isAggressive = (a: TableAction) => a.type === "bet" || a.type === "raise";
@@ -963,7 +986,8 @@ function finish(
   equity: MultiwayEquity,
   foldEquitySims: number,
   ranges: Record<number, Range>,
-  models: SeatModels
+  models: SeatModels,
+  profiles?: ProfileLookup
 ): BotDecision {
   const actions = legalActions(state, seat, config);
   if (actions.length === 0) {
@@ -974,7 +998,7 @@ function finish(
   const potBefore = state.pot;
   const toCall = toCallOf(state, seat);
   const evs = evByAction(actions, equity, potBefore, toCall);
-  const profile = profileFor(hero.profile);
+  const profile = profileFor(hero.profile, profiles);
   const sizings = sizingLadder(state, seat, config);
 
   const base = actions.find(isAggressive);
@@ -1073,6 +1097,12 @@ export interface DeciderOptions {
    * what this file did before the model was learnable at all.
    */
   models?: SeatModels;
+  /**
+   * Profiles for labels the static roster does not carry, chiefly `mirror`.
+   * Unset means the roster alone, which is every table the engine's own tests
+   * build.
+   */
+  profiles?: ProfileLookup;
 }
 
 /**
@@ -1103,7 +1133,8 @@ export function tableDecider(options: DeciderOptions = {}): SyncBotDecider {
       equity,
       foldEquityBudget(options),
       request.ranges ?? {},
-      models
+      models,
+      options.profiles
     );
   };
 }
@@ -1129,7 +1160,8 @@ export function asyncTableDecider(options: DeciderOptions = {}): BotDecider {
       equity,
       foldEquityBudget(options),
       request.ranges ?? {},
-      models
+      models,
+      options.profiles
     );
   };
 }

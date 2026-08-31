@@ -44,6 +44,7 @@ const NAV = [
   { to: "/profile", label: "Profile" },
   // Where you go to learn the maths itself, rather than to see what one hand
   // did. Last, because it is the only one that does not need a hand first.
+  { to: "/drill", label: "Drill" },
   { to: "/learn", label: "Learn" },
 ];
 

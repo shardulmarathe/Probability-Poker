@@ -66,7 +66,7 @@ const chips = (value: number): string => {
  * `why` is one sentence and states the rule that was broken, not the chips it
  * cost. The cost is already in the row.
  */
-const LEAK_COPY: Record<
+export const LEAK_COPY: Record<
   LeakKind,
   { label: string; concept: ConceptId; why: string }
 > = {

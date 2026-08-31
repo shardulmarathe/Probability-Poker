@@ -83,7 +83,19 @@ type SeatState = "idle" | "active" | "allin" | "folded";
  * as the bots rather than falling back to a person glyph.
  */
 const MONOGRAM = "font-display font-semibold tracking-tight text-ivory/85";
-const HUMAN_MONOGRAM = "YOU";
+
+/**
+ * What an opponent's chip says when its profile could not be resolved.
+ *
+ * A bot seat can legitimately have no profile: `mirror` is resolved per decision
+ * from the player's measured style, and there may not be one, in which case
+ * `profileFor` falls the seat through to the pure-EV baseline. So the absence of
+ * a profile does not mean "this is the human", and the two opponent skins must
+ * not read it that way: they did, and a mirrored seat with no measured style sat
+ * at the table wearing the human's own mark. The hero's own chip is not drawn at
+ * all, because its name is already "You" on the line beside it.
+ */
+const BASELINE_MONOGRAM = "EV";
 
 function seatState(seat: TableSeat, active: boolean): SeatState {
   if (seat.status === "folded" || seat.status === "out") return "folded";
@@ -460,7 +472,7 @@ function FullSeat({
             className={`pp-avatar flex h-8 w-8 items-center justify-center rounded-full border text-[0.6rem] ${MONOGRAM}`}
             style={avatarStyle(state, won)}
           >
-            {profile?.monogram ?? HUMAN_MONOGRAM}
+            {profile?.monogram ?? BASELINE_MONOGRAM}
           </span>
           <Badge label={position} tone={position === "BTN" ? "dealer" : "blind"} />
         </div>
@@ -528,7 +540,7 @@ function CompactSeat({ seat, position, profile, reveal, won, state, settled }: S
         }`}
         style={avatarStyle(state, won)}
       >
-        {profile?.monogram ?? HUMAN_MONOGRAM}
+        {profile?.monogram ?? BASELINE_MONOGRAM}
       </span>
       <span className="mt-0.5 flex items-center gap-1">
         <Badge label={position} tone={position === "BTN" ? "dealer" : "quiet"} />

@@ -256,22 +256,32 @@ const TableContext = createContext<TableContextValue | null>(null);
  * Seat names, deduplicated. The picker allows the same archetype twice, and two
  * seats both called "Hyper-Aggressive" is unreadable at a glance.
  */
-function seatNames(profiles: string[]): string[] {
+function seatNames(profiles: string[], mirror: BotProfile | null): string[] {
   const seen = new Map<string, number>();
   return profiles.map((id) => {
-    const base = BOT_PROFILES[id as keyof typeof BOT_PROFILES]?.name ?? "Bot";
+    // `mirror` has no roster row, and when it cannot be built the seat really is
+    // playing the baseline, so it is named for what it plays rather than for
+    // what it was asked to be.
+    const base =
+      id === MIRROR_ID
+        ? (mirror?.name ?? BOT_PROFILES.professor.name)
+        : (BOT_PROFILES[id as keyof typeof BOT_PROFILES]?.name ?? "Bot");
     const n = (seen.get(base) ?? 0) + 1;
     seen.set(base, n);
     return n === 1 ? base : `${base} ${n}`;
   });
 }
 
-function buildTable(options: TableOptions, seed?: number): Table {
+function buildTable(
+  options: TableOptions,
+  seed?: number,
+  mirror: BotProfile | null = null
+): Table {
   const lineup = [...options.lineup];
   // A lineup shorter than the table (corrupt storage, an older saved setup)
   // still has to seat everyone; the pure-EV baseline is the honest filler.
   while (lineup.length < options.seatCount) lineup.push("professor");
-  const names = seatNames(lineup);
+  const names = seatNames(lineup, mirror);
 
   const seats: SeatSetup[] = [];
   if (!options.observer) seats.push({ name: "You", kind: "human" });
@@ -842,7 +852,9 @@ function priceDrill(
 
 export function TableProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<TableOptions>(loadSetup);
-  const [table, setTable] = useState<Table>(() => buildTable(loadSetup()));
+  const [table, setTable] = useState<Table>(() =>
+    buildTable(loadSetup(), undefined, loadMirrorProfile())
+  );
   const [history, setHistory] = useState<TableHandReport[]>([]);
 
   // What the bots have learned about this player. Read on every decision,
@@ -1327,7 +1339,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
         setOptions(next);
         setHistory([]);
         runExclusive(async () => {
-          const fresh = buildTable(next);
+          const fresh = buildTable(next, undefined, mirrorRef.current);
           startHand(fresh);
           await beginHand(fresh);
         });

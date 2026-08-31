@@ -7,7 +7,7 @@
   "routes": [
     { "handle": "filesystem" },
     { "src": "^/$", "dest": "/index.html" },
-    { "src": "^/(?:table|profile|learn)/?$", "dest": "/index.html" },
+    { "src": "^/(?:table|profile|learn|drill)/?$", "dest": "/index.html" },
     { "src": "^/(?:review|replay)(?:/[^/]+)?/?$", "dest": "/index.html" },
     { "src": "^/.*$", "status": 404, "dest": "/index.html" }
   ]

@@ -23,6 +23,7 @@ const TableGame = lazy(() => import("./components/table/TableGame"));
 const HandReview = lazy(() => import("./components/report/HandReview"));
 const Profile = lazy(() => import("./components/profile/Profile"));
 const ReplayPage = lazy(() => import("./components/profile/ReplayPage"));
+const DrillPage = lazy(() => import("./components/drill/DrillPage"));
 
 export default function App() {
   return (
@@ -88,6 +89,9 @@ export default function App() {
               <Route path="/review" element={<HandReview />} />
               <Route path="/review/:handNumber" element={<HandReview />} />
               <Route path="/profile" element={<Profile />} />
+              {/* Inside the provider group so it shares one archive recorder:
+                  a drill reads the same stored hands the profile priced. */}
+              <Route path="/drill" element={<DrillPage />} />
               {/* Replays are addressed by deal seed: hand numbers restart with
                   every new table, seeds do not. */}
               <Route path="/replay" element={<ReplayPage />} />

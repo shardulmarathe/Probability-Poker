@@ -45,6 +45,7 @@ import { ArchetypeCard } from "./Archetype";
 import { CalibrationCard } from "./Calibration";
 import { DemoBanner, DemoSessionButton } from "./DemoSession";
 import { getArchiveScope, setArchiveScope } from "./store";
+import { enqueueLeaks, saveQueue } from "../../lib/drillQueue";
 import type { DemoResult } from "../../poker/replay/demoSession";
 import {
   LeakByStreet,
@@ -125,6 +126,31 @@ export default function Profile() {
       try {
         const result = analyzeHands(priced, seat);
         if (!cancelled) setSession(result);
+        /*
+         * Queue every priced mistake for the drill page.
+         *
+         * Here rather than behind a button because the analysis is the only
+         * place the priced decisions exist, and asking the reader to press
+         * "add these to my drills" is asking them to opt into the thing the
+         * page just told them they need. `enqueueLeaks` is idempotent on
+         * (seed, index) and leaves an existing item's schedule alone, which is
+         * what makes it safe to run on every visit.
+         *
+         * The player scope only. The demo's sixty hands come from a scripted
+         * driver, and they are namespaced away from the archive for exactly this
+         * reason: they are not how the reader plays. Queueing them would fill
+         * the drill page with somebody else's mistakes, and the drill page
+         * would then prune them all anyway, because it reads the player archive
+         * and could not find the hand a demo seed points at.
+         */
+        if (!cancelled && getArchiveScope() === "player") {
+          saveQueue(
+            enqueueLeaks(
+              result.hands.flatMap((h) => h.decisions),
+              (handNumber) => seedOf.get(handNumber)
+            )
+          );
+        }
       } catch {
         // A single unpriceable hand must not take the page down with it.
         if (!cancelled) setSession(null);

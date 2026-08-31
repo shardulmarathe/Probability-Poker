@@ -1,11 +1,18 @@
 import { defineConfig } from "vitest/config";
 
-// Pure-logic tests only, no DOM, no React. Kept deliberately separate from
-// vite.config.ts so the app build never pulls in test configuration.
+// Node by default: almost every suite here is pure logic against a seeded
+// engine or a fake storage object, and a DOM would be setup cost for nothing.
+// The handful of component suites opt in per file with
+//
+//     // @vitest-environment jsdom
+//
+// at the top, which keeps jsdom off the ~35 files that do not need it rather
+// than making every test pay for the four that do. Kept deliberately separate
+// from vite.config.ts so the app build never pulls in test configuration.
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     // The slow tests are the engine self-play runs: they play real hands with
     // the bot deciding at production sim counts. 30s fails fast on a hang and
     // covers everything except the equity-ladder audit in

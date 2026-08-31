@@ -59,6 +59,7 @@ import {
   tableDecider,
   uncontestedEquity,
 } from "./decider";
+import { BOT_PROFILES } from "./profiles";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -1502,5 +1503,81 @@ describe("injecting a learned model", () => {
     expect(Array.from(after[2])).toEqual(Array.from(before[2]));
     expect(Array.from(after[3])).toEqual(Array.from(before[3]));
     expect(Array.from(after[0])).not.toEqual(Array.from(before[0]));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resolving a profile the roster does not carry
+// ---------------------------------------------------------------------------
+//
+// `mirror` is the reason `DeciderOptions.profiles` exists: its four numbers are
+// measured from a played session, so the static roster cannot hold a row for it
+// (`./mirror.ts`). These tests pin the resolution order, because getting it
+// wrong is silent: a seat labelled as one style while playing another looks
+// exactly like a seat playing the style it claims.
+
+describe("profileFor", () => {
+  it("falls back to the pure-EV baseline for a label nobody resolves", () => {
+    expect(profileFor("mirror").id).toBe("professor");
+    expect(profileFor("nonsense").id).toBe("professor");
+    expect(profileFor(undefined).id).toBe("professor");
+  });
+
+  it("prefers an injected lookup over the static roster", () => {
+    // Override as well as supply: a caller that can only fill gaps cannot swap a
+    // roster row out for a measured one, which is what a mirror of a nit is.
+    const loud = { ...BOT_PROFILES.maniac, id: "tag" as const };
+    expect(profileFor("tag").aggression).toBe(BOT_PROFILES.tag.aggression);
+    expect(profileFor("tag", () => loud).aggression).toBe(
+      BOT_PROFILES.maniac.aggression
+    );
+  });
+
+  it("treats an undefined lookup result as no opinion, not as an answer", () => {
+    expect(profileFor("station", () => undefined).id).toBe("station");
+    expect(profileFor("mirror", () => undefined).id).toBe("professor");
+  });
+});
+
+describe("a seat whose profile comes from the lookup", () => {
+  it("is priced with the injected parameters, not the baseline's", () => {
+    // The observable difference is the decision itself. A mirror carrying the
+    // maniac's parameters must play the maniac's game, or the injection is
+    // decorative.
+    const table = dealt(["mirror", "tag", "station"]);
+    const seat = table.toAct as number;
+
+    const baseline = tableDecider({ simulations: 400 })(table, seat, table.config);
+    const asManiac = tableDecider({
+      simulations: 400,
+      profiles: (id) =>
+        id === "mirror" ? { ...BOT_PROFILES.maniac, id: "mirror" as never } : undefined,
+    })(table, seat, table.config);
+
+    // Same spot, same seed, same sim budget: the EV table is identical because
+    // the profile bends the choice rather than the pricing.
+    expect(asManiac.evByAction).toEqual(baseline.evByAction);
+    // And the recorded profile is the label, so the review can say which seat
+    // this was without the roster having a row for it.
+    expect(asManiac.profile).toBe("mirror");
+  });
+
+  it("records the label rather than what it resolved to", () => {
+    const table = dealt(["mirror", "tag"]);
+    const seat = table.toAct as number;
+    const decision = tableDecider({
+      simulations: 400,
+      profiles: (id) =>
+        id === "mirror" ? { ...BOT_PROFILES.nit, id: "mirror" as never } : undefined,
+    })(table, seat, table.config);
+    expect(decision.profile).toBe("mirror");
+  });
+
+  it("deals a hand out with an unresolvable mirror rather than throwing", () => {
+    // A stored setup can name `mirror` on a machine whose archive has since been
+    // cleared. That must be a table, not a white screen.
+    const table = dealt(["mirror", "mirror", "tag"]);
+    const seat = table.toAct as number;
+    expect(() => FAST(table, seat, table.config)).not.toThrow();
   });
 });

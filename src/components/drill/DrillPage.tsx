@@ -122,7 +122,19 @@ const chips = (value: number): string => {
 
 export default function DrillPage() {
   const [queue, setQueue] = useState<DrillQueue>(() => loadQueue());
-  const [answered, setAnswered] = useState<Answer | null>(null);
+  /**
+   * The answer given, and the spot it was given about.
+   *
+   * The spot is held here rather than read from `spot` while the verdict is up.
+   * Answering advances the queue, `spot` recomputes to the next due item, and a
+   * verdict rendered from it scored the reader's answer against a different
+   * hand: answer a big blind spot with nothing to call, read a verdict about an
+   * under-the-gun spot facing a raise. Freezing the pair is what makes the
+   * verdict about the question that was asked.
+   */
+  const [answered, setAnswered] = useState<{ choice: Answer; spot: Spot } | null>(
+    null
+  );
 
   const reports = useMemo(() => loadArchive().hands, []);
 
@@ -155,7 +167,7 @@ export default function DrillPage() {
   const answer = useCallback(
     (choice: Answer) => {
       if (!spot || answered) return;
-      setAnswered(choice);
+      setAnswered({ choice, spot });
       setQueue((current) =>
         saveQueue(recordAttempt(spot.item, choice === correctAnswer(spot.decision), current))
       );
@@ -166,7 +178,13 @@ export default function DrillPage() {
   const advance = useCallback(() => setAnswered(null), []);
 
   const summary = queueSummary(queue);
-  const decision = spot?.decision;
+  /*
+   * What the page is currently about. The frozen spot while a verdict is up,
+   * the next due one otherwise, so the question, the cards and the verdict are
+   * always the same hand.
+   */
+  const shown = answered?.spot ?? spot;
+  const decision = shown?.decision;
 
   return (
     <main className="relative text-ivory" data-testid="drill" data-due={summary.due}>
@@ -213,20 +231,36 @@ export default function DrillPage() {
           </div>
         ) : (
           <div className="mt-7 flex flex-col gap-5">
-            {/* ------------------------- The spot ------------------------- */}
+            {/* -------------------------- The spot -------------------------
+             *
+             * While a verdict is up this is the spot that was answered, not the
+             * one queued next. Answering advances the queue, so reading it live
+             * swapped the board and the cards out from under the verdict.
+             */}
             <Group
               title={`${decision!.street[0].toUpperCase()}${decision!.street.slice(1)}, ${decision!.position}`}
               lede={`${decision!.opponentCount} opponent${
                 decision!.opponentCount === 1 ? "" : "s"
-              } in the pot. Hand #${decision!.handNumber}, dealt from ${spot.item.seed}.`}
+              } in the pot. Hand #${decision!.handNumber}, dealt from ${shown!.item.seed}.`}
             >
               <div className="flex flex-col gap-3">
+                {/*
+                 * `md`, the size this repo uses for cards the reader is meant
+                 * to study rather than glance at. These are the whole question:
+                 * at the default they were the smallest thing on a page whose
+                 * only job is to be read and answered.
+                 */}
                 <CardRow
                   label="Board"
-                  cards={boardAt(spot.report, decision!)}
+                  cards={boardAt(shown!.report, decision!)}
+                  size="md"
                   empty="Pre-flop, no board yet"
                 />
-                <CardRow label="You hold" cards={holeOf(spot.report, decision!.seat)} />
+                <CardRow
+                  label="You hold"
+                  cards={holeOf(shown!.report, decision!.seat)}
+                  size="md"
+                />
                 <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[0.72rem] text-ivory/55">
                   <span>pot {money(decision!.potBefore)}</span>
                   <span>
@@ -269,9 +303,9 @@ export default function DrillPage() {
               </Group>
             ) : (
               <Verdict
-                decision={decision!}
-                seed={spot.item.seed}
-                chose={answered}
+                decision={answered.spot.decision}
+                seed={answered.spot.item.seed}
+                chose={answered.choice}
                 onNext={advance}
                 hasNext={nextDrill(queue) !== null}
               />

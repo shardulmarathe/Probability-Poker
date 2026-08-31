@@ -84,7 +84,8 @@ export interface ProfileView extends ProfileArchive {
   setSeat: (seat: number) => void;
   /** Widest table in the archive, how many seats the picker offers. */
   seatCount: number;
-  seatName: (seat: number) => string;
+  /** `handSeatCount` defaults to the archive's widest table. */
+  seatName: (seat: number, handSeatCount?: number) => string;
   reset: () => void;
   /** Re-read the archive after something outside this hook wrote to it. */
   refresh: () => void;
@@ -137,11 +138,17 @@ export function useProfileArchive(): ProfileView {
   const seat = Math.max(0, Math.min(seatCount - 1, seatOverride ?? defaultSeat));
 
   const seatName = useCallback(
-    (id: number) => {
+    (id: number, handSeatCount: number = seatCount) => {
       // Names are a property of the table, not of a hand, so they are only
       // trustworthy for a table of the same size as the one sitting now.
+      //
+      // Which table to measure against depends on the caller. A page reading
+      // one hand should pass that hand's seat count, the way the hand review
+      // does; the default is the archive's widest table, which is the only
+      // honest answer for the profile's own aggregates because they span every
+      // hand at once.
       const live = table.seats[id];
-      if (live && table.seats.length === seatCount) return live.name;
+      if (live && table.seats.length === handSeatCount) return live.name;
       return id === (heroSeat ?? 0) ? "You" : `Seat ${id + 1}`;
     },
     [table.seats, seatCount, heroSeat]

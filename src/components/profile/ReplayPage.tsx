@@ -26,7 +26,7 @@
  * than only the selected one's.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { money } from "../../lib/format";
 import { replayHand } from "../../poker/replay";
@@ -71,23 +71,31 @@ export default function ReplayPage() {
 
   const config = useMemo(() => ({ smallBlind, bigBlind }), [smallBlind, bigBlind]);
 
-  // Hands are addressed by deal seed below, so the seat count is known before
-  // the report is; `seatCount` here is the archive's widest table, which is all
-  // `seatName` needs. Names go into the replay table itself so the engine's own
-  // narration ("Tight Aggressive raises to $40") matches the seats on screen.
-  const options = useMemo(
-    () => ({
-      config,
-      seats: Array.from({ length: 6 }, (_, i) => ({ name: seatName(i) })),
-    }),
-    [config, seatName]
-  );
-
   // Hands are addressed by deal seed, not hand number: numbers restart at 1 for
   // every new table, so a link to "#3" would mean a different hand tomorrow.
   const requested = params.seed ? Number(params.seed) : undefined;
   const report =
     hands.find((h) => h.seed === requested) ?? hands[hands.length - 1] ?? null;
+
+  // This page reads one hand, so it names seats against that hand's table, the
+  // same rule the hand review uses. Left to its default `seatName` measures
+  // against the archive's widest table instead, and a single six-handed hand in
+  // the archive then strips the names off every four-handed replay while the
+  // review of the very same hand still shows them.
+  const nameFor = useCallback(
+    (id: number) => seatName(id, report?.seatCount),
+    [seatName, report?.seatCount]
+  );
+
+  // Names go into the replay table itself so the engine's own narration
+  // ("Tight Aggressive raises to $40") matches the seats on screen.
+  const options = useMemo(
+    () => ({
+      config,
+      seats: Array.from({ length: 6 }, (_, i) => ({ name: nameFor(i) })),
+    }),
+    [config, nameFor]
+  );
 
   const replay = useMemo(
     () => (report ? replayHand(report, options) : null),
@@ -143,7 +151,7 @@ export default function ReplayPage() {
               Hand #{report.handNumber}: {report.seatCount}-handed, dealt from
               seed {report.seed}.
               {mine
-                ? ` ${seatName(seat)} netted ${mine.net >= 0 ? `+${money(mine.net)}` : `−${money(-mine.net)}`}.`
+                ? ` ${nameFor(seat)} netted ${mine.net >= 0 ? `+${money(mine.net)}` : `−${money(-mine.net)}`}.`
                 : ""}
             </>
           }
@@ -261,7 +269,7 @@ export default function ReplayPage() {
               button={report.button}
               seatCount={report.seatCount}
               focus={seat}
-              seatName={seatName}
+              seatName={nameFor}
             />
           )}
 
@@ -270,7 +278,7 @@ export default function ReplayPage() {
               report={report}
               options={options}
               seat={seat}
-              seatName={seatName}
+              seatName={nameFor}
             />
           )}
 
@@ -279,7 +287,7 @@ export default function ReplayPage() {
               report={report}
               options={options}
               seat={seat}
-              seatName={seatName}
+              seatName={nameFor}
             />
           )}
         </div>

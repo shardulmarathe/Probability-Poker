@@ -178,6 +178,42 @@ describe("with a real mistake queued", () => {
   });
 });
 
+describe("the verdict is about the question that was asked", () => {
+  it("keeps the answered hand on screen rather than the next one", () => {
+    // Answering advances the queue. Reading the spot live meant the board, the
+    // cards and the priced lines all swapped to the next drill the moment an
+    // answer landed, so a big blind spot with nothing to call could be answered
+    // and an under-the-gun spot facing a raise verdicted. Every one of the tests
+    // above passed while that was true, because none of them looked at which
+    // hand the verdict was about.
+    const { reports, seat } = realSession();
+    seedArchive(reports, seat);
+    queueFrom(reports, seat);
+
+    draw();
+    const askedHand = (document.body.textContent ?? "").match(/Hand #(\d+)/)?.[1];
+    expect(askedHand).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("drill-passive"));
+
+    const verdictHand = (document.body.textContent ?? "").match(/Hand #(\d+)/)?.[1];
+    expect(verdictHand).toBe(askedHand);
+  });
+
+  it("moves on only when asked to", () => {
+    const { reports, seat } = realSession();
+    seedArchive(reports, seat);
+    if (queueFrom(reports, seat) < 2) return; // needs a second spot to move to
+    draw();
+    const first = (document.body.textContent ?? "").match(/Hand #(\d+)/)?.[1];
+    fireEvent.click(screen.getByTestId("drill-fold"));
+    expect((document.body.textContent ?? "").match(/Hand #(\d+)/)?.[1]).toBe(first);
+    fireEvent.click(screen.getByTestId("drill-next"));
+    // Now the question is back, and it is a different spot.
+    expect(screen.getByTestId("drill-fold")).toBeTruthy();
+  });
+});
+
 describe("a queued spot whose hand has left the archive", () => {
   it("is dropped rather than asked about forever", () => {
     // The archive is capped, so an item can outlive the hand it points at.
